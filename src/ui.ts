@@ -107,26 +107,108 @@ function getGradientColor(t: number): [number, number, number] {
 }
 
 /**
- * Print the SPECIFY banner with true color gradient.
+ * Print the SPECIFY banner with animated reveal and true color gradient.
+ * Characters appear in a wave from left to right, then settle into the final gradient.
  */
-export function printBanner(): void {
-  console.log();
+export async function printBanner(): Promise<void> {
+  const totalCols = BANNER_LINES[0].length;
+  const totalRows = BANNER_LINES.length;
 
-  for (let lineIdx = 0; lineIdx < BANNER_LINES.length; lineIdx++) {
+  // Build the final colored lines
+  const finalLines: string[] = [];
+  for (let lineIdx = 0; lineIdx < totalRows; lineIdx++) {
     const line = BANNER_LINES[lineIdx];
-    const lineT = BANNER_LINES.length > 1 ? lineIdx / (BANNER_LINES.length - 1) : 0;
-
-    // Vertical gradient: shift the horizontal gradient based on line position
-    const startT = lineT * 0.3; // Offset start
-    const endT = 0.7 + lineT * 0.3; // Offset end
-
+    const lineT = totalRows > 1 ? lineIdx / (totalRows - 1) : 0;
+    const startT = lineT * 0.3;
+    const endT = 0.7 + lineT * 0.3;
     const startColor = getGradientColor(startT);
     const endColor = getGradientColor(endT);
-
-    console.log(renderGradientLine(line, startColor, endColor));
+    finalLines.push(renderGradientLine(line, startColor, endColor));
   }
 
-  console.log();
+  // Check if stdout is a TTY — skip animation if piped/redirected
+  const isTTY = process.stdout.isTTY ?? false;
+  if (!isTTY) {
+    console.log();
+    for (const line of finalLines) console.log(line);
+    console.log();
+    return;
+  }
+
+  const write = (s: string) => process.stdout.write(s);
+  const HIDE_CURSOR = '\x1b[?25l';
+  const SHOW_CURSOR = '\x1b[?25h';
+  const MOVE_UP = (n: number) => `\x1b[${n}A`;
+  const CLEAR_LINE = '\x1b[2K\r';
+
+  write(HIDE_CURSOR);
+  write('\n');
+
+  // Print empty lines as placeholders
+  for (let i = 0; i < totalRows; i++) write('\n');
+
+  const FRAMES = 20;
+  const FRAME_MS = 25;
+
+  for (let frame = 0; frame <= FRAMES; frame++) {
+    // Move cursor back up to first banner line
+    write(MOVE_UP(totalRows));
+
+    const revealCol = Math.floor((frame / FRAMES) * (totalCols + 8));
+
+    for (let lineIdx = 0; lineIdx < totalRows; lineIdx++) {
+      write(CLEAR_LINE);
+      const line = BANNER_LINES[lineIdx];
+      const lineT = totalRows > 1 ? lineIdx / (totalRows - 1) : 0;
+      const startT = lineT * 0.3;
+      const endT = 0.7 + lineT * 0.3;
+      const startColor = getGradientColor(startT);
+      const endColor = getGradientColor(endT);
+
+      // Stagger: lower rows reveal slightly later
+      const rowDelay = lineIdx * 2;
+      const effectiveReveal = revealCol - rowDelay;
+
+      let result = '';
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === ' ') {
+          result += ' ';
+          continue;
+        }
+        if (i > effectiveReveal) {
+          result += ' ';
+          continue;
+        }
+
+        const t = line.length > 1 ? i / (line.length - 1) : 0;
+
+        if (i > effectiveReveal - 4 && frame < FRAMES) {
+          // Leading edge: bright white flash
+          const flash = 1 - ((effectiveReveal - i) / 4);
+          const [gr, gg, gb] = lerpColor(startColor, endColor, t);
+          const fr = Math.min(255, Math.round(gr + (255 - gr) * flash));
+          const fg = Math.min(255, Math.round(gg + (255 - gg) * flash));
+          const fb = Math.min(255, Math.round(gb + (255 - gb) * flash));
+          const color = rgbToHex(fr, fg, fb);
+          result += new Style().foreground(color).bold(true).render(char);
+        } else {
+          // Settled: final gradient color
+          const [r, g, b] = lerpColor(startColor, endColor, t);
+          const color = rgbToHex(r, g, b);
+          result += new Style().foreground(color).bold(true).render(char);
+        }
+      }
+      write(result + '\n');
+    }
+
+    if (frame < FRAMES) {
+      await new Promise(resolve => setTimeout(resolve, FRAME_MS));
+    }
+  }
+
+  write(SHOW_CURSOR);
+  write('\n');
 }
 
 // ============================================================================

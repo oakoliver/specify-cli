@@ -319,7 +319,7 @@ This constitution supersedes all other practices. Amendments require documentati
  */
 export async function init(options: InitCommandOptions = {}): Promise<boolean> {
   // Print banner
-  printBanner();
+  await printBanner();
   console.log();
 
   // Validate options

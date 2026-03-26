@@ -168,7 +168,7 @@ function checkProjectStructure(projectRoot: string): CheckResult[] {
  * Run all checks and report results.
  */
 export async function check(): Promise<boolean> {
-  printBanner();
+  await printBanner();
   console.log();
   console.log(titleStyle.render('Checking project setup...'));
   console.log();

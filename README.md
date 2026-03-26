@@ -32,7 +32,259 @@ specify check
 
 Spec-Driven Development (SDD) is a methodology where every feature starts as a specification before any code is written. This ensures clarity, alignment, and systematic implementation — especially powerful when working with AI coding agents.
 
-### The Flow
+### Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph Foundation["Foundation Layer"]
+        CONST[".specify/memory/constitution.md<br/>Project Principles & Guidelines"]
+        TEMPLATES["Templates<br/>spec, plan, tasks, checklist"]
+        EXTENSIONS[".specify/extensions.yml<br/>Custom Commands & Hooks"]
+    end
+
+    subgraph Commands["9 Slash Commands"]
+        direction LR
+        CONSTITUTION["/speckit.constitution"]
+        SPECIFY["/speckit.specify"]
+        PLAN["/speckit.plan"]
+        TASKS["/speckit.tasks"]
+        IMPLEMENT["/speckit.implement"]
+        CLARIFY["/speckit.clarify"]
+        ANALYZE["/speckit.analyze"]
+        CHECKLIST["/speckit.checklist"]
+        ISSUES["/speckit.taskstoissues"]
+    end
+
+    subgraph Artifacts["Generated Artifacts"]
+        SPEC["spec.md"]
+        PLANMD["plan.md + research.md<br/>+ data-model.md"]
+        TASKSMD["tasks.md"]
+        CODE["Code + Tests"]
+        CHECKS["checklists/*.md"]
+    end
+
+    CONST --> Commands
+    TEMPLATES --> Commands
+    EXTENSIONS -.->|hooks| Commands
+
+    CONSTITUTION --> CONST
+    SPECIFY --> SPEC
+    PLAN --> PLANMD
+    TASKS --> TASKSMD
+    IMPLEMENT --> CODE
+    CHECKLIST --> CHECKS
+
+    CLARIFY -.->|refines| SPEC
+    CLARIFY -.->|refines| PLANMD
+    ANALYZE -.->|informs| SPEC
+    ISSUES -.->|exports| TASKSMD
+```
+
+### Complete Workflow Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as Developer
+    participant CLI as specify CLI
+    participant Agent as AI Agent
+    participant Const as Constitution
+    participant Ext as Extensions
+    participant FS as File System
+
+    Note over Dev,FS: PHASE 0: Project Setup
+
+    Dev->>CLI: specify init my-project --ai claude
+    CLI->>FS: Create .specify/ structure
+    CLI->>FS: Copy templates (spec, plan, tasks, checklist)
+    CLI->>FS: Create constitution-template.md
+    CLI->>FS: Install bash scripts
+    CLI->>FS: Register agent commands (.claude/commands/)
+    CLI-->>Dev: Project initialized
+
+    Note over Dev,FS: PHASE 1: Constitution (Optional but Recommended)
+
+    Dev->>Agent: /speckit.constitution "Define project principles"
+    Agent->>FS: Load constitution-template.md
+    Agent->>Dev: Collect principles interactively
+    Agent->>FS: Write .specify/memory/constitution.md
+    Agent->>FS: Propagate to dependent templates
+    Agent-->>Dev: Constitution v1.0.0 ratified
+
+    Note over Dev,FS: PHASE 2: Specification
+
+    Dev->>Agent: /speckit.specify "Add user authentication with OAuth"
+    
+    rect rgb(255, 245, 230)
+        Note right of Ext: Extension Hook: before_specify
+        Agent->>Ext: Check .specify/extensions.yml
+        Ext-->>Agent: Run pre-hooks (if any)
+    end
+
+    Agent->>FS: Run create-new-feature.sh --json
+    FS-->>Agent: {branch: "001-user-auth", spec_file: "..."}
+    Agent->>FS: Load spec-template.md
+    Agent->>Const: Load constitution principles
+    Agent->>Agent: Generate spec from description
+    Agent->>FS: Write specs/001-user-auth/spec.md
+    Agent->>FS: Create checklists/requirements.md
+    Agent->>Agent: Validate spec quality
+    
+    alt Has [NEEDS CLARIFICATION]
+        Agent->>Dev: Present clarification questions (max 3)
+        Dev->>Agent: Provide answers
+        Agent->>FS: Update spec with answers
+    end
+
+    rect rgb(255, 245, 230)
+        Note right of Ext: Extension Hook: after_specify
+        Agent->>Ext: Check .specify/extensions.yml
+        Ext-->>Agent: Run post-hooks (if any)
+    end
+
+    Agent-->>Dev: Spec complete, ready for /speckit.plan
+
+    Note over Dev,FS: PHASE 3: Planning
+
+    Dev->>Agent: /speckit.plan
+
+    rect rgb(255, 245, 230)
+        Note right of Ext: Extension Hook: before_plan
+        Agent->>Ext: Check .specify/extensions.yml
+        Ext-->>Agent: Run pre-hooks (if any)
+    end
+
+    Agent->>FS: Run setup-plan.sh --json
+    Agent->>FS: Load spec.md
+    Agent->>Const: Load constitution for compliance check
+
+    Note over Agent: Phase 0: Research
+    Agent->>Agent: Extract unknowns from spec
+    Agent->>Agent: Research technologies & patterns
+    Agent->>FS: Write research.md
+
+    Note over Agent: Phase 1: Design
+    Agent->>FS: Write data-model.md
+    Agent->>FS: Write contracts/ (if APIs)
+    Agent->>FS: Write quickstart.md
+    Agent->>FS: Run update-agent-context.sh
+    Agent->>Const: Re-validate against constitution
+    Agent->>FS: Write plan.md
+
+    rect rgb(255, 245, 230)
+        Note right of Ext: Extension Hook: after_plan
+        Agent->>Ext: Check .specify/extensions.yml
+        Ext-->>Agent: Run post-hooks (if any)
+    end
+
+    Agent-->>Dev: Plan complete, ready for /speckit.tasks
+
+    Note over Dev,FS: PHASE 4: Task Breakdown
+
+    Dev->>Agent: /speckit.tasks
+    Agent->>FS: Load plan.md, spec.md
+    Agent->>Agent: Break plan into atomic tasks
+    Agent->>Agent: Identify dependencies & parallel work [P]
+    Agent->>FS: Write tasks.md with phases
+    Agent-->>Dev: Tasks ready for /speckit.implement
+
+    Note over Dev,FS: PHASE 5: Implementation
+
+    Dev->>Agent: /speckit.implement
+
+    rect rgb(255, 245, 230)
+        Note right of Ext: Extension Hook: before_implement
+        Agent->>Ext: Check .specify/extensions.yml
+        Ext-->>Agent: Run pre-hooks (if any)
+    end
+
+    Agent->>FS: Load tasks.md, plan.md, data-model.md
+    Agent->>FS: Check checklists status
+
+    alt Incomplete Checklists
+        Agent->>Dev: "Checklists incomplete. Proceed? (yes/no)"
+        Dev->>Agent: Decision
+    end
+
+    Agent->>FS: Setup project (ignore files, structure)
+
+    loop For each task phase
+        loop For each task
+            Agent->>Agent: Execute task (TDD: tests first)
+            Agent->>FS: Write code & tests
+            Agent->>FS: Mark task [X] in tasks.md
+        end
+        Agent->>Agent: Validate phase completion
+    end
+
+    rect rgb(255, 245, 230)
+        Note right of Ext: Extension Hook: after_implement
+        Agent->>Ext: Check .specify/extensions.yml
+        Ext-->>Agent: Run post-hooks (if any)
+    end
+
+    Agent-->>Dev: Implementation complete
+
+    Note over Dev,FS: SUPPORTING COMMANDS (Anytime)
+
+    rect rgb(230, 245, 255)
+        Dev->>Agent: /speckit.clarify "What about edge case X?"
+        Agent->>FS: Load current spec/plan
+        Agent->>Dev: Ask clarifying questions
+        Dev->>Agent: Provide answers
+        Agent->>FS: Update spec/plan with clarifications
+    end
+
+    rect rgb(230, 245, 255)
+        Dev->>Agent: /speckit.analyze "How does auth work currently?"
+        Agent->>FS: Search codebase
+        Agent-->>Dev: Analysis report with patterns
+    end
+
+    rect rgb(230, 245, 255)
+        Dev->>Agent: /speckit.checklist "security"
+        Agent->>FS: Load checklist-template.md
+        Agent->>FS: Write checklists/security.md
+    end
+
+    rect rgb(230, 245, 255)
+        Dev->>Agent: /speckit.taskstoissues
+        Agent->>FS: Load tasks.md
+        Agent->>Agent: Format as GitHub issues
+        Agent-->>Dev: Ready to create issues via gh CLI
+    end
+```
+
+### Extension Hooks
+
+Extensions can inject custom behavior at key points in the workflow:
+
+| Hook Point | When It Runs | Use Cases |
+|------------|--------------|-----------|
+| `before_specify` | Before spec generation | Pre-validation, context gathering |
+| `after_specify` | After spec is written | Auto-review, notifications |
+| `before_plan` | Before planning starts | Load external research, check constraints |
+| `after_plan` | After plan is complete | Architecture review, cost estimation |
+| `before_implement` | Before coding starts | Environment setup, dependency checks |
+| `after_implement` | After implementation | Auto-testing, deployment triggers |
+
+Hooks are configured in `.specify/extensions.yml`:
+
+```yaml
+hooks:
+  after_specify:
+    - extension: security-review
+      command: speckit.security-scan
+      description: Run security analysis on spec
+      optional: false  # Mandatory hook - runs automatically
+  before_implement:
+    - extension: deps-check
+      command: speckit.check-deps
+      description: Verify all dependencies available
+      optional: true   # Optional - user decides to run
+```
+
+### The Flow (Simplified)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -52,10 +304,12 @@ Spec-Driven Development (SDD) is a methodology where every feature starts as a s
        │                │                │                │
        └────────────────┴────────────────┴────────────────┘
                                 │
-                    ┌───────────┴───────────┐
-                    │   /speckit.clarify    │
-                    │   (at any point)      │
-                    └───────────────────────┘
+         ┌──────────────────────┼──────────────────────┐
+         │                      │                      │
+    ┌────┴─────┐         ┌──────┴──────┐        ┌──────┴──────┐
+    │ CLARIFY  │         │  CHECKLIST  │        │   ANALYZE   │
+    │(anytime) │         │  (quality)  │        │ (codebase)  │
+    └──────────┘         └─────────────┘        └─────────────┘
 ```
 
 ### Step-by-Step Workflow

@@ -1,7 +1,7 @@
 {
   "name": "@oakoliver/specify-cli",
   "version": "1.0.2",
-  "description": "Spec-Driven Development CLI for AI coding agents. Zero dependencies, multi-runtime.",
+  "description": "Spec-Driven Development CLI for AI coding agents. Multi-runtime.",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -57,24 +57,14 @@
     "@oakoliver/bubbletea": "^1.0.0",
     "@oakoliver/bubbles": "^1.0.0",
     "@oakoliver/glamour": "^1.0.0",
-    "@oakoliver/huh": "^1.0.0",
-    "@oakoliver/lipgloss": "^1.0.0",
     "@types/bun": "^1.0.0",
     "@types/node": "^20.0.0",
     "esbuild": "^0.27.4",
     "typescript": "^5.0.0"
   },
-  "peerDependencies": {
+  "dependencies": {
     "@oakoliver/huh": "^1.0.0",
     "@oakoliver/lipgloss": "^1.0.0"
-  },
-  "peerDependenciesMeta": {
-    "@oakoliver/huh": {
-      "optional": true
-    },
-    "@oakoliver/lipgloss": {
-      "optional": true
-    }
   },
   "engines": {
     "node": ">=18.0.0"

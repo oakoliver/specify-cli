@@ -115,11 +115,9 @@ sequenceDiagram
 
     Dev->>Agent: /speckit.specify "Add user authentication with OAuth"
     
-    rect rgb(255, 245, 230)
-        Note right of Ext: Extension Hook: before_specify
-        Agent->>Ext: Check .specify/extensions.yml
-        Ext-->>Agent: Run pre-hooks (if any)
-    end
+    Note right of Ext: HOOK: before_specify
+    Agent->>Ext: Check .specify/extensions.yml
+    Ext-->>Agent: Run pre-hooks (if any)
 
     Agent->>FS: Run create-new-feature.sh --json
     FS-->>Agent: {branch: "001-user-auth", spec_file: "..."}
@@ -136,11 +134,9 @@ sequenceDiagram
         Agent->>FS: Update spec with answers
     end
 
-    rect rgb(255, 245, 230)
-        Note right of Ext: Extension Hook: after_specify
-        Agent->>Ext: Check .specify/extensions.yml
-        Ext-->>Agent: Run post-hooks (if any)
-    end
+    Note right of Ext: HOOK: after_specify
+    Agent->>Ext: Check .specify/extensions.yml
+    Ext-->>Agent: Run post-hooks (if any)
 
     Agent-->>Dev: Spec complete, ready for /speckit.plan
 
@@ -148,11 +144,9 @@ sequenceDiagram
 
     Dev->>Agent: /speckit.plan
 
-    rect rgb(255, 245, 230)
-        Note right of Ext: Extension Hook: before_plan
-        Agent->>Ext: Check .specify/extensions.yml
-        Ext-->>Agent: Run pre-hooks (if any)
-    end
+    Note right of Ext: HOOK: before_plan
+    Agent->>Ext: Check .specify/extensions.yml
+    Ext-->>Agent: Run pre-hooks (if any)
 
     Agent->>FS: Run setup-plan.sh --json
     Agent->>FS: Load spec.md
@@ -171,11 +165,9 @@ sequenceDiagram
     Agent->>Const: Re-validate against constitution
     Agent->>FS: Write plan.md
 
-    rect rgb(255, 245, 230)
-        Note right of Ext: Extension Hook: after_plan
-        Agent->>Ext: Check .specify/extensions.yml
-        Ext-->>Agent: Run post-hooks (if any)
-    end
+    Note right of Ext: HOOK: after_plan
+    Agent->>Ext: Check .specify/extensions.yml
+    Ext-->>Agent: Run post-hooks (if any)
 
     Agent-->>Dev: Plan complete, ready for /speckit.tasks
 
@@ -192,11 +184,9 @@ sequenceDiagram
 
     Dev->>Agent: /speckit.implement
 
-    rect rgb(255, 245, 230)
-        Note right of Ext: Extension Hook: before_implement
-        Agent->>Ext: Check .specify/extensions.yml
-        Ext-->>Agent: Run pre-hooks (if any)
-    end
+    Note right of Ext: HOOK: before_implement
+    Agent->>Ext: Check .specify/extensions.yml
+    Ext-->>Agent: Run pre-hooks (if any)
 
     Agent->>FS: Load tasks.md, plan.md, data-model.md
     Agent->>FS: Check checklists status
@@ -217,42 +207,32 @@ sequenceDiagram
         Agent->>Agent: Validate phase completion
     end
 
-    rect rgb(255, 245, 230)
-        Note right of Ext: Extension Hook: after_implement
-        Agent->>Ext: Check .specify/extensions.yml
-        Ext-->>Agent: Run post-hooks (if any)
-    end
+    Note right of Ext: HOOK: after_implement
+    Agent->>Ext: Check .specify/extensions.yml
+    Ext-->>Agent: Run post-hooks (if any)
 
     Agent-->>Dev: Implementation complete
 
     Note over Dev,FS: SUPPORTING COMMANDS (Anytime)
 
-    rect rgb(230, 245, 255)
-        Dev->>Agent: /speckit.clarify "What about edge case X?"
-        Agent->>FS: Load current spec/plan
-        Agent->>Dev: Ask clarifying questions
-        Dev->>Agent: Provide answers
-        Agent->>FS: Update spec/plan with clarifications
-    end
+    Dev->>Agent: /speckit.clarify "What about edge case X?"
+    Agent->>FS: Load current spec/plan
+    Agent->>Dev: Ask clarifying questions
+    Dev->>Agent: Provide answers
+    Agent->>FS: Update spec/plan with clarifications
 
-    rect rgb(230, 245, 255)
-        Dev->>Agent: /speckit.analyze "How does auth work currently?"
-        Agent->>FS: Search codebase
-        Agent-->>Dev: Analysis report with patterns
-    end
+    Dev->>Agent: /speckit.analyze "How does auth work currently?"
+    Agent->>FS: Search codebase
+    Agent-->>Dev: Analysis report with patterns
 
-    rect rgb(230, 245, 255)
-        Dev->>Agent: /speckit.checklist "security"
-        Agent->>FS: Load checklist-template.md
-        Agent->>FS: Write checklists/security.md
-    end
+    Dev->>Agent: /speckit.checklist "security"
+    Agent->>FS: Load checklist-template.md
+    Agent->>FS: Write checklists/security.md
 
-    rect rgb(230, 245, 255)
-        Dev->>Agent: /speckit.taskstoissues
-        Agent->>FS: Load tasks.md
-        Agent->>Agent: Format as GitHub issues
-        Agent-->>Dev: Ready to create issues via gh CLI
-    end
+    Dev->>Agent: /speckit.taskstoissues
+    Agent->>FS: Load tasks.md
+    Agent->>Agent: Format as GitHub issues
+    Agent-->>Dev: Ready to create issues via gh CLI
 ```
 
 ### Extension Hooks

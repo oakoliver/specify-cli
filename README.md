@@ -248,7 +248,13 @@ Extensions can inject custom behavior at key points in the workflow:
 | `before_implement` | Before coding starts | Environment setup, dependency checks |
 | `after_implement` | After implementation | Auto-testing, deployment triggers |
 
-Hooks are configured in `.specify/extensions.yml`:
+**[See full Extension Hooks documentation](docs/EXTENSION_HOOKS.md)** for:
+- Lifecycle state diagrams
+- Hook execution flow
+- Real-world extension examples (security scanner, Jira sync, ADR generator, cost estimator, compliance checker)
+- How to create your own extensions
+
+Quick example in `.specify/extensions.yml`:
 
 ```yaml
 hooks:
@@ -256,7 +262,7 @@ hooks:
     - extension: security-review
       command: speckit.security-scan
       description: Run security analysis on spec
-      optional: false  # Mandatory hook - runs automatically
+      optional: false  # Mandatory - blocks if fails
   before_implement:
     - extension: deps-check
       command: speckit.check-deps

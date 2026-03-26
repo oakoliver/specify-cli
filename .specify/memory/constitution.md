@@ -1,50 +1,107 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+## Sync Impact Report
+- Version change: 1.0.0 → 1.1.0
+- Modified principles: None renamed
+- Added sections: Principle VI (1:1 Migration Fidelity)
+- Removed sections: None
+- Templates requiring updates: ✅ None (principle is additive guidance)
+- Follow-up TODOs: None
+-->
+
+# Spec-Kit TypeScript Port Constitution
+
+## Mission
+
+Enable Spec-Driven Development in corporate enterprise environments where Python installation is restricted or prohibited. By porting spec-kit to TypeScript/Bun with zero runtime dependencies, organizations can adopt SDD workflows using only Node.js/Bun - runtimes that are already approved and available in most enterprise development environments.
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Zero Runtime Dependencies
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+The TypeScript port MUST have zero runtime dependencies. Only devDependencies (esbuild, typescript, @types/node) are permitted. This ensures minimal bundle size, no supply chain vulnerabilities, and maximum compatibility across Node.js, Bun, and Deno runtimes.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### II. Multi-Runtime Compatibility
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+All code MUST work on Node.js 18+, Bun 1.0+, and Deno without modification. Runtime-specific APIs require feature detection. Use standard ECMAScript APIs and Web APIs (fetch, crypto, etc.) when available.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### III. TypeScript-First
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+Full type safety is mandatory. No `any` types except where truly unavoidable (with explicit justification in comments). All public APIs MUST export their types. Use strict TypeScript configuration with `"strict": true`.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### IV. Oakoliver CLI Libraries
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+For all terminal UI and CLI functionality, MUST use the @oakoliver/* packages:
+- `@oakoliver/bubbletea` for the Elm Architecture TUI framework
+- `@oakoliver/bubbles` for pre-built TUI components (text input, list, spinner, etc.)
+- `@oakoliver/lipgloss` for terminal styling
+- `@oakoliver/glamour` for markdown rendering
+- `@oakoliver/huh` for interactive forms and prompts
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+These replace Python's Typer/Rich and provide a consistent, battle-tested CLI experience.
+
+### V. Idiomatic TypeScript API
+
+Adapt the original Python API to TypeScript conventions:
+- Use camelCase for functions/methods (not snake_case)
+- Use classes where Python uses classes with methods
+- Use `undefined` instead of Python's `None` sentinel
+- Use async/await for I/O operations
+- Use builder/fluent patterns where they improve ergonomics
+
+### VI. 1:1 Migration Fidelity
+
+This port MUST maintain exact behavioral parity with the original Python spec-kit repository (github/spec-kit). This principle ensures:
+
+- **Output Format Compatibility**: JSON files (init-options.json, registries) MUST use identical keys and structure as the Python version. Use snake_case for JSON keys to match Python's output.
+- **Directory Structure Parity**: The `.specify/` directory layout, file locations, and naming conventions MUST match the Python implementation exactly.
+- **Command Behavior**: All CLI commands MUST produce equivalent results. When the Python version creates specific files in specific locations, the TypeScript port MUST do the same.
+- **Agent Configuration**: The `AGENT_CONFIGS` dictionary MUST stay synchronized with the Python repository's agent definitions.
+- **Template Content**: Bundled templates MUST be sourced from or validated against the Python repository to ensure consistency.
+
+**Rationale**: By maintaining 1:1 parity, users can easily migrate between implementations, the TypeScript port can catch upstream improvements from the original repository, and testing can validate output equivalence. Any deviation from Python behavior MUST be explicitly documented and justified.
+
+**Exception**: Internal implementation details (class names, module structure, async patterns) may differ to follow TypeScript idioms (Principle V), but external behavior and artifacts MUST match.
+
+## Development Workflow
+
+### Testing Requirements
+
+- Tests written using Bun's built-in test runner (`bun test`)
+- Test files named `*.test.ts` in `tests/` directory
+- Coverage target: >90% for public API surface
+- All user stories MUST have corresponding acceptance tests
+
+### Code Organization
+
+- `src/index.ts` - Public API barrel export
+- `src/cli/` - CLI entry points and commands
+- `src/core/` - Core business logic
+- `src/agents/` - Agent configuration and registration
+- `src/templates/` - Template management
+- `src/extensions/` - Extension system
+- `src/presets/` - Preset system
+
+## Quality Gates
+
+### Pre-Commit
+
+- TypeScript compilation MUST pass (`bun run typecheck`)
+- All tests MUST pass (`bun test`)
+- No ESLint errors (when configured)
+
+### Pre-Publish
+
+- Build MUST succeed for all formats (ESM, CJS, types)
+- Package size MUST be reasonable (< 1MB unpacked)
+- README MUST include: description, installation, usage examples, API reference
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other practices. Amendments require:
+1. Documentation of the proposed change
+2. Justification for the amendment
+3. Migration plan if breaking existing features
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+All PRs must verify compliance with these principles.
+
+**Version**: 1.1.0 | **Ratified**: 2026-03-25 | **Last Amended**: 2026-03-26

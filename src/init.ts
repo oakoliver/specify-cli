@@ -6,7 +6,7 @@
  * @module init
  */
 
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve, basename } from 'node:path';
 import { execSync } from 'node:child_process';
 
@@ -231,7 +231,7 @@ function updateGitignore(projectRoot: string): void {
 `;
 
   if (existsSync(gitignorePath)) {
-    const content = require('fs').readFileSync(gitignorePath, 'utf-8');
+    const content = readFileSync(gitignorePath, 'utf-8');
     if (!content.includes('# Spec-Kit')) {
       writeFileSync(gitignorePath, content + specKitEntries, 'utf-8');
     }

@@ -634,7 +634,7 @@ describe('ExtensionManager', () => {
   });
 
   describe('installFromDirectory', () => {
-    test('installs valid extension', () => {
+    test('installs valid extension', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
@@ -642,7 +642,7 @@ describe('ExtensionManager', () => {
       // Create agent commands directory
       mkdirSync(join(projectRoot, '.github', 'agents'), { recursive: true });
       
-      const manifest = manager.installFromDirectory(extDir, '1.0.0', false);
+      const manifest = await manager.installFromDirectory(extDir, '1.0.0', false);
       
       expect(manifest.id).toBe('test-ext');
       expect(manager.registry.isInstalled('test-ext')).toBe(true);
@@ -651,15 +651,15 @@ describe('ExtensionManager', () => {
       expect(existsSync(join(projectRoot, '.specify', 'extensions', 'test-ext', 'extension.yml'))).toBe(true);
     });
 
-    test('throws for already installed extension', () => {
+    test('throws for already installed extension', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false);
+      await manager.installFromDirectory(extDir, '1.0.0', false);
       
-      expect(() => {
-        manager.installFromDirectory(extDir, '1.0.0', false);
+      expect(async () => {
+        await manager.installFromDirectory(extDir, '1.0.0', false);
       }).toThrow(ExtensionError);
     });
 
@@ -670,17 +670,17 @@ describe('ExtensionManager', () => {
       const extDir = createExtensionDir(projectRoot, 'test-ext', manifest);
       const manager = new ExtensionManager(projectRoot);
       
-      expect(() => {
-        manager.installFromDirectory(extDir, '1.0.0', false);
+      expect(async () => {
+        await manager.installFromDirectory(extDir, '1.0.0', false);
       }).toThrow(CompatibilityError);
     });
 
-    test('sets custom priority', () => {
+    test('sets custom priority', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false, 5);
+      await manager.installFromDirectory(extDir, '1.0.0', false, 5);
       
       const metadata = manager.registry.get('test-ext')!;
       expect(metadata.priority).toBe(5);
@@ -688,13 +688,13 @@ describe('ExtensionManager', () => {
   });
 
   describe('remove', () => {
-    test('removes installed extension', () => {
+    test('removes installed extension', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false);
-      const result = manager.remove('test-ext');
+      await manager.installFromDirectory(extDir, '1.0.0', false);
+      const result = await manager.remove('test-ext');
       
       expect(result).toBe(true);
       expect(manager.registry.isInstalled('test-ext')).toBe(false);
@@ -705,23 +705,23 @@ describe('ExtensionManager', () => {
       const projectRoot = setupTestProject();
       const manager = new ExtensionManager(projectRoot);
       
-      expect(() => {
-        manager.remove('nonexistent');
+      expect(async () => {
+        await manager.remove('nonexistent');
       }).toThrow(ExtensionError);
     });
 
-    test('backs up config files with keepConfig', () => {
+    test('backs up config files with keepConfig', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false);
+      await manager.installFromDirectory(extDir, '1.0.0', false);
       
       // Add a config file
       const installedDir = join(projectRoot, '.specify', 'extensions', 'test-ext');
       writeFileSync(join(installedDir, 'test-ext-config.yml'), 'key: value');
       
-      manager.remove('test-ext', true);
+      await manager.remove('test-ext', true);
       
       // Check config was backed up
       expect(existsSync(join(projectRoot, '.specify', 'extensions', '.backup', 'test-ext', 'test-ext-config.yml'))).toBe(true);
@@ -736,15 +736,15 @@ describe('ExtensionManager', () => {
       expect(manager.listInstalled()).toEqual([]);
     });
 
-    test('returns installed extensions sorted by priority', () => {
+    test('returns installed extensions sorted by priority', async () => {
       const projectRoot = setupTestProject();
       const manager = new ExtensionManager(projectRoot);
       
       const ext1Dir = createExtensionDir(projectRoot, 'ext-one', validManifest('ext-one'));
       const ext2Dir = createExtensionDir(projectRoot, 'ext-two', validManifest('ext-two'));
       
-      manager.installFromDirectory(ext1Dir, '1.0.0', false, 20);
-      manager.installFromDirectory(ext2Dir, '1.0.0', false, 5);
+      await manager.installFromDirectory(ext1Dir, '1.0.0', false, 20);
+      await manager.installFromDirectory(ext2Dir, '1.0.0', false, 5);
       
       const list = manager.listInstalled();
       
@@ -755,12 +755,12 @@ describe('ExtensionManager', () => {
   });
 
   describe('getExtension', () => {
-    test('returns manifest for installed extension', () => {
+    test('returns manifest for installed extension', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false);
+      await manager.installFromDirectory(extDir, '1.0.0', false);
       
       const manifest = manager.getExtension('test-ext');
       expect(manifest?.id).toBe('test-ext');
@@ -775,12 +775,12 @@ describe('ExtensionManager', () => {
   });
 
   describe('enable/disable', () => {
-    test('enables and disables extension', () => {
+    test('enables and disables extension', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false);
+      await manager.installFromDirectory(extDir, '1.0.0', false);
       
       manager.disable('test-ext');
       expect(manager.registry.get('test-ext')?.enabled).toBe(false);
@@ -791,23 +791,23 @@ describe('ExtensionManager', () => {
   });
 
   describe('setPriority', () => {
-    test('sets extension priority', () => {
+    test('sets extension priority', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false);
+      await manager.installFromDirectory(extDir, '1.0.0', false);
       
       manager.setPriority('test-ext', 3);
       expect(manager.registry.get('test-ext')?.priority).toBe(3);
     });
 
-    test('normalizes invalid priority', () => {
+    test('normalizes invalid priority', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
       
-      manager.installFromDirectory(extDir, '1.0.0', false);
+      await manager.installFromDirectory(extDir, '1.0.0', false);
       
       manager.setPriority('test-ext', -5);
       expect(manager.registry.get('test-ext')?.priority).toBe(DEFAULT_PRIORITY);

@@ -1,10 +1,10 @@
 <!--
 ## Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
-- Modified principles: None renamed
-- Added sections: Principle VI (1:1 Migration Fidelity)
+- Version change: 1.1.0 → 1.2.0
+- Modified principles: Principle I (clarified @oakoliver/* exception)
+- Modified sections: Code Organization (aligned with actual flat src/ layout)
 - Removed sections: None
-- Templates requiring updates: ✅ None (principle is additive guidance)
+- Templates requiring updates: ✅ None (changes are descriptive, not prescriptive)
 - Follow-up TODOs: None
 -->
 
@@ -18,7 +18,7 @@ Enable Spec-Driven Development in corporate enterprise environments where Python
 
 ### I. Zero Runtime Dependencies
 
-The TypeScript port MUST have zero runtime dependencies. Only devDependencies (esbuild, typescript, @types/node) are permitted. This ensures minimal bundle size, no supply chain vulnerabilities, and maximum compatibility across Node.js, Bun, and Deno runtimes.
+The TypeScript port MUST have zero third-party runtime dependencies. The only permitted runtime dependencies are the `@oakoliver/*` CLI libraries (see Principle IV), which are maintained by the project author and provide essential terminal UI functionality. All other packages (esbuild, typescript, @types/node, etc.) MUST be devDependencies only. This ensures minimal bundle size, no external supply chain vulnerabilities, and maximum compatibility across Node.js, Bun, and Deno runtimes.
 
 ### II. Multi-Runtime Compatibility
 
@@ -73,13 +73,19 @@ This port MUST maintain exact behavioral parity with the original Python spec-ki
 
 ### Code Organization
 
+All source files reside in a flat `src/` directory:
+
 - `src/index.ts` - Public API barrel export
-- `src/cli/` - CLI entry points and commands
-- `src/core/` - Core business logic
-- `src/agents/` - Agent configuration and registration
-- `src/templates/` - Template management
-- `src/extensions/` - Extension system
-- `src/presets/` - Preset system
+- `src/cli.ts` - CLI entry point and command routing
+- `src/init.ts` - `specify init` command logic
+- `src/check.ts` - `specify check` command logic
+- `src/types.ts` - All TypeScript types, agent configs, utility functions
+- `src/config.ts` - Path constants, init-options persistence, project detection
+- `src/registrar.ts` - Command registration/unregistration for all agents
+- `src/templates.ts` - Template management and copying
+- `src/extension.ts` - Extension manifest, registry, and manager
+- `src/preset.ts` - Preset manifest, registry, manager, and resolver
+- `src/ui.ts` - Terminal styling and output helpers
 
 ## Quality Gates
 
@@ -104,4 +110,4 @@ This constitution supersedes all other practices. Amendments require:
 
 All PRs must verify compliance with these principles.
 
-**Version**: 1.1.0 | **Ratified**: 2026-03-25 | **Last Amended**: 2026-03-26
+**Version**: 1.2.0 | **Ratified**: 2026-03-25 | **Last Amended**: 2026-03-28

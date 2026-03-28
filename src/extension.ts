@@ -10,7 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, rmSync, copyFileSync, statSync } from 'node:fs';
 import { join, basename, dirname, relative } from 'node:path';
 import { createHash } from 'node:crypto';
-import { parseFrontmatter } from './registrar.js';
+import { parseFrontmatter, registerCommands as registrarRegisterCommands, unregisterCommands as registrarUnregisterCommands } from './registrar.js';
 
 // ============================================================================
 // Constants
@@ -715,12 +715,12 @@ export class ExtensionManager {
   /**
    * Install extension from local directory.
    */
-  installFromDirectory(
+  async installFromDirectory(
     sourceDir: string,
     speckitVersion: string,
     registerCommands = true,
     priority = DEFAULT_PRIORITY
-  ): ExtensionManifest {
+  ): Promise<ExtensionManifest> {
     const manifestPath = join(sourceDir, 'extension.yml');
     const manifest = new ExtensionManifest(manifestPath);
     
@@ -748,7 +748,7 @@ export class ExtensionManager {
     // Register commands if requested
     let registeredCommands: Record<string, string[]> = {};
     if (registerCommands) {
-      registeredCommands = this.registerExtensionCommands(manifest, extDir);
+      registeredCommands = await this.registerExtensionCommands(manifest, extDir);
     }
     
     // Add to registry
@@ -788,10 +788,7 @@ export class ExtensionManager {
     }
   }
   
-  private registerExtensionCommands(manifest: ExtensionManifest, extensionDir: string): Record<string, string[]> {
-    // Import registrar dynamically to avoid circular dependency
-    const { registerCommands } = require('./registrar.js');
-    
+  private async registerExtensionCommands(manifest: ExtensionManifest, extensionDir: string): Promise<Record<string, string[]>> {
     const commands = manifest.commands.map(cmd => ({
       name: cmd.name.replace('speckit.', ''),
       description: cmd.description || '',
@@ -802,7 +799,7 @@ export class ExtensionManager {
     const initOptions = this.loadInitOptions();
     const agent = initOptions?.ai || 'copilot';
     
-    return registerCommands(agent, commands, this.projectRoot, manifest.id);
+    return registrarRegisterCommands(agent, commands, this.projectRoot, manifest.id);
   }
   
   private loadCommandContent(extensionDir: string, file: string): string {
@@ -827,7 +824,7 @@ export class ExtensionManager {
   /**
    * Remove extension.
    */
-  remove(extensionId: string, keepConfig = false): boolean {
+  async remove(extensionId: string, keepConfig = false): Promise<boolean> {
     const metadata = this.registry.get(extensionId);
     if (!metadata) {
       throw new ExtensionError(`Extension not found: ${extensionId}`);
@@ -835,7 +832,7 @@ export class ExtensionManager {
     
     // Unregister commands
     if (metadata.registered_commands) {
-      this.unregisterCommands(metadata.registered_commands);
+      await this.unregisterCommands(metadata.registered_commands);
     }
     
     // Backup config files if requested
@@ -855,9 +852,8 @@ export class ExtensionManager {
     return true;
   }
   
-  private unregisterCommands(registeredCommands: Record<string, string[]>): void {
-    const { unregisterCommands: unregister } = require('./registrar.js');
-    unregister(registeredCommands, this.projectRoot);
+  private async unregisterCommands(registeredCommands: Record<string, string[]>): Promise<void> {
+    await registrarUnregisterCommands(registeredCommands, this.projectRoot);
   }
   
   private backupConfigFiles(extensionId: string): void {

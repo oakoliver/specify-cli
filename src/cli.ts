@@ -10,7 +10,7 @@
 
 import { init, parseInitArgs } from './init.js';
 import { check } from './check.js';
-import { printError, printSuccess, printInfo, titleStyle, dimStyle, successStyle } from './ui.js';
+import { printError, printSuccess, printInfo, titleStyle, dimStyle, successStyle, printBanner } from './ui.js';
 import { SUPPORTED_AGENTS } from './types.js';
 import { ExtensionManager } from './extension.js';
 import { PresetManager } from './preset.js';
@@ -21,7 +21,7 @@ import { existsSync } from 'node:fs';
 // Version and Help
 // ============================================================================
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.4';
 
 const HELP = `
 ${titleStyle.render('specify')} - Spec-Driven Development CLI
@@ -530,6 +530,7 @@ async function main(): Promise<void> {
   }
 
   if (command === '--version' || command === 'version') {
+    await printBanner();
     console.log(`specify v${VERSION}`);
     return;
   }

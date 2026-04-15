@@ -48,8 +48,8 @@ import {
 // ============================================================================
 
 describe('AGENT_CONFIGS', () => {
-  test('contains all 23 supported agents', () => {
-    expect(SUPPORTED_AGENTS.length).toBe(23);
+  test('contains all 28 supported agents', () => {
+    expect(SUPPORTED_AGENTS.length).toBe(28);
   });
 
   // Test each agent individually (matches Python's parametrized tests)
@@ -77,6 +77,12 @@ describe('AGENT_CONFIGS', () => {
     'kimi',
     'trae',
     'iflow',
+    // New agents added in v1.1.0
+    'goose',
+    'forge',
+    'jules',
+    'agy',
+    'kiro', // alias for kiro-cli
   ];
 
   test('contains all expected agents', () => {
@@ -248,7 +254,7 @@ describe('AGENT_CONFIGS', () => {
       expect(config.format, `${name} missing format`).toBeDefined();
       expect(config.args, `${name} missing args`).toBeDefined();
       expect(config.extension, `${name} missing extension`).toBeDefined();
-      expect(['markdown', 'toml']).toContain(config.format);
+      expect(['markdown', 'toml', 'yaml']).toContain(config.format);
     }
   });
 
@@ -268,9 +274,9 @@ describe('AGENT_CONFIGS', () => {
     }
   });
 
-  test('markdown agents use $ARGUMENTS placeholder', () => {
+  test('markdown agents use $ARGUMENTS placeholder (except forge)', () => {
     const markdownAgents = Object.entries(AGENT_CONFIGS).filter(
-      ([_, config]) => config.format === 'markdown'
+      ([name, config]) => config.format === 'markdown' && name !== 'forge'
     );
     expect(markdownAgents.length).toBeGreaterThan(0);
     for (const [name, config] of markdownAgents) {
@@ -278,8 +284,16 @@ describe('AGENT_CONFIGS', () => {
     }
   });
 
+  test('forge uses {{parameters}} placeholder', () => {
+    expect(AGENT_CONFIGS['forge'].args).toBe('{{parameters}}');
+  });
+
+  test('goose uses yaml format', () => {
+    expect(AGENT_CONFIGS['goose'].format).toBe('yaml');
+  });
+
   test('skill-based agents use /SKILL.md extension', () => {
-    const skillAgents = ['codex', 'kimi'];
+    const skillAgents = ['codex', 'kimi', 'agy'];
     for (const agent of skillAgents) {
       expect(AGENT_CONFIGS[agent].extension).toBe('/SKILL.md');
     }

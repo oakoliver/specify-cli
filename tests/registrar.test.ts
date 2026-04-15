@@ -564,8 +564,150 @@ describe('registerCommandsForAllAgents', () => {
   test('registers for all agents when no target specified', async () => {
     const registered = await registerCommandsForAllAgents([testCommand], testDir, 'core');
 
-    // Should have entries for all 23 agents
+    // Should have entries for all 28 agents
     const agentCount = Object.keys(registered).length;
-    expect(agentCount).toBe(23);
+    expect(agentCount).toBe(28);
+  });
+});
+
+// ============================================================================
+// YAML Recipe Generation Tests (Goose Agent Support)
+// ============================================================================
+
+import { toYamlRecipe, AGENT_CONFIGS, SUPPORTED_AGENTS, isYamlAgent } from '../src/index.js';
+
+describe('toYamlRecipe', () => {
+  test('generates valid YAML recipe structure', () => {
+    const result = toYamlRecipe(
+      'speckit.specify',
+      'Create a feature specification',
+      'You are a helpful assistant.'
+    );
+
+    expect(result).toContain('version: 1.0.0');
+    expect(result).toContain('title: "Spec Kit Specify"');
+    expect(result).toContain('description: "Create a feature specification"');
+    expect(result).toContain('author:');
+    expect(result).toContain('contact: spec-kit');
+    expect(result).toContain('extensions:');
+    expect(result).toContain('type: builtin');
+    expect(result).toContain('name: developer');
+    expect(result).toContain('activities:');
+    expect(result).toContain('Spec-Driven Development');
+    expect(result).toContain('prompt: |');
+    expect(result).toContain('  You are a helpful assistant.');
+  });
+
+  test('escapes double quotes in description', () => {
+    const result = toYamlRecipe(
+      'test.cmd',
+      'Description with "quotes"',
+      'Prompt content'
+    );
+
+    expect(result).toContain('description: "Description with \\"quotes\\""');
+  });
+
+  test('formats multi-word command names correctly', () => {
+    const result = toYamlRecipe(
+      'speckit.create-new-feature',
+      'Test',
+      'Prompt'
+    );
+
+    expect(result).toContain('title: "Spec Kit Create New Feature"');
+  });
+
+  test('handles multi-line prompts', () => {
+    const prompt = `Line 1
+Line 2
+Line 3`;
+
+    const result = toYamlRecipe('test.cmd', 'Test', prompt);
+
+    expect(result).toContain('prompt: |');
+    expect(result).toContain('  Line 1');
+    expect(result).toContain('  Line 2');
+    expect(result).toContain('  Line 3');
+  });
+
+  test('handles empty prompt', () => {
+    const result = toYamlRecipe('test.cmd', 'Test', '');
+
+    expect(result).toContain('prompt: |');
+    expect(result).toContain('version: 1.0.0');
+  });
+});
+
+describe('isYamlAgent', () => {
+  test('returns true for goose', () => {
+    expect(isYamlAgent('goose')).toBe(true);
+  });
+
+  test('returns false for markdown agents', () => {
+    expect(isYamlAgent('claude')).toBe(false);
+    expect(isYamlAgent('cursor')).toBe(false);
+    expect(isYamlAgent('opencode')).toBe(false);
+  });
+
+  test('returns false for toml agents', () => {
+    expect(isYamlAgent('codex')).toBe(false);
+  });
+});
+
+describe('goose agent registration', () => {
+  let testDir: string;
+
+  beforeEach(() => {
+    testDir = join(tmpdir(), `goose-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(testDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    rmSync(testDir, { recursive: true, force: true });
+  });
+
+  test('goose agent config uses yaml format', () => {
+    expect(AGENT_CONFIGS['goose'].format).toBe('yaml');
+    expect(AGENT_CONFIGS['goose'].dir).toBe('.goose/recipes');
+  });
+
+  test('registers commands for goose in correct directory', async () => {
+    const command: CommandDefinition = {
+      name: 'speckit.specify',
+      description: 'Create a feature specification',
+      content: 'Test prompt content',
+    };
+
+    const registered = await registerCommands('goose', [command], testDir, 'core');
+
+    expect(registered['goose']).toBeDefined();
+    expect(registered['goose'].length).toBe(1);
+    expect(registered['goose'][0]).toContain('.goose/recipes');
+    expect(registered['goose'][0]).toEndWith('.yaml');
+  });
+
+  test('creates valid yaml recipe file', async () => {
+    const command: CommandDefinition = {
+      name: 'speckit.specify',
+      description: 'Create a feature specification',
+      content: 'You are a spec generator.',
+    };
+
+    const registered = await registerCommands('goose', [command], testDir, 'core');
+    const filePath = registered['goose'][0];
+
+    expect(existsSync(filePath)).toBe(true);
+
+    const content = readFileSync(filePath, 'utf-8');
+    expect(content).toContain('version: 1.0.0');
+    expect(content).toContain('title: "Spec Kit Specify"');
+    expect(content).toContain('description: "Create a feature specification"');
+    expect(content).toContain('prompt: |');
+    expect(content).toContain('  You are a spec generator.');
+  });
+
+  test('goose is in SUPPORTED_AGENTS', () => {
+    expect(SUPPORTED_AGENTS).toContain('goose');
   });
 });

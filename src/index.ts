@@ -42,6 +42,7 @@ export {
   getCommandFilePath,
   isSkillBasedAgent,
   isTomlAgent,
+  isYamlAgent,
   getAgentArgsPlaceholder,
 } from './types.js';
 
@@ -85,8 +86,9 @@ export {
   parseFrontmatter,
   renderFrontmatter,
 
-  // TOML generation
+  // Format generation
   toToml,
+  toYamlRecipe,
 
   // Command registration
   registerCommands,
@@ -193,3 +195,38 @@ export {
   PresetManager,
   PresetResolver,
 } from './preset.js';
+
+// Integration System
+export {
+  // Types
+  type IntegrationManifest,
+  type IntegrationInfo,
+
+  // Functions
+  loadManifest,
+  listIntegrations,
+  addIntegration,
+  removeIntegration,
+  getIntegrationInfo,
+} from './integration.js';
+
+// Catalog System
+export {
+  // Types
+  type CatalogEntry,
+  type Catalog,
+  type SearchResult,
+
+  // Constants
+  DEFAULT_EXTENSION_CATALOG,
+  DEFAULT_PRESET_CATALOG,
+  CATALOG_CACHE_DIR,
+  CACHE_EXPIRY_MS,
+
+  // Functions
+  fetchCatalog,
+  searchCatalog,
+  findEntryById,
+  downloadAndExtract,
+  cleanupDownloadTemp,
+} from './catalog.js';

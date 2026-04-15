@@ -510,7 +510,7 @@ Creates `checklists/security.md`:
 
 ## Supported AI Agents
 
-23 AI coding agents supported:
+28 AI coding agents supported:
 
 | Agent | Command Directory | Format |
 |-------|------------------|--------|
@@ -528,6 +528,11 @@ Creates `checklists/security.md`:
 | roo | `.roo/commands/` | Markdown |
 | amp | `.agents/commands/` | Markdown |
 | trae | `.trae/rules/` | Markdown |
+| goose | `.goose/recipes/` | YAML |
+| forge | `.forge/commands/` | Markdown |
+| jules | `.jules/commands/` | Markdown |
+| agy | `.antigravity/skills/` | SKILL.md |
+| kiro | `.kiro/prompts/` | Markdown |
 | *and more...* | | |
 
 ## CLI Reference

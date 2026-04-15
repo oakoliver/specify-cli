@@ -470,7 +470,7 @@ export async function init(options: InitCommandOptions = {}): Promise<boolean> {
       here: options.here || false,
       offline: options.offline || false,
       preset: null,
-      speckit_version: '1.0.0', // TypeScript port version
+      speckit_version: '1.1.0', // TypeScript port version
     };
     saveInitOptions(projectRoot, initOpts);
     printStep('Saving configuration', 'done');

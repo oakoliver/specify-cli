@@ -1,6 +1,6 @@
 {
   "name": "@oakoliver/specify-cli",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "Spec-Driven Development CLI for AI coding agents. Multi-runtime.",
   "main": "dist/index.js",
   "module": "dist/index.js",

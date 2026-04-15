@@ -266,6 +266,47 @@ ${prompt}
 }
 
 // ============================================================================
+// YAML Recipe Generation (Goose Format)
+// ============================================================================
+
+/**
+ * Convert a command to YAML recipe format for Goose.
+ *
+ * @param commandName - Command name (e.g., "speckit.specify")
+ * @param description - Command description
+ * @param prompt - Command prompt/body
+ * @returns Valid YAML recipe string
+ */
+export function toYamlRecipe(commandName: string, description: string, prompt: string): string {
+  // Escape special characters for YAML
+  const escapedDesc = description.replace(/"/g, '\\"');
+  
+  // Format command name as title (e.g., "speckit.specify" -> "Spec Kit Specify")
+  const title = commandName
+    .replace(/^speckit\./, '')   // Remove speckit. prefix
+    .split(/[.\s-]+/)
+    .filter(w => w.length > 0)   // Remove empty strings
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+  
+  const fullTitle = commandName.startsWith('speckit.') ? `Spec Kit ${title}` : title;
+
+  return `version: 1.0.0
+title: "${fullTitle}"
+description: "${escapedDesc}"
+author:
+  contact: spec-kit
+extensions:
+  - type: builtin
+    name: developer
+activities:
+  - Spec-Driven Development
+prompt: |
+${prompt.split('\n').map(line => '  ' + line).join('\n')}
+`;
+}
+
+// ============================================================================
 // Command Registration
 // ============================================================================
 
@@ -365,6 +406,36 @@ async function registerTomlCommand(
 }
 
 /**
+ * Register a YAML recipe command for Goose.
+ */
+async function registerYamlCommand(
+  projectRoot: string,
+  agent: string,
+  commandName: string,
+  content: string
+): Promise<string> {
+  const config = AGENT_CONFIGS[agent];
+  if (!config) {
+    throw new Error(`Unknown agent: ${agent}`);
+  }
+
+  const dir = join(projectRoot, config.dir);
+  ensureDir(dir);
+
+  // Parse frontmatter to extract description
+  const { frontmatter, body } = parseFrontmatter(content);
+  const description = (frontmatter.description as string) || '';
+
+  // Convert to YAML recipe format
+  const yamlContent = toYamlRecipe(commandName, description, body);
+
+  const filePath = join(dir, `${commandName}${config.extension}`);
+  writeFileSync(filePath, yamlContent, 'utf-8');
+
+  return filePath;
+}
+
+/**
  * Register a skill-based command for Codex/Kimi.
  */
 async function registerSkillCommand(
@@ -442,6 +513,9 @@ export async function registerCommands(
       paths = await registerCopilotCommand(projectRoot, commandName, content);
     } else if (config.format === 'toml') {
       const path = await registerTomlCommand(projectRoot, agent, commandName, content);
+      paths = [path];
+    } else if (config.format === 'yaml') {
+      const path = await registerYamlCommand(projectRoot, agent, commandName, content);
       paths = [path];
     } else if (config.extension === '/SKILL.md') {
       const path = await registerSkillCommand(projectRoot, agent, commandName, content);

@@ -15,8 +15,9 @@
  * Command format supported by an AI agent.
  * - markdown: Standard markdown files with YAML frontmatter
  * - toml: TOML configuration files (Gemini, Tabnine)
+ * - yaml: YAML recipe format (Goose)
  */
-export type CommandFormat = 'markdown' | 'toml';
+export type CommandFormat = 'markdown' | 'toml' | 'yaml';
 
 /**
  * Configuration for a single AI coding agent.
@@ -172,6 +173,38 @@ export const AGENT_CONFIGS: Record<string, AgentConfig> = {
   },
   iflow: {
     dir: '.iflow/commands',
+    format: 'markdown',
+    args: '$ARGUMENTS',
+    extension: '.md',
+  },
+  // New agents added in v1.1.0
+  goose: {
+    dir: '.goose/recipes',
+    format: 'yaml',
+    args: '$ARGUMENTS',
+    extension: '.yaml',
+  },
+  forge: {
+    dir: '.forge/commands',
+    format: 'markdown',
+    args: '{{parameters}}',
+    extension: '.md',
+  },
+  jules: {
+    dir: '.jules/commands',
+    format: 'markdown',
+    args: '$ARGUMENTS',
+    extension: '.md',
+  },
+  agy: {
+    dir: '.antigravity/skills',
+    format: 'markdown',
+    args: '$ARGUMENTS',
+    extension: '/SKILL.md',
+  },
+  // Alias for kiro-cli
+  kiro: {
+    dir: '.kiro/prompts',
     format: 'markdown',
     args: '$ARGUMENTS',
     extension: '.md',
@@ -435,6 +468,14 @@ export function isSkillBasedAgent(agent: string): boolean {
 export function isTomlAgent(agent: string): boolean {
   const config = AGENT_CONFIGS[agent];
   return config?.format === 'toml';
+}
+
+/**
+ * Check if an agent uses YAML format.
+ */
+export function isYamlAgent(agent: string): boolean {
+  const config = AGENT_CONFIGS[agent];
+  return config?.format === 'yaml';
 }
 
 /**

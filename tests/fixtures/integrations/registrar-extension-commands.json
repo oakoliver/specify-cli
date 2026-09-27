@@ -1,0 +1,485 @@
+{
+ "agy": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".agents/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: agy\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: agy\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "alquimia": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".alquimia/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: alquimia\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".alquimia/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: alquimia\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".alquimia/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "amp": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".agents/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: amp\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: amp\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "auggie": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".augment/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: auggie\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".augment/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: auggie\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".augment/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "bob": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".bob/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: bob\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".bob/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: bob\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".bob/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "claude": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".claude/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: claude\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".claude/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: claude\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".claude/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "cline": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".clinerules/workflows/speckit-git-ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit-plan\n  prompt: Continue with speckit-git-commit\nname: speckit-git-ci\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: cline\n\n## Hooks\n\n- When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n- For each executable hook, output the following\n  - `/speckit-git-commit`\nWindows path: C:\\Users\\dev\\file",
+   ".clinerules/workflows/speckit-git-commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit-plan\n  prompt: Continue with speckit-git-commit\nname: speckit-git-commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: cline\n\n## Hooks\n\n- When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n- For each executable hook, output the following\n  - `/speckit-git-commit`\nWindows path: C:\\Users\\dev\\file",
+   ".clinerules/workflows/speckit-git-status.md": "---\ndescription: Show status\nname: speckit-git-status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "codebuddy": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".codebuddy/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: codebuddy\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".codebuddy/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: codebuddy\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".codebuddy/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "codex": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".agents/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall $speckit-git-commit or $speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: codex\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall $speckit-git-commit or $speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: codex\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "command-code": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".commandcode/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall $speckit-git-commit or $speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: command-code\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".commandcode/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall $speckit-git-commit or $speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: command-code\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".commandcode/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "copilot": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".github/agents/speckit.git.ci.agent.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: copilot\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".github/agents/speckit.git.commit.agent.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: copilot\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".github/agents/speckit.git.status.agent.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS",
+   ".github/prompts/speckit.git.ci.prompt.md": "---\nagent: speckit.git.ci\n---\n",
+   ".github/prompts/speckit.git.commit.prompt.md": "---\nagent: speckit.git.commit\n---\n",
+   ".github/prompts/speckit.git.status.prompt.md": "---\nagent: speckit.git.status\n---\n"
+  }
+ },
+ "cursor-agent": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".cursor/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: cursor-agent\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".cursor/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: cursor-agent\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".cursor/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "devin": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".devin/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: devin\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".devin/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: devin\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".devin/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "docker-agent": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".agents/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: docker-agent\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: docker-agent\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "droid": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".factory/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: droid\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".factory/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: droid\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".factory/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "dsh": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".dsh/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: dsh\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".dsh/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: dsh\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".dsh/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "firebender": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".firebender/commands/speckit.git.ci.mdc": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: firebender\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".firebender/commands/speckit.git.commit.mdc": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: firebender\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".firebender/commands/speckit.git.status.mdc": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "forge": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".forge/commands/speckit-git-ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nname: speckit-git-ci\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: {{parameters}}\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json {{parameters}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: forge\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".forge/commands/speckit-git-commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nname: speckit-git-commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: {{parameters}}\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json {{parameters}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: forge\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".forge/commands/speckit-git-status.md": "---\ndescription: Show status\nname: speckit-git-status\n---\n\n\n<!-- Source: git -->\nStatus for {{parameters}}"
+  }
+ },
+ "gemini": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".gemini/commands/speckit.git.ci.toml": "description = \"Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\"\n\n# Source: git\n\nprompt = '''\n# Commit\n\nUser input: {{args}}\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json {{args}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: gemini\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file\n'''",
+   ".gemini/commands/speckit.git.commit.toml": "description = \"Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\"\n\n# Source: git\n\nprompt = '''\n# Commit\n\nUser input: {{args}}\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json {{args}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: gemini\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file\n'''",
+   ".gemini/commands/speckit.git.status.toml": "description = \"Show status\"\n\n# Source: git\n\nprompt = \"\"\"\nStatus for {{args}}\n\"\"\""
+  }
+ },
+ "goose": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".goose/recipes/speckit.git.ci.yaml": "version: 1.0.0\ntitle: Git Commit\ndescription: Commit changes with a conventional message — über fast. This description\n  is deliberately long so that YAML emitters would fold it across multiple lines if\n  width were limited\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  # Commit\n  \n  User input: {{args}}\n  \n  Run `.specify/extensions/git/scripts/bash/commit.sh --json {{args}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\n  Call /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\n  Agent: goose\n  \n  ## Hooks\n  \n  - For each executable hook, output the following\n    - `/speckit.git.commit`\n  Windows path: C:\\Users\\dev\\file\n\n# Source: git\n",
+   ".goose/recipes/speckit.git.commit.yaml": "version: 1.0.0\ntitle: Git Commit\ndescription: Commit changes with a conventional message — über fast. This description\n  is deliberately long so that YAML emitters would fold it across multiple lines if\n  width were limited\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  # Commit\n  \n  User input: {{args}}\n  \n  Run `.specify/extensions/git/scripts/bash/commit.sh --json {{args}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\n  Call /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\n  Agent: goose\n  \n  ## Hooks\n  \n  - For each executable hook, output the following\n    - `/speckit.git.commit`\n  Windows path: C:\\Users\\dev\\file\n\n# Source: git\n",
+   ".goose/recipes/speckit.git.status.yaml": "version: 1.0.0\ntitle: Git Status\ndescription: Show status\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  Status for {{args}}\n\n# Source: git\n"
+  }
+ },
+ "grok": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".grok/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: grok\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".grok/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: grok\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".grok/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "hermes": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   "~/.hermes/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: hermes\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   "~/.hermes/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: hermes\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   "~/.hermes/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "junie": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".junie/commands/speckit-git-ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit-plan\n  prompt: Continue with speckit.git.commit\nname: speckit-git-ci\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: junie\n\n## Hooks\n\n- When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".junie/commands/speckit-git-commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit-plan\n  prompt: Continue with speckit.git.commit\nname: speckit-git-commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: junie\n\n## Hooks\n\n- When constructing slash commands from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".junie/commands/speckit-git-status.md": "---\ndescription: Show status\nname: speckit-git-status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "kilocode": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".kilo/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: kilocode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".kilo/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: kilocode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".kilo/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "kimi": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".kimi-code/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /skill:speckit-git-commit or /skill:speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: kimi\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".kimi-code/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /skill:speckit-git-commit or /skill:speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: kimi\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".kimi-code/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "kiro-cli": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".kiro/prompts/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: (the user will provide the argument in this conversation)\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json (the user will provide the argument in this conversation)` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: kiro-cli\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".kiro/prompts/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: (the user will provide the argument in this conversation)\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json (the user will provide the argument in this conversation)` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: kiro-cli\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".kiro/prompts/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for (the user will provide the argument in this conversation)"
+  }
+ },
+ "lingma": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".lingma/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: lingma\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".lingma/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: lingma\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".lingma/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "muse": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".agents/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: muse\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: muse\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "omp": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".omp/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: omp\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".omp/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: omp\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".omp/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "opencode": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".opencode/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: opencode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".opencode/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: opencode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".opencode/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "pi": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".pi/prompts/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: pi\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".pi/prompts/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: pi\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".pi/prompts/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "qodercli": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".qoder/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: qodercli\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".qoder/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: qodercli\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".qoder/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "qwen": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".qwen/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: qwen\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".qwen/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: qwen\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".qwen/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "rovodev": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".rovodev/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: rovodev\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".rovodev/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: rovodev\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".rovodev/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "shai": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".shai/commands/speckit.git.ci.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: shai\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".shai/commands/speckit.git.commit.md": "---\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\nargument-hint: Optional commit message\nhandoffs:\n- label: Plan it\n  agent: speckit.plan\n  prompt: Continue with speckit.git.commit\n---\n\n\n<!-- Source: git -->\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: shai\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".shai/commands/speckit.git.status.md": "---\ndescription: Show status\n---\n\n\n<!-- Source: git -->\nStatus for $ARGUMENTS"
+  }
+ },
+ "tabnine": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".tabnine/agent/commands/speckit.git.ci.toml": "description = \"Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\"\n\n# Source: git\n\nprompt = '''\n# Commit\n\nUser input: {{args}}\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json {{args}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: tabnine\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file\n'''",
+   ".tabnine/agent/commands/speckit.git.commit.toml": "description = \"Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\"\n\n# Source: git\n\nprompt = '''\n# Commit\n\nUser input: {{args}}\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json {{args}}` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit.git.commit or /speckit.plan when done (see .specify/scripts/bash/common.sh).\nAgent: tabnine\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file\n'''",
+   ".tabnine/agent/commands/speckit.git.status.toml": "description = \"Show status\"\n\n# Source: git\n\nprompt = \"\"\"\nStatus for {{args}}\n\"\"\""
+  }
+ },
+ "trae": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".trae/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: trae\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".trae/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: trae\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".trae/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "vibe": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".vibe/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: vibe\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".vibe/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: vibe\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".vibe/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "zcode": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".zcode/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall $speckit-git-commit or $speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: zcode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".zcode/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall $speckit-git-commit or $speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: zcode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".zcode/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
+ "zed": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".agents/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: zed\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: zed\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".agents/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ }
+}

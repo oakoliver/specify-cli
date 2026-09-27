@@ -230,3 +230,42 @@ export {
   downloadAndExtract,
   cleanupDownloadTemp,
 } from './catalog.js';
+
+// ============================================================================
+// spec-kit v1.0.12 parity API (v2.0.0)
+// ============================================================================
+
+export { UPSTREAM_SPEC_KIT_VERSION } from './version.js';
+export { getSpeckitVersion, locateCorePack } from './assets.js';
+export { parseYaml, dumpYaml, YAMLError } from './yaml.js';
+export { CommandRegistrar } from './agents.js';
+export { INTEGRATION_REGISTRY, getIntegration } from './integrations/index.js';
+export { IntegrationBase } from './integrations/base.js';
+export { WorkflowEngine, WorkflowDefinition, RunState } from './workflows/engine.js';
+
+// Command entry points (each returns a process exit code).
+export { runInitCommand } from './init.js';
+export { runCheckCommand } from './command-check.js';
+export { runVersionCommand } from './command-version.js';
+export { runSelfCommand } from './selfs/commands.js';
+export { runExtensionCommand } from './extensions/commands.js';
+export { runIntegrationCommand } from './integrations/commands.js';
+export { runEventCommand } from './events/commands.js';
+export { runPresetCommand } from './presets/commands.js';
+export { runArtifactCommand } from './artifacts/commands.js';
+export { runBundleCommand } from './bundles/commands.js';
+export { runWorkflowCommand } from './workflows/commands.js';
+export { runDoctorCommand, runStatusCommand } from './doctor.js';
+
+// Full domain namespaces (1:1 with upstream specify_cli packages).
+export * as integrations from './integrations/index.js';
+export * as extensions from './extensions/index.js';
+export * as presets from './presets/index.js';
+export * as workflows from './workflows/index.js';
+export * as bundles from './bundles/index.js';
+export * as events from './events/index.js';
+export * as artifacts from './artifacts/index.js';
+export * as authentication from './authentication/index.js';
+export * as sharedInfra from './shared-infra.js';
+export * as integrationState from './integration-state.js';
+export * as downloadSecurity from './download-security.js';

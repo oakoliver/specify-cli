@@ -129,8 +129,9 @@ export async function printBanner(): Promise<void> {
   // Check if stdout is a TTY — skip animation if piped/redirected
   const isTTY = process.stdout.isTTY ?? false;
   if (!isTTY) {
+    const plain = !!process.env.NO_COLOR || process.env.TERM === 'dumb';
     console.log();
-    for (const line of finalLines) console.log(line);
+    for (let i = 0; i < finalLines.length; i++) console.log(plain ? BANNER_LINES[i] : finalLines[i]);
     console.log();
     return;
   }

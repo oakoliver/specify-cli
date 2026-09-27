@@ -171,7 +171,9 @@ tilde: ~
 name: test # inline comment
 `;
     const result = parseSimpleYaml(yaml);
-    expect(result.name).toBe('test # inline comment'); // Note: inline comments not stripped
+    // parseSimpleYaml is now backed by the PyYAML-compatible parser, which
+    // strips inline comments like upstream.
+    expect(result.name).toBe('test');
   });
 });
 
@@ -308,18 +310,21 @@ describe('ExtensionManifest', () => {
     }).toThrow(ValidationError);
   });
 
-  test('throws ValidationError for command name not matching extension ID', () => {
+  test('command name not matching extension ID is rejected at install time', () => {
+    // Upstream validates the namespace in ExtensionManager (install time), not
+    // in ExtensionManifest: the manifest itself loads fine.
     const projectRoot = setupTestProject();
     const manifest = { ...validManifest('my-ext') } as any;
     manifest.provides.commands[0].name = 'speckit.other-ext.hello';
-    
+
     const extDir = join(projectRoot, 'bad-ext');
     mkdirSync(extDir, { recursive: true });
     writeFileSync(join(extDir, 'extension.yml'), toYaml(manifest));
-    
+
+    expect(new ExtensionManifest(join(extDir, 'extension.yml')).id).toBe('my-ext');
     expect(() => {
-      new ExtensionManifest(join(extDir, 'extension.yml'));
-    }).toThrow(ValidationError);
+      new ExtensionManager(projectRoot).installFromDirectory(extDir, '1.0.0', false);
+    }).toThrow("Command 'speckit.other-ext.hello' must use extension namespace 'my-ext'");
   });
 
   test('computes manifest hash', () => {
@@ -340,7 +345,7 @@ describe('ExtensionManifest', () => {
 describe('ExtensionRegistry', () => {
   test('creates empty registry', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     expect(registry.list()).toEqual({});
     expect(registry.keys().size).toBe(0);
@@ -348,7 +353,7 @@ describe('ExtensionRegistry', () => {
 
   test('adds extension', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     registry.add('test-ext', {
       version: '1.0.0',
@@ -367,7 +372,7 @@ describe('ExtensionRegistry', () => {
 
   test('removes extension', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     registry.add('test-ext', {
       version: '1.0.0',
@@ -388,7 +393,7 @@ describe('ExtensionRegistry', () => {
 
   test('persists registry to disk', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     registry.add('test-ext', {
       version: '1.0.0',
@@ -402,15 +407,13 @@ describe('ExtensionRegistry', () => {
     });
     
     // Create new registry instance to test persistence
-    const registry2 = new ExtensionRegistry(projectRoot);
+    const registry2 = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     expect(registry2.isInstalled('test-ext')).toBe(true);
   });
 
   test('updates extension preserving installed_at', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
-    const originalTimestamp = '2024-01-01T00:00:00.000Z';
-    
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     registry.add('test-ext', {
       version: '1.0.0',
       source: 'local',
@@ -419,9 +422,10 @@ describe('ExtensionRegistry', () => {
       priority: 10,
       registered_commands: {},
       registered_skills: [],
-      installed_at: originalTimestamp,
     });
-    
+    // add() always stamps installed_at itself (upstream parity).
+    const originalTimestamp = registry.get('test-ext')!.installed_at;
+
     registry.update('test-ext', { version: '2.0.0', enabled: false });
     
     const updated = registry.get('test-ext')!;
@@ -432,16 +436,16 @@ describe('ExtensionRegistry', () => {
 
   test('update throws for missing extension', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     expect(() => {
       registry.update('nonexistent', { enabled: false });
-    }).toThrow(ExtensionError);
+    }).toThrow("Extension 'nonexistent' is not installed");
   });
 
   test('restore overwrites completely', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     registry.add('test-ext', {
       version: '1.0.0',
@@ -475,16 +479,16 @@ describe('ExtensionRegistry', () => {
 
   test('restore rejects null metadata', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     expect(() => {
       registry.restore('test-ext', null as any);
-    }).toThrow(ExtensionError);
+    }).toThrow("Cannot restore 'test-ext': metadata must be a dict");
   });
 
   test('get returns deep copy', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     registry.add('test-ext', {
       version: '1.0.0',
@@ -506,7 +510,7 @@ describe('ExtensionRegistry', () => {
 
   test('listByPriority sorts by priority', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     registry.add('ext-low', {
       version: '1.0.0',
@@ -547,7 +551,7 @@ describe('ExtensionRegistry', () => {
 
   test('listByPriority excludes disabled by default', () => {
     const projectRoot = setupTestProject();
-    const registry = new ExtensionRegistry(projectRoot);
+    const registry = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions'));
     
     registry.add('ext-enabled', {
       version: '1.0.0',
@@ -620,7 +624,7 @@ describe('ExtensionManager', () => {
       expect(manager.checkCompatibility(manifest, '2.0.0')).toBe(true);
     });
 
-    test('returns false for incompatible versions', () => {
+    test('throws CompatibilityError for incompatible versions', () => {
       const projectRoot = setupTestProject();
       const manifest = { ...validManifest() } as any;
       manifest.requires.speckit_version = '>=1.0.0';
@@ -629,7 +633,7 @@ describe('ExtensionManager', () => {
       const manifestObj = new ExtensionManifest(join(extDir, 'extension.yml'));
       const manager = new ExtensionManager(projectRoot);
       
-      expect(manager.checkCompatibility(manifestObj, '0.9.0')).toBe(false);
+      expect(() => manager.checkCompatibility(manifestObj, '0.9.0')).toThrow(CompatibilityError);
     });
   });
 
@@ -701,16 +705,14 @@ describe('ExtensionManager', () => {
       expect(existsSync(join(projectRoot, '.specify', 'extensions', 'test-ext'))).toBe(false);
     });
 
-    test('throws for nonexistent extension', () => {
+    test('returns false for nonexistent extension', () => {
       const projectRoot = setupTestProject();
       const manager = new ExtensionManager(projectRoot);
-      
-      expect(async () => {
-        await manager.remove('nonexistent');
-      }).toThrow(ExtensionError);
+
+      expect(manager.remove('nonexistent')).toBe(false);
     });
 
-    test('backs up config files with keepConfig', async () => {
+    test('backs up config files on plain remove; keepConfig preserves them in place', async () => {
       const projectRoot = setupTestProject();
       const extDir = createExtensionDir(projectRoot, 'test-ext', validManifest());
       const manager = new ExtensionManager(projectRoot);
@@ -721,9 +723,12 @@ describe('ExtensionManager', () => {
       const installedDir = join(projectRoot, '.specify', 'extensions', 'test-ext');
       writeFileSync(join(installedDir, 'test-ext-config.yml'), 'key: value');
       
-      await manager.remove('test-ext', true);
-      
-      // Check config was backed up
+      manager.remove('test-ext', true);
+      expect(readFileSync(join(installedDir, 'test-ext-config.yml'), 'utf-8')).toBe('key: value');
+      expect(existsSync(join(installedDir, '.keep-config'))).toBe(true);
+
+      await manager.installFromDirectory(extDir, '1.0.0', false);
+      manager.remove('test-ext');
       expect(existsSync(join(projectRoot, '.specify', 'extensions', '.backup', 'test-ext', 'test-ext-config.yml'))).toBe(true);
     });
   });
@@ -736,7 +741,7 @@ describe('ExtensionManager', () => {
       expect(manager.listInstalled()).toEqual([]);
     });
 
-    test('returns installed extensions sorted by priority', async () => {
+    test('returns installed extensions; listByPriority sorts by priority', async () => {
       const projectRoot = setupTestProject();
       const manager = new ExtensionManager(projectRoot);
       
@@ -747,10 +752,10 @@ describe('ExtensionManager', () => {
       await manager.installFromDirectory(ext2Dir, '1.0.0', false, 5);
       
       const list = manager.listInstalled();
-      
+
       expect(list).toHaveLength(2);
-      expect(list[0].id).toBe('ext-two');
-      expect(list[1].id).toBe('ext-one');
+      expect(list.map((e) => e.priority).sort((a, b) => a - b)).toEqual([5, 20]);
+      expect(manager.registry.listByPriority().map(([id]) => id)).toEqual(['ext-two', 'ext-one']);
     });
   });
 

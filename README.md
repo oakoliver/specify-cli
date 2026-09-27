@@ -2,7 +2,9 @@
 
 Spec-Driven Development CLI for AI coding agents. Zero runtime dependencies, multi-runtime (Node.js 18+, Bun, Deno).
 
-Ported from [github/spec-kit](https://github.com/github/spec-kit) (Python) to TypeScript.
+Ported from [github/spec-kit](https://github.com/github/spec-kit) (Python) to TypeScript, at **1:1 parity with spec-kit v1.0.12** (run `specify version` to see the parity line).
+
+> **v2.0.0 is a breaking release**, mirroring upstream's 1.0 line: the legacy `--ai`, `--ai-commands-dir`, `--ai-skills` and `--no-git` init flags are gone (use `--integration` / `--integration-options`; git is now the opt-in `git` extension), the roo/windsurf/iflow agents were retired upstream, and extensions/presets use `extension.yml` / `preset.yml` manifests.
 
 ## Install
 
@@ -15,17 +17,21 @@ bun install -g @oakoliver/specify-cli
 ## Quick Start
 
 ```bash
-# Initialize a new project with interactive agent selection
+# Initialize a new project with interactive integration selection
 specify init my-project
 
-# Or specify the agent directly
-specify init my-project --ai opencode
+# Or pick the integration directly
+specify init my-project --integration opencode
 
-# Initialize in current directory
-specify init . --ai claude --here
+# Initialize in the current directory, scripted (no prompts)
+specify init --here --force --non-interactive --integration claude
 
-# Check project structure
+# Add the opt-in git extension and a preset at init time
+specify init my-project --integration claude --extension git --preset lean
+
+# Check installed tools / project health
 specify check
+specify integration status
 ```
 
 ## The Spec-Driven Development Workflow
@@ -42,7 +48,7 @@ flowchart TB
         EXTENSIONS[".specify/extensions.yml<br/>Custom Commands & Hooks"]
     end
 
-    subgraph Commands["9 Slash Commands"]
+    subgraph Commands["10 Slash Commands"]
         direction LR
         CONSTITUTION["/speckit.constitution"]
         SPECIFY["/speckit.specify"]
@@ -53,6 +59,7 @@ flowchart TB
         ANALYZE["/speckit.analyze"]
         CHECKLIST["/speckit.checklist"]
         ISSUES["/speckit.taskstoissues"]
+        CONVERGE["/speckit.converge"]
     end
 
     subgraph Artifacts["Generated Artifacts"]
@@ -94,7 +101,7 @@ sequenceDiagram
 
     Note over Dev,FS: PHASE 0: Project Setup
 
-    Dev->>CLI: specify init my-project --ai claude
+    Dev->>CLI: specify init my-project --integration claude
     CLI->>FS: Create .specify/ structure
     CLI->>FS: Copy templates (spec, plan, tasks, checklist)
     CLI->>FS: Create constitution-template.md
@@ -426,6 +433,7 @@ The AI agent:
 | `/speckit.checklist` | To create quality checklists |
 | `/speckit.constitution` | To define project principles |
 | `/speckit.taskstoissues` | To export tasks as GitHub issues |
+| `/speckit.converge` | To append remaining unbuilt work to tasks.md after an implement pass |
 
 ## Complete Examples
 
@@ -433,7 +441,7 @@ The AI agent:
 
 ```bash
 # 1. Create the project
-specify init my-saas --ai claude
+specify init my-saas --integration claude
 
 # 2. Create feature branch
 cd my-saas
@@ -510,73 +518,84 @@ Creates `checklists/security.md`:
 
 ## Supported AI Agents
 
-28 AI coding agents supported:
+41 integrations (upstream spec-kit v1.0.12 registry, including `generic`). Skills-based integrations install one `<name>/SKILL.md` per command and invoke as `/speckit-<name>`; command-based ones use `/speckit.<name>`.
 
-| Agent | Command Directory | Format |
-|-------|------------------|--------|
-| claude | `.claude/commands/` | Markdown |
-| copilot | `.github/agents/` + `.github/prompts/` | Markdown |
-| gemini | `.gemini/commands/` | TOML |
-| opencode | `.opencode/command/` | Markdown |
-| cursor | `.cursor/commands/` | Markdown |
-| codex | `.agents/skills/` | SKILL.md |
-| windsurf | `.windsurf/workflows/` | Markdown |
-| tabnine | `.tabnine/agent/commands/` | TOML |
-| kimi | `.kimi/skills/` | SKILL.md |
-| qwen | `.qwen/commands/` | Markdown |
-| junie | `.junie/commands/` | Markdown |
-| roo | `.roo/commands/` | Markdown |
-| amp | `.agents/commands/` | Markdown |
-| trae | `.trae/rules/` | Markdown |
-| goose | `.goose/recipes/` | YAML |
-| forge | `.forge/commands/` | Markdown |
-| jules | `.jules/commands/` | Markdown |
-| agy | `.antigravity/skills/` | SKILL.md |
-| kiro | `.kiro/prompts/` | Markdown |
-| *and more...* | | |
+| Key | Agent | Commands / skills directory | Format |
+|-----|-------|-----------------------------|--------|
+| agy | Antigravity | `.agents/skills` | SKILL.md |
+| alquimia | Alquimia AI | `.alquimia/skills` | SKILL.md |
+| amp | Amp | `.agents/commands` | Markdown |
+| auggie | Auggie CLI | `.augment/commands` | Markdown |
+| bob | IBM Bob | `.bob/commands` | Markdown |
+| claude | Claude Code | `.claude/skills` | SKILL.md |
+| cline | Cline | `.clinerules/workflows` | Markdown |
+| codebuddy | CodeBuddy | `.codebuddy/commands` | Markdown |
+| codex | Codex CLI | `.agents/skills` | SKILL.md |
+| command-code | Command Code | `.commandcode/skills` | SKILL.md |
+| copilot | GitHub Copilot | `.github/agents` | Markdown |
+| cursor-agent | Cursor | `.cursor/skills` | SKILL.md |
+| devin | Devin for Terminal | `.devin/skills` | SKILL.md |
+| docker-agent | Docker Agent | `.agents/skills` | SKILL.md |
+| droid | Factory Droid | `.factory/skills` | SKILL.md |
+| dsh | DeepSeek Harness | `.dsh/skills` | SKILL.md |
+| firebender | Firebender | `.firebender/commands` | Markdown |
+| forge | Forge | `.forge/commands` | Markdown |
+| gemini | Gemini CLI | `.gemini/commands` | TOML |
+| generic | Generic (bring your own agent) | `--commands-dir` | Markdown |
+| goose | Goose | `.goose/recipes` | YAML |
+| grok | Grok Build | `.grok/skills` | SKILL.md |
+| hermes | Hermes Agent | `~/.hermes/skills` | SKILL.md |
+| junie | Junie | `.junie/commands` | Markdown |
+| kilocode | Kilo Code | `.kilo/commands` | Markdown |
+| kimi | Kimi Code | `.kimi-code/skills` | SKILL.md |
+| kiro-cli | Kiro CLI | `.kiro/prompts` | Markdown |
+| lingma | Lingma | `.lingma/skills` | SKILL.md |
+| muse | Muse Code | `.agents/skills` | SKILL.md |
+| omp | Oh My Pi | `.omp/commands` | Markdown |
+| opencode | opencode | `.opencode/commands` | Markdown |
+| pi | Pi Coding Agent | `.pi/prompts` | Markdown |
+| qodercli | Qoder CLI | `.qoder/skills` | SKILL.md |
+| qwen | Qwen Code | `.qwen/commands` | Markdown |
+| rovodev | RovoDev ACLI | `.rovodev/skills` | SKILL.md |
+| shai | SHAI | `.shai/commands` | Markdown |
+| tabnine | Tabnine CLI | `.tabnine/agent/commands` | TOML |
+| trae | Trae | `.trae/skills` | SKILL.md |
+| vibe | Mistral Vibe | `.vibe/skills` | SKILL.md |
+| zcode | ZCode | `.zcode/skills` | SKILL.md |
+| zed | Zed | `.agents/skills` | SKILL.md |
+
+`copilot` installs skills (`.github/skills/`) by default; pass `--integration-options="--commands"` for legacy `.github/agents/` prompt files. `generic` requires `--integration-options="--commands-dir <dir>"`.
 
 ## CLI Reference
 
-### `specify init`
-
-```bash
-specify init <project-name> [options]
-
-Arguments:
-  project-name          Project directory name (use "." for current dir)
-
-Options:
-  --ai <agent>          AI agent to configure (default: interactive picker)
-  --here                Initialize in current directory (requires ".")
-  --force               Overwrite existing files
-  --no-git              Skip git repository initialization
-  --script <sh|ps>      Shell script type (default: sh)
-  --branch-numbering    "sequential" or "timestamp" (default: sequential)
-  --ai-skills           Generate SKILL.md files for skill-based agents
-  --ai-commands-dir     Custom commands directory (for generic agent)
-  --offline             Use bundled assets only (no network)
-  --help                Show help
-  --version             Show version
-
-Examples:
-  specify init my-app
-  specify init my-app --ai opencode
-  specify init . --ai claude --here --force
-  specify init my-app --ai codex --ai-skills
-  specify init my-app --script ps --branch-numbering timestamp
+```text
+specify init [PROJECT_NAME]   Initialize a new Specify project
+specify check                 Check that all required tools are installed
+specify version               Display version and system information
+specify self check|upgrade    Check for / install newer CLI releases (npm/bun/pnpm/yarn)
+specify integration ...       list, install, uninstall, switch, use, upgrade, status, scaffold, search, info, catalog
+specify extension ...         list [--json], add, remove, search, info, update, enable, disable, set-priority, catalog
+specify preset ...            list [--json], add, remove, search, info, update, resolve, enable, disable, set-priority, catalog
+specify workflow ...          run, resume, status, list, add, remove, search, info, update, enable, disable, resolve,
+                              catalog, step (add/remove/list/search/info/catalog), overlay
+specify bundle ...            search, info, list, install, add, update, remove, validate, build, init, catalog
+specify artifact ...          list, info, lookup (introspect commands/templates/scripts/hooks)
+specify event run             Execute event-driven hook commands
+specify doctor | status       Project diagnostics / overview (specify-cli additions, not in upstream)
 ```
 
-### `specify check`
+Every command supports `--help`. Key `specify init` options:
 
-```bash
-specify check [options]
-
-Options:
-  --fix                 Auto-fix missing directories and files
-
-Examples:
-  specify check
-  specify check --fix
+```text
+--integration KEY            Coding agent integration (default: copilot when non-interactive)
+--integration-options STR    e.g. --integration-options="--commands-dir .myagent/cmds"
+--script sh|ps|py            Script flavour (bash, PowerShell, Python)
+--here / --force             Initialize in the current directory / skip the non-empty confirmation
+--non-interactive            Never prompt (CI and agent harnesses)
+--preset ID                  Install a preset during init
+--extension SPEC             Bundled name, local path or HTTPS URL (repeatable)
+--trust-extension-urls       Pre-authorize URL extensions without the trust prompt
+--ignore-agent-tools         Skip checks for coding agent CLIs
 ```
 
 ## Project Structure
@@ -585,6 +604,9 @@ Examples:
 my-project/
 ├── .specify/
 │   ├── init-options.json        # Saved configuration
+│   ├── integration.json         # Installed/default integrations
+│   ├── integrations/            # Per-integration file manifests (hashes)
+│   ├── workflows/               # Installed workflows (bundled `speckit`) + runs
 │   ├── memory/
 │   │   └── constitution.md      # Project principles & guidelines
 │   ├── templates/
@@ -593,17 +615,15 @@ my-project/
 │   │   ├── tasks-template.md    # Tasks template
 │   │   └── ...
 │   ├── scripts/
-│   │   └── bash/
+│   │   └── bash/ | powershell/ | python/
 │   │       ├── create-new-feature.sh
 │   │       ├── setup-plan.sh
+│   │       ├── setup-tasks.sh
 │   │       └── ...
 │   ├── extensions/              # Installed extensions
 │   └── presets/                 # Installed presets
-├── .<agent>/                    # Agent-specific config
-│   └── commands/                # Installed slash commands
-│       ├── speckit.specify.md
-│       ├── speckit.plan.md
-│       └── ...
+├── .<agent>/                    # Agent-specific commands or skills
+│   └── skills/speckit-specify/SKILL.md   (or commands/speckit.specify.md)
 └── specs/                       # Feature specifications
     └── 001-feature-name/
         ├── spec.md
@@ -627,43 +647,35 @@ specify extension remove <extension-id>
 specify preset add <preset-name>
 specify preset list
 specify preset remove <preset-id>
+
+# Bundled first-party assets (no network needed)
+specify extension add git            # opt-in git branching workflow
+specify preset add lean
+specify workflow run speckit         # full specify -> plan -> tasks -> implement cycle
 ```
 
 ## Programmatic API
 
-Use spec-kit in your own tools:
-
 ```typescript
-import { 
-  init, 
-  check, 
-  AGENT_CONFIGS, 
-  SUPPORTED_AGENTS,
-  registerCommands,
-  ExtensionManager,
-  PresetResolver
+import {
+  runInitCommand,          // same as `specify init ...`, returns an exit code
+  INTEGRATION_REGISTRY,
+  getIntegration,
+  CommandRegistrar,
+  WorkflowEngine,
+  parseYaml,
+  UPSTREAM_SPEC_KIT_VERSION, // '1.0.12'
+  extensions, presets, workflows, bundles, events, artifacts, // full domain namespaces
 } from '@oakoliver/specify-cli';
 
-// Initialize a project programmatically
-await init({
-  projectName: 'my-project',
-  ai: 'opencode',
-  script: 'sh',
-  branchNumbering: 'sequential',
-  noGit: false,
-});
+const code = await runInitCommand(['my-project', '--integration', 'claude', '--non-interactive']);
 
-// Check project structure
-const result = await check({ fix: false });
-console.log(result.overall); // 'valid' | 'fixable' | 'invalid'
+const claude = getIntegration('claude');
+console.log(claude?.config?.name);          // 'Claude Code'
+console.log(Object.keys(INTEGRATION_REGISTRY).length); // 41
 
-// Get agent configuration
-const config = AGENT_CONFIGS['claude'];
-console.log(config.dir);    // '.claude/commands'
-console.log(config.format); // 'markdown'
-
-// List all supported agents
-console.log(SUPPORTED_AGENTS); // ['claude', 'copilot', 'gemini', ...]
+const manager = new extensions.ExtensionManager('/path/to/project');
+console.log(manager.listInstalled());
 ```
 
 ## Why Spec-Driven Development?

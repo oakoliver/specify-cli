@@ -1,245 +1,120 @@
 /**
  * @oakoliver/specify-cli - Check Command
  *
- * Verifies project setup and required tools.
+ * Port of spec-kit `command_check.py` (v1.0.12): `specify check` detects which
+ * integration CLIs (those whose config sets `requires_cli`) and VS Code
+ * variants are installed, rendered as a StepTracker tree.
  *
  * @module check
  */
 
-import { existsSync } from 'node:fs';
-import { execSync } from 'node:child_process';
-import { join } from 'node:path';
-
-import { loadInitOptions, isSpeckitProject, findProjectRoot, SPECKIT_DIR } from './config.js';
-import { AGENT_CONFIGS } from './types.js';
-import {
-  printBanner,
-  printStep,
-  printSuccess,
-  printError,
-  printWarning,
-  titleStyle,
-} from './ui.js';
+import { StepTracker, console } from './console.js';
+import { printBanner } from './ui.js';
+import { checkTool } from './utils.js';
 
 // ============================================================================
 // Types
 // ============================================================================
 
+/** Result of a single tool check (kept for API compatibility with earlier releases). */
 export interface CheckResult {
   name: string;
   status: 'ok' | 'warning' | 'error';
   message?: string;
 }
 
-// ============================================================================
-// Tool Checking
-// ============================================================================
-
-/**
- * Check if a command-line tool is available.
- */
-function checkTool(name: string): boolean {
-  try {
-    execSync(`${name} --version`, { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
+/** Minimal shape of an AGENT_CONFIG entry used by `specify check`. */
+export interface CheckAgentConfig {
+  name: string;
+  requires_cli: boolean;
+  [key: string]: unknown;
 }
 
-/**
- * Check if git is installed and available.
- */
-function checkGit(): CheckResult {
-  if (checkTool('git')) {
-    return { name: 'git', status: 'ok' };
-  }
-  return {
-    name: 'git',
-    status: 'warning',
-    message: 'Git not found. Some features may not work.',
-  };
-}
-
-/**
- * Check if GitHub CLI is installed.
- */
-function checkGitHubCli(): CheckResult {
-  if (checkTool('gh')) {
-    return { name: 'gh (GitHub CLI)', status: 'ok' };
-  }
-  return {
-    name: 'gh (GitHub CLI)',
-    status: 'warning',
-    message: 'GitHub CLI not found. /speckit.taskstoissues will not work.',
-  };
+/** Summary returned by {@link checkAvailableTools}. */
+export interface CheckSummary {
+  /** agent key -> whether its CLI was found (IDE-based agents are false). */
+  agentResults: Record<string, boolean>;
+  tracker: StepTracker;
 }
 
 // ============================================================================
-// Project Checking
+// Injection surface (tests)
 // ============================================================================
 
-/**
- * Check project structure.
- */
-function checkProjectStructure(projectRoot: string): CheckResult[] {
-  const results: CheckResult[] = [];
+type RegistryLike =
+  | Map<string, { config?: Record<string, unknown> | null }>
+  | Record<string, { config?: Record<string, unknown> | null }>;
 
-  // Check .specify directory
-  if (existsSync(join(projectRoot, SPECKIT_DIR))) {
-    results.push({ name: '.specify directory', status: 'ok' });
-  } else {
-    results.push({
-      name: '.specify directory',
-      status: 'error',
-      message: 'Not found. Run `specify init` to initialize.',
-    });
-    return results; // Stop checking if not initialized
+/** Port of `_agent_config._build_agent_config()` over the integration registry. */
+export function buildAgentConfig(registry: RegistryLike): Record<string, CheckAgentConfig> {
+  const entries = registry instanceof Map ? [...registry.entries()] : Object.entries(registry);
+  const config: Record<string, CheckAgentConfig> = {};
+  for (const [key, integration] of entries) {
+    const cfg = integration?.config;
+    if (cfg && Object.keys(cfg).length > 0) config[key] = { ...cfg } as CheckAgentConfig;
   }
+  return config;
+}
 
-  // Check init-options.json
-  const initOptions = loadInitOptions(projectRoot);
-  if (initOptions.ai) {
-    results.push({ name: 'init-options.json', status: 'ok' });
-  } else {
-    results.push({
-      name: 'init-options.json',
-      status: 'warning',
-      message: 'Missing or invalid. Run `specify init --force` to reinitialize.',
-    });
-  }
+export const checkDeps = {
+  // Lazy import: the registry pulls in every integration module (upstream builds
+  // AGENT_CONFIG at import time of _agent_config.py).
+  agentConfig: async (): Promise<Record<string, CheckAgentConfig>> => {
+    const { INTEGRATION_REGISTRY } = await import('./integrations/index.js');
+    return buildAgentConfig(INTEGRATION_REGISTRY as unknown as RegistryLike);
+  },
+  checkTool: (tool: string, tracker?: StepTracker | null): boolean => checkTool(tool, tracker ?? undefined),
+  // Keep this port's animated gradient banner (upstream: show_banner()).
+  showBanner: (): Promise<void> => printBanner(),
+};
 
-  // Check templates directory
-  if (existsSync(join(projectRoot, SPECKIT_DIR, 'templates'))) {
-    results.push({ name: 'templates directory', status: 'ok' });
-  } else {
-    results.push({
-      name: 'templates directory',
-      status: 'warning',
-      message: 'Templates not found.',
-    });
-  }
+// ============================================================================
+// Check
+// ============================================================================
 
-  // Check scripts directory
-  if (existsSync(join(projectRoot, SPECKIT_DIR, 'scripts'))) {
-    results.push({ name: 'scripts directory', status: 'ok' });
-  } else {
-    results.push({
-      name: 'scripts directory',
-      status: 'warning',
-      message: 'Scripts not found.',
-    });
-  }
+/** Run the tool checks without printing (used by `specify check`). */
+export async function checkAvailableTools(): Promise<CheckSummary> {
+  const tracker = new StepTracker('Check Available Tools');
+  const agentResults: Record<string, boolean> = {};
 
-  // Check agent commands
-  const agentConfig = AGENT_CONFIGS[initOptions.ai];
-  if (agentConfig) {
-    const commandsDir = join(projectRoot, agentConfig.dir);
-    if (existsSync(commandsDir)) {
-      results.push({ name: `${initOptions.ai} commands`, status: 'ok' });
+  for (const [agentKey, agentConfig] of Object.entries(await checkDeps.agentConfig())) {
+    if (agentKey === 'generic') continue;
+    tracker.add(agentKey, String(agentConfig.name));
+    if (agentConfig.requires_cli) {
+      agentResults[agentKey] = checkDeps.checkTool(agentKey, tracker);
     } else {
-      results.push({
-        name: `${initOptions.ai} commands`,
-        status: 'warning',
-        message: `Commands directory not found at ${agentConfig.dir}`,
-      });
+      tracker.skip(agentKey, 'IDE-based, no CLI check');
+      agentResults[agentKey] = false;
     }
   }
 
-  // Check specs directory
-  if (existsSync(join(projectRoot, 'specs'))) {
-    results.push({ name: 'specs directory', status: 'ok' });
-  } else {
-    results.push({
-      name: 'specs directory',
-      status: 'warning',
-      message: 'Specs directory not found.',
-    });
-  }
+  tracker.add('code', 'Visual Studio Code');
+  checkDeps.checkTool('code', tracker);
 
-  return results;
+  tracker.add('code-insiders', 'Visual Studio Code Insiders');
+  checkDeps.checkTool('code-insiders', tracker);
+
+  return { agentResults, tracker };
 }
 
-// ============================================================================
-// Main Check Function
-// ============================================================================
-
 /**
- * Run all checks and report results.
+ * Check that all required tools are installed (`specify check`).
+ * Always succeeds (upstream exits 0); returns true for backward compatibility.
  */
 export async function check(): Promise<boolean> {
-  await printBanner();
-  console.log();
-  console.log(titleStyle.render('Checking project setup...'));
-  console.log();
+  await checkDeps.showBanner();
+  console.print('[bold]Checking for installed tools...[/bold]\n');
 
-  const results: CheckResult[] = [];
+  const { agentResults, tracker } = await checkAvailableTools();
 
-  // Tool checks
-  console.log(titleStyle.render('Tools'));
-  console.log();
+  console.print(tracker.render());
 
-  const gitResult = checkGit();
-  results.push(gitResult);
-  printStep(gitResult.name, gitResult.status === 'ok' ? 'done' : 'skip');
-  if (gitResult.message) {
-    printWarning(gitResult.message);
+  console.print('\n[bold green]Specify CLI is ready to use![/bold green]');
+
+  if (!Object.values(agentResults).some(Boolean)) {
+    console.print('[dim]Tip: Install a coding agent for the best experience[/dim]');
   }
 
-  const ghResult = checkGitHubCli();
-  results.push(ghResult);
-  printStep(ghResult.name, ghResult.status === 'ok' ? 'done' : 'skip');
-  if (ghResult.message) {
-    printWarning(ghResult.message);
-  }
-
-  console.log();
-
-  // Project structure checks
-  const projectRoot = findProjectRoot(process.cwd());
-  
-  if (!projectRoot) {
-    console.log(titleStyle.render('Project'));
-    console.log();
-    printError('Not in a spec-kit project. Run `specify init` first.');
-    return false;
-  }
-
-  console.log(titleStyle.render('Project Structure'));
-  console.log();
-
-  const projectResults = checkProjectStructure(projectRoot);
-  results.push(...projectResults);
-
-  for (const result of projectResults) {
-    printStep(
-      result.name,
-      result.status === 'ok' ? 'done' : result.status === 'warning' ? 'skip' : 'error'
-    );
-    if (result.message) {
-      if (result.status === 'error') {
-        printError(result.message);
-      } else {
-        printWarning(result.message);
-      }
-    }
-  }
-
-  console.log();
-
-  // Summary
-  const errors = results.filter(r => r.status === 'error');
-  const warnings = results.filter(r => r.status === 'warning');
-
-  if (errors.length > 0) {
-    printError(`${errors.length} error(s) found. Please fix before proceeding.`);
-    return false;
-  } else if (warnings.length > 0) {
-    printWarning(`${warnings.length} warning(s) found. Some features may not work.`);
-    printSuccess('Project check completed with warnings.');
-    return true;
-  } else {
-    printSuccess('All checks passed!');
-    return true;
-  }
+  console.print("[dim]Tip: Run 'specify self check' to verify you have the latest CLI version[/dim]");
+  return true;
 }

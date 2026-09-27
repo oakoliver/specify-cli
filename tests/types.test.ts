@@ -1,34 +1,32 @@
 /**
- * Tests for core types and configuration
+ * Tests for core types (legacy compatibility layer over the integration
+ * registry) and configuration.
  *
- * This test suite matches the coverage from Python's spec-kit tests:
- * - test_agent_config_consistency.py
- * - test_branch_numbering.py
- * - test_merge.py (partial - JSON handling)
+ * Ports tests/test_agent_config_consistency.py (upstream v1.0.12): the agent
+ * table now derives from the integration registry, so retired agents (roo,
+ * windsurf, iflow, cursor, jules, kiro alias) are gone and skills-first agents
+ * (claude, codex, kimi, qodercli, trae, cursor-agent, ...) use `/SKILL.md`.
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import {
-  // Types and constants
   AGENT_CONFIGS,
   SUPPORTED_AGENTS,
   DEFAULT_INIT_OPTIONS,
-  type AgentConfig,
   type InitOptions,
-
-  // Utility functions
   isAgentSupported,
   getAgentCommandsDir,
   getCommandFilePath,
   isSkillBasedAgent,
   isTomlAgent,
+  isYamlAgent,
   getAgentArgsPlaceholder,
-
-  // Config functions
+} from '../src/types.js';
+import {
   loadInitOptions,
   saveInitOptions,
   loadExtensionRegistry,
@@ -41,411 +39,154 @@ import {
   INIT_OPTIONS_PATH,
   EXTENSION_REGISTRY_PATH,
   PRESET_REGISTRY_PATH,
-} from '../src/index.js';
+} from '../src/config.js';
+import { CommandRegistrar } from '../src/agents.js';
+import { INTEGRATION_REGISTRY } from '../src/integrations/index.js';
 
 // ============================================================================
-// Agent Configuration Tests (matches test_agent_config_consistency.py)
+// Agent Configuration Tests (test_agent_config_consistency.py)
 // ============================================================================
+
+const EXPECTED: Record<string, [string, string, string, string]> = {
+  // key: [dir, format, args, extension]
+  agy: ['.agents/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  alquimia: ['.alquimia/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  amp: ['.agents/commands', 'markdown', '$ARGUMENTS', '.md'],
+  auggie: ['.augment/commands', 'markdown', '$ARGUMENTS', '.md'],
+  bob: ['.bob/commands', 'markdown', '$ARGUMENTS', '.md'],
+  claude: ['.claude/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  cline: ['.clinerules/workflows', 'markdown', '$ARGUMENTS', '.md'],
+  codebuddy: ['.codebuddy/commands', 'markdown', '$ARGUMENTS', '.md'],
+  codex: ['.agents/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  'command-code': ['.commandcode/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  copilot: ['.github/agents', 'markdown', '$ARGUMENTS', '.agent.md'],
+  'cursor-agent': ['.cursor/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  devin: ['.devin/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  'docker-agent': ['.agents/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  droid: ['.factory/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  dsh: ['.dsh/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  firebender: ['.firebender/commands', 'markdown', '$ARGUMENTS', '.mdc'],
+  forge: ['.forge/commands', 'markdown', '{{parameters}}', '.md'],
+  gemini: ['.gemini/commands', 'toml', '{{args}}', '.toml'],
+  goose: ['.goose/recipes', 'yaml', '{{args}}', '.yaml'],
+  grok: ['.grok/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  hermes: ['~/.hermes/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  junie: ['.junie/commands', 'markdown', '$ARGUMENTS', '.md'],
+  kilocode: ['.kilo/commands', 'markdown', '$ARGUMENTS', '.md'],
+  kimi: ['.kimi-code/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  'kiro-cli': ['.kiro/prompts', 'markdown', '(the user will provide the argument in this conversation)', '.md'],
+  lingma: ['.lingma/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  muse: ['.agents/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  omp: ['.omp/commands', 'markdown', '$ARGUMENTS', '.md'],
+  opencode: ['.opencode/commands', 'markdown', '$ARGUMENTS', '.md'],
+  pi: ['.pi/prompts', 'markdown', '$ARGUMENTS', '.md'],
+  qodercli: ['.qoder/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  qwen: ['.qwen/commands', 'markdown', '$ARGUMENTS', '.md'],
+  rovodev: ['.rovodev/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  shai: ['.shai/commands', 'markdown', '$ARGUMENTS', '.md'],
+  tabnine: ['.tabnine/agent/commands', 'toml', '{{args}}', '.toml'],
+  trae: ['.trae/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  vibe: ['.vibe/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  zcode: ['.zcode/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+  zed: ['.agents/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
+};
 
 describe('AGENT_CONFIGS', () => {
-  test('contains all 28 supported agents', () => {
-    expect(SUPPORTED_AGENTS.length).toBe(28);
+  test('contains all 40 registrar agents (generic excluded)', () => {
+    expect(SUPPORTED_AGENTS.length).toBe(40);
+    expect([...SUPPORTED_AGENTS].sort()).toEqual(Object.keys(EXPECTED).sort());
+    expect(SUPPORTED_AGENTS).toEqual(Object.keys(CommandRegistrar.AGENT_CONFIGS));
   });
 
-  // Test each agent individually (matches Python's parametrized tests)
-  const expectedAgents = [
-    'claude',
-    'gemini',
-    'copilot',
-    'cursor',
-    'qwen',
-    'opencode',
-    'codex',
-    'windsurf',
-    'junie',
-    'kilocode',
-    'auggie',
-    'roo',
-    'codebuddy',
-    'qodercli',
-    'kiro-cli',
-    'pi',
-    'amp',
-    'shai',
-    'tabnine',
-    'bob',
-    'kimi',
-    'trae',
-    'iflow',
-    // New agents added in v1.1.0
-    'goose',
-    'forge',
-    'jules',
-    'agy',
-    'kiro', // alias for kiro-cli
-  ];
+  for (const [agent, [dir, format, args, extension]] of Object.entries(EXPECTED)) {
+    test(`${agent} config`, () => {
+      const cfg = AGENT_CONFIGS[agent];
+      expect([cfg.dir, cfg.format, cfg.args, cfg.extension]).toEqual([dir, format, args, extension]);
+    });
+  }
 
-  test('contains all expected agents', () => {
-    for (const agent of expectedAgents) {
-      expect(AGENT_CONFIGS[agent]).toBeDefined();
+  test('retired agents removed', () => {
+    for (const agent of ['roo', 'windsurf', 'iflow', 'cursor', 'jules', 'kiro', 'q']) {
+      expect(isAgentSupported(agent)).toBe(false);
     }
   });
 
-  test('does not contain removed legacy agents (q/amazonq)', () => {
-    expect(AGENT_CONFIGS['q']).toBeUndefined();
-    expect(AGENT_CONFIGS['amazonq']).toBeUndefined();
+  test('legacy dirs kept for migration', () => {
+    expect(AGENT_CONFIGS.kilocode.legacy_dir).toBe('.kilocode/workflows');
+    expect(AGENT_CONFIGS.opencode.legacy_dir).toBe('.opencode/command');
+    expect(AGENT_CONFIGS.hermes.detect_dir).toBe('.hermes/skills');
   });
 
-  // Individual agent tests (matches test_*_in_agent_config tests)
-  describe('claude', () => {
-    test('has correct configuration', () => {
-      const config = AGENT_CONFIGS['claude'];
-      expect(config).toEqual({
-        dir: '.claude/commands',
-        format: 'markdown',
-        args: '$ARGUMENTS',
-        extension: '.md',
-      });
-    });
-  });
-
-  describe('gemini', () => {
-    test('has TOML format', () => {
-      const config = AGENT_CONFIGS['gemini'];
-      expect(config.format).toBe('toml');
-      expect(config.extension).toBe('.toml');
-      expect(config.args).toBe('{{args}}');
-      expect(config.dir).toBe('.gemini/commands');
-    });
-  });
-
-  describe('copilot', () => {
-    test('has .agent.md extension', () => {
-      const config = AGENT_CONFIGS['copilot'];
-      expect(config.dir).toBe('.github/agents');
-      expect(config.format).toBe('markdown');
-      expect(config.extension).toBe('.agent.md');
-    });
-  });
-
-  describe('cursor', () => {
-    test('has correct configuration', () => {
-      const config = AGENT_CONFIGS['cursor'];
-      expect(config.dir).toBe('.cursor/commands');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('qwen', () => {
-    test('uses markdown format', () => {
-      const config = AGENT_CONFIGS['qwen'];
-      expect(config.format).toBe('markdown');
-      expect(config.dir).toBe('.qwen/commands');
-    });
-  });
-
-  describe('opencode', () => {
-    test('has singular command directory', () => {
-      const config = AGENT_CONFIGS['opencode'];
-      expect(config.dir).toBe('.opencode/command');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('codex', () => {
-    test('uses native skills directory', () => {
-      const config = AGENT_CONFIGS['codex'];
-      expect(config.dir).toBe('.agents/skills');
-      expect(config.extension).toBe('/SKILL.md');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('windsurf', () => {
-    test('uses workflows directory', () => {
-      const config = AGENT_CONFIGS['windsurf'];
-      expect(config.dir).toBe('.windsurf/workflows');
-    });
-  });
-
-  describe('kilocode', () => {
-    test('uses workflows directory', () => {
-      const config = AGENT_CONFIGS['kilocode'];
-      expect(config.dir).toBe('.kilocode/workflows');
-    });
-  });
-
-  describe('kiro-cli', () => {
-    test('uses prompts directory', () => {
-      const config = AGENT_CONFIGS['kiro-cli'];
-      expect(config.dir).toBe('.kiro/prompts');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('pi', () => {
-    test('uses prompts directory', () => {
-      const config = AGENT_CONFIGS['pi'];
-      expect(config.dir).toBe('.pi/prompts');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('amp', () => {
-    test('uses commands directory under .agents', () => {
-      const config = AGENT_CONFIGS['amp'];
-      expect(config.dir).toBe('.agents/commands');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('tabnine', () => {
-    test('has TOML format', () => {
-      const config = AGENT_CONFIGS['tabnine'];
-      expect(config.format).toBe('toml');
-      expect(config.extension).toBe('.toml');
-      expect(config.args).toBe('{{args}}');
-      expect(config.dir).toBe('.tabnine/agent/commands');
-    });
-  });
-
-  describe('kimi', () => {
-    test('uses skills directory', () => {
-      const config = AGENT_CONFIGS['kimi'];
-      expect(config.dir).toBe('.kimi/skills');
-      expect(config.extension).toBe('/SKILL.md');
-    });
-  });
-
-  describe('trae', () => {
-    test('uses rules directory', () => {
-      const config = AGENT_CONFIGS['trae'];
-      expect(config.dir).toBe('.trae/rules');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('iflow', () => {
-    test('uses commands directory', () => {
-      const config = AGENT_CONFIGS['iflow'];
-      expect(config.dir).toBe('.iflow/commands');
-      expect(config.format).toBe('markdown');
-    });
-  });
-
-  describe('roo', () => {
-    test('has correct configuration', () => {
-      const config = AGENT_CONFIGS['roo'];
-      expect(config.dir).toBe('.roo/commands');
-    });
-  });
-
-  describe('shai', () => {
-    test('has correct configuration', () => {
-      const config = AGENT_CONFIGS['shai'];
-      expect(config.dir).toBe('.shai/commands');
-    });
-  });
-
-  // Structural validation (matches test_all_agents_have_required_fields)
-  test('all agents have required fields', () => {
-    for (const [name, config] of Object.entries(AGENT_CONFIGS)) {
-      expect(config.dir, `${name} missing dir`).toBeDefined();
-      expect(config.format, `${name} missing format`).toBeDefined();
-      expect(config.args, `${name} missing args`).toBeDefined();
-      expect(config.extension, `${name} missing extension`).toBeDefined();
-      expect(['markdown', 'toml', 'yaml']).toContain(config.format);
+  test('skills agents have hyphen invoke separator', () => {
+    for (const [agent, cfg] of Object.entries(AGENT_CONFIGS)) {
+      if (cfg.extension === '/SKILL.md') expect({ agent, sep: cfg.invoke_separator }).toEqual({ agent, sep: '-' });
     }
+    expect(AGENT_CONFIGS.gemini.invoke_separator).toBe('.');
+    expect(AGENT_CONFIGS.forge.invoke_separator).toBe('-');
   });
 
-  test('all agent directories start with dot', () => {
-    for (const [name, config] of Object.entries(AGENT_CONFIGS)) {
-      expect(config.dir.startsWith('.'), `${name} dir should start with dot`).toBe(true);
-    }
+  test('codex dev_no_symlink policy', () => {
+    expect(AGENT_CONFIGS.codex.dev_no_symlink).toBe(true);
   });
 
-  test('TOML agents use {{args}} placeholder', () => {
-    const tomlAgents = Object.entries(AGENT_CONFIGS).filter(
-      ([_, config]) => config.format === 'toml'
-    );
-    expect(tomlAgents.length).toBeGreaterThan(0);
-    for (const [name, config] of tomlAgents) {
-      expect(config.args, `${name} should use {{args}}`).toBe('{{args}}');
-    }
-  });
-
-  test('markdown agents use $ARGUMENTS placeholder (except forge)', () => {
-    const markdownAgents = Object.entries(AGENT_CONFIGS).filter(
-      ([name, config]) => config.format === 'markdown' && name !== 'forge'
-    );
-    expect(markdownAgents.length).toBeGreaterThan(0);
-    for (const [name, config] of markdownAgents) {
-      expect(config.args, `${name} should use $ARGUMENTS`).toBe('$ARGUMENTS');
-    }
-  });
-
-  test('forge uses {{parameters}} placeholder', () => {
-    expect(AGENT_CONFIGS['forge'].args).toBe('{{parameters}}');
-  });
-
-  test('goose uses yaml format', () => {
-    expect(AGENT_CONFIGS['goose'].format).toBe('yaml');
-  });
-
-  test('skill-based agents use /SKILL.md extension', () => {
-    const skillAgents = ['codex', 'kimi', 'agy'];
-    for (const agent of skillAgents) {
-      expect(AGENT_CONFIGS[agent].extension).toBe('/SKILL.md');
-    }
+  test('every registrar agent maps to a registered integration', () => {
+    for (const agent of SUPPORTED_AGENTS) expect(agent in INTEGRATION_REGISTRY).toBe(true);
+    expect('generic' in INTEGRATION_REGISTRY).toBe(true);
   });
 });
-
-// ============================================================================
-// Utility Function Tests
-// ============================================================================
 
 describe('isAgentSupported', () => {
-  test('returns true for valid agents', () => {
-    expect(isAgentSupported('copilot')).toBe(true);
+  test('known and unknown agents', () => {
     expect(isAgentSupported('claude')).toBe(true);
-    expect(isAgentSupported('opencode')).toBe(true);
-    expect(isAgentSupported('gemini')).toBe(true);
     expect(isAgentSupported('kiro-cli')).toBe(true);
-  });
-
-  test('returns false for invalid agents', () => {
-    expect(isAgentSupported('invalid')).toBe(false);
-    expect(isAgentSupported('')).toBe(false);
-    expect(isAgentSupported('COPILOT')).toBe(false); // case-sensitive
-  });
-
-  test('returns false for removed legacy agents', () => {
-    expect(isAgentSupported('q')).toBe(false);
-    expect(isAgentSupported('amazonq')).toBe(false);
+    expect(isAgentSupported('generic')).toBe(false);
+    expect(isAgentSupported('unknown-agent')).toBe(false);
+    expect(isAgentSupported('constructor')).toBe(false);
   });
 });
 
-describe('getAgentCommandsDir', () => {
-  test('returns correct path for each agent type', () => {
-    expect(getAgentCommandsDir('/project', 'copilot')).toBe('/project/.github/agents');
-    expect(getAgentCommandsDir('/project', 'claude')).toBe('/project/.claude/commands');
-    expect(getAgentCommandsDir('/project', 'gemini')).toBe('/project/.gemini/commands');
-    expect(getAgentCommandsDir('/project', 'codex')).toBe('/project/.agents/skills');
-    expect(getAgentCommandsDir('/project', 'kiro-cli')).toBe('/project/.kiro/prompts');
-    expect(getAgentCommandsDir('/project', 'trae')).toBe('/project/.trae/rules');
-    expect(getAgentCommandsDir('/project', 'windsurf')).toBe('/project/.windsurf/workflows');
+describe('getAgentCommandsDir / getCommandFilePath', () => {
+  let root: string;
+  beforeEach(() => {
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'speckit-types-')));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  test('project-relative dirs', () => {
+    expect(getAgentCommandsDir(root, 'gemini')).toBe(join(root, '.gemini/commands'));
+    expect(() => getAgentCommandsDir(root, 'unknown')).toThrow('Unknown agent: unknown');
   });
 
-  test('throws for unknown agent', () => {
-    expect(() => getAgentCommandsDir('/project', 'unknown')).toThrow('Unknown agent: unknown');
+  test('home-relative dir for hermes', () => {
+    const saved = process.env.HOME;
+    process.env.HOME = root;
+    try {
+      expect(getAgentCommandsDir('/proj', 'hermes')).toBe(join(root, '.hermes/skills'));
+    } finally {
+      process.env.HOME = saved;
+    }
   });
 
-  test('handles paths with trailing slash', () => {
-    const path = getAgentCommandsDir('/project/', 'claude');
-    expect(path).toBe('/project//.claude/commands');
-  });
-});
-
-describe('getCommandFilePath', () => {
-  describe('markdown agents', () => {
-    test('returns correct path for claude', () => {
-      const path = getCommandFilePath('/project', 'claude', 'speckit.specify');
-      expect(path).toBe('/project/.claude/commands/speckit.specify.md');
-    });
-
-    test('returns correct path for cursor', () => {
-      const path = getCommandFilePath('/project', 'cursor', 'speckit.plan');
-      expect(path).toBe('/project/.cursor/commands/speckit.plan.md');
-    });
-  });
-
-  describe('copilot with .agent.md', () => {
-    test('returns correct path', () => {
-      const path = getCommandFilePath('/project', 'copilot', 'speckit.specify');
-      expect(path).toBe('/project/.github/agents/speckit.specify.agent.md');
-    });
-  });
-
-  describe('skill-based agents', () => {
-    test('returns correct path for codex', () => {
-      const path = getCommandFilePath('/project', 'codex', 'speckit.specify');
-      expect(path).toBe('/project/.agents/skills/speckit.specify/SKILL.md');
-    });
-
-    test('returns correct path for kimi', () => {
-      const path = getCommandFilePath('/project', 'kimi', 'speckit.specify');
-      expect(path).toBe('/project/.kimi/skills/speckit.specify/SKILL.md');
-    });
-  });
-
-  describe('TOML agents', () => {
-    test('returns correct path for gemini', () => {
-      const path = getCommandFilePath('/project', 'gemini', 'speckit.specify');
-      expect(path).toBe('/project/.gemini/commands/speckit.specify.toml');
-    });
-
-    test('returns correct path for tabnine', () => {
-      const path = getCommandFilePath('/project', 'tabnine', 'speckit.specify');
-      expect(path).toBe('/project/.tabnine/agent/commands/speckit.specify.toml');
-    });
-  });
-
-  test('throws for unknown agent', () => {
-    expect(() => getCommandFilePath('/project', 'unknown', 'cmd')).toThrow();
+  test('file paths use registrar output names', () => {
+    expect(getCommandFilePath(root, 'gemini', 'speckit.plan')).toBe(join(root, '.gemini/commands') + '/speckit.plan.toml');
+    expect(getCommandFilePath(root, 'copilot', 'speckit.plan')).toBe(join(root, '.github/agents') + '/speckit.plan.agent.md');
+    expect(getCommandFilePath(root, 'claude', 'speckit.git.commit')).toBe(
+      join(root, '.claude/skills') + '/speckit-git-commit/SKILL.md',
+    );
+    expect(getCommandFilePath(root, 'forge', 'speckit.git.commit')).toBe(join(root, '.forge/commands') + '/speckit-git-commit.md');
   });
 });
 
-describe('isSkillBasedAgent', () => {
-  test('returns true for codex and kimi', () => {
+describe('format predicates', () => {
+  test('skill / toml / yaml agents and args placeholders', () => {
     expect(isSkillBasedAgent('codex')).toBe(true);
-    expect(isSkillBasedAgent('kimi')).toBe(true);
-  });
-
-  test('returns false for other agents', () => {
-    expect(isSkillBasedAgent('claude')).toBe(false);
     expect(isSkillBasedAgent('copilot')).toBe(false);
-    expect(isSkillBasedAgent('gemini')).toBe(false);
-    expect(isSkillBasedAgent('opencode')).toBe(false);
-    expect(isSkillBasedAgent('amp')).toBe(false);
-  });
-
-  test('returns false for unknown agent', () => {
-    expect(isSkillBasedAgent('unknown')).toBe(false);
-  });
-});
-
-describe('isTomlAgent', () => {
-  test('returns true for gemini and tabnine', () => {
     expect(isTomlAgent('gemini')).toBe(true);
     expect(isTomlAgent('tabnine')).toBe(true);
-  });
-
-  test('returns false for markdown agents', () => {
     expect(isTomlAgent('claude')).toBe(false);
-    expect(isTomlAgent('copilot')).toBe(false);
-    expect(isTomlAgent('codex')).toBe(false);
-    expect(isTomlAgent('kiro-cli')).toBe(false);
-  });
-
-  test('returns false for unknown agent', () => {
-    expect(isTomlAgent('unknown')).toBe(false);
-  });
-});
-
-describe('getAgentArgsPlaceholder', () => {
-  test('returns $ARGUMENTS for markdown agents', () => {
-    expect(getAgentArgsPlaceholder('claude')).toBe('$ARGUMENTS');
-    expect(getAgentArgsPlaceholder('copilot')).toBe('$ARGUMENTS');
-    expect(getAgentArgsPlaceholder('codex')).toBe('$ARGUMENTS');
-    expect(getAgentArgsPlaceholder('opencode')).toBe('$ARGUMENTS');
-  });
-
-  test('returns {{args}} for TOML agents', () => {
-    expect(getAgentArgsPlaceholder('gemini')).toBe('{{args}}');
-    expect(getAgentArgsPlaceholder('tabnine')).toBe('{{args}}');
-  });
-
-  test('returns $ARGUMENTS for unknown agent (fallback)', () => {
+    expect(isYamlAgent('goose')).toBe(true);
+    expect(getAgentArgsPlaceholder('forge')).toBe('{{parameters}}');
+    expect(getAgentArgsPlaceholder('goose')).toBe('{{args}}');
     expect(getAgentArgsPlaceholder('unknown')).toBe('$ARGUMENTS');
   });
 });

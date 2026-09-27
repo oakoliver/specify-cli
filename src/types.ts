@@ -7,222 +7,78 @@
  * @module types
  */
 
+import { CommandRegistrar } from './agents.js';
+
 // ============================================================================
 // Agent Configuration Types
 // ============================================================================
 
 /**
  * Command format supported by an AI agent.
- * - markdown: Standard markdown files with YAML frontmatter
- * - toml: TOML configuration files (Gemini, Tabnine)
+ * - markdown: Markdown files with YAML frontmatter (also SKILL.md skills)
+ * - toml: TOML command files (Gemini, Tabnine)
  * - yaml: YAML recipe format (Goose)
  */
 export type CommandFormat = 'markdown' | 'toml' | 'yaml';
 
 /**
- * Configuration for a single AI coding agent.
- * Defines where commands are stored and how they're formatted.
+ * Registration config for a single AI coding agent — a read-only view of
+ * ``CommandRegistrar.AGENT_CONFIGS`` (derived from the integration registry,
+ * upstream spec-kit v1.0.12).
  */
 export interface AgentConfig {
-  /** Directory path relative to project root (e.g., ".claude/commands") */
+  /** Directory path relative to project root (e.g. ".claude/skills"), or ``~/``-relative */
   dir: string;
   /** Command file format */
   format: CommandFormat;
-  /** Arguments placeholder used in templates (e.g., "$ARGUMENTS" or "{{args}}") */
+  /** Arguments placeholder (e.g. "$ARGUMENTS", "{{args}}", "{{parameters}}") */
   args: string;
-  /** File extension including dot (e.g., ".md", ".agent.md", "/SKILL.md") */
+  /** File extension including dot (".md", ".agent.md", ".toml", ".yaml") or "/SKILL.md" */
   extension: string;
+  /** Command-reference separator (``.`` or ``-``) */
+  invoke_separator?: string;
+  /** Legacy directory still honoured when the canonical one is missing */
+  legacy_dir?: string;
+  /** Project-local marker directory used for detection (Hermes) */
+  detect_dir?: string;
+  /** Frontmatter keys stripped on registration (Forge: handoffs) */
+  strip_frontmatter_keys?: string[];
+  /** Inject a ``name`` frontmatter field (Forge/Junie/Cline) */
+  inject_name?: boolean;
+  /** Custom output-name formatter */
+  format_name?: (cmdName: string) => string;
+  /** Write files instead of dev-mode symlinks */
+  dev_no_symlink?: boolean;
 }
 
 /**
- * Complete registry of all supported AI coding agents.
- * Each agent has its own folder structure and command format.
+ * Registry of all agents that accept extension/preset command registration,
+ * derived from the upstream v1.0.12 integration registry (``generic`` is
+ * excluded, exactly like ``CommandRegistrar.AGENT_CONFIGS``). Retired agents
+ * (roo, windsurf, iflow, jules, cursor, kiro alias) are gone.
  */
-export const AGENT_CONFIGS: Record<string, AgentConfig> = {
-  claude: {
-    dir: '.claude/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  gemini: {
-    dir: '.gemini/commands',
-    format: 'toml',
-    args: '{{args}}',
-    extension: '.toml',
-  },
-  copilot: {
-    dir: '.github/agents',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.agent.md',
-  },
-  cursor: {
-    dir: '.cursor/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  qwen: {
-    dir: '.qwen/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  opencode: {
-    dir: '.opencode/command',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  codex: {
-    dir: '.agents/skills',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '/SKILL.md',
-  },
-  windsurf: {
-    dir: '.windsurf/workflows',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  junie: {
-    dir: '.junie/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  kilocode: {
-    dir: '.kilocode/workflows',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  auggie: {
-    dir: '.augment/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  roo: {
-    dir: '.roo/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  codebuddy: {
-    dir: '.codebuddy/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  qodercli: {
-    dir: '.qoder/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  'kiro-cli': {
-    dir: '.kiro/prompts',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  pi: {
-    dir: '.pi/prompts',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  amp: {
-    dir: '.agents/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  shai: {
-    dir: '.shai/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  tabnine: {
-    dir: '.tabnine/agent/commands',
-    format: 'toml',
-    args: '{{args}}',
-    extension: '.toml',
-  },
-  bob: {
-    dir: '.bob/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  kimi: {
-    dir: '.kimi/skills',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '/SKILL.md',
-  },
-  trae: {
-    dir: '.trae/rules',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  iflow: {
-    dir: '.iflow/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  // New agents added in v1.1.0
-  goose: {
-    dir: '.goose/recipes',
-    format: 'yaml',
-    args: '$ARGUMENTS',
-    extension: '.yaml',
-  },
-  forge: {
-    dir: '.forge/commands',
-    format: 'markdown',
-    args: '{{parameters}}',
-    extension: '.md',
-  },
-  jules: {
-    dir: '.jules/commands',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-  agy: {
-    dir: '.antigravity/skills',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '/SKILL.md',
-  },
-  // Alias for kiro-cli
-  kiro: {
-    dir: '.kiro/prompts',
-    format: 'markdown',
-    args: '$ARGUMENTS',
-    extension: '.md',
-  },
-} as const;
+export const AGENT_CONFIGS: Readonly<Record<string, AgentConfig>> = buildLegacyAgentConfigs();
 
-/** List of all supported agent names */
-export const SUPPORTED_AGENTS = Object.keys(AGENT_CONFIGS) as AgentName[];
+function buildLegacyAgentConfigs(): Record<string, AgentConfig> {
+  const out: Record<string, AgentConfig> = {};
+  for (const [key, cfg] of Object.entries(CommandRegistrar.AGENT_CONFIGS)) {
+    out[key] = { ...(cfg as AgentConfig) };
+  }
+  return out;
+}
+
+/** List of all supported agent names (registrar agents, upstream order) */
+export const SUPPORTED_AGENTS: AgentName[] = Object.keys(AGENT_CONFIGS);
 
 /** Type for valid agent names */
-export type AgentName = keyof typeof AGENT_CONFIGS;
+export type AgentName = string;
 
 // ============================================================================
 // Init Options Types
 // ============================================================================
 
-/** Shell script type for generated scripts */
-export type ScriptType = 'sh' | 'ps';
+/** Script variant for generated scripts (``py`` added upstream in v1.x) */
+export type ScriptType = 'sh' | 'ps' | 'py';
 
 /** Branch numbering mode for feature branches */
 export type BranchNumbering = 'sequential' | 'timestamp';
@@ -410,78 +266,74 @@ export interface Project {
  * Check if an agent name is supported.
  */
 export function isAgentSupported(agent: string): agent is AgentName {
-  return agent in AGENT_CONFIGS;
+  return Object.prototype.hasOwnProperty.call(AGENT_CONFIGS, agent);
+}
+
+function agentConfigOf(agent: string): AgentConfig | undefined {
+  return Object.prototype.hasOwnProperty.call(AGENT_CONFIGS, agent) ? AGENT_CONFIGS[agent] : undefined;
 }
 
 /**
- * Get the commands directory for an agent.
+ * Get the commands directory for an agent (``CommandRegistrar._resolve_agent_dir``:
+ * ``~/``-relative and absolute dirs honoured, legacy dir fallback).
  * @param projectRoot - Project root directory
  * @param agent - Agent name
- * @returns Absolute path to commands directory
+ * @returns Path to the commands directory
  */
 export function getAgentCommandsDir(projectRoot: string, agent: string): string {
-  const config = AGENT_CONFIGS[agent];
+  const config = agentConfigOf(agent);
   if (!config) {
     throw new Error(`Unknown agent: ${agent}`);
   }
-  return `${projectRoot}/${config.dir}`;
+  return CommandRegistrar.resolveAgentDir(agent, config as never, projectRoot);
 }
 
 /**
- * Get the full file path for a command.
+ * Get the full file path for a registered command.
+ * Skill-based agents use ``<dir>/speckit-<name>/SKILL.md``; other agents use
+ * ``<dir>/<output-name><extension>`` (Forge/Junie/Cline hyphenate names).
  * @param projectRoot - Project root directory
  * @param agent - Agent name
  * @param commandName - Command name (e.g., "speckit.specify")
- * @returns Absolute path to command file
  */
 export function getCommandFilePath(
   projectRoot: string,
   agent: string,
   commandName: string
 ): string {
-  const config = AGENT_CONFIGS[agent];
+  const config = agentConfigOf(agent);
   if (!config) {
     throw new Error(`Unknown agent: ${agent}`);
   }
-
-  const dir = `${projectRoot}/${config.dir}`;
-
-  // Skill-based agents use directory structure
-  if (config.extension === '/SKILL.md') {
-    return `${dir}/${commandName}/SKILL.md`;
-  }
-
-  return `${dir}/${commandName}${config.extension}`;
+  const dir = getAgentCommandsDir(projectRoot, agent);
+  const outputName = CommandRegistrar.computeOutputName(agent, commandName, config as never);
+  return `${dir}/${outputName}${config.extension}`;
 }
 
 /**
  * Check if an agent uses skill-based commands (directory per command).
  */
 export function isSkillBasedAgent(agent: string): boolean {
-  const config = AGENT_CONFIGS[agent];
-  return config?.extension === '/SKILL.md';
+  return agentConfigOf(agent)?.extension === '/SKILL.md';
 }
 
 /**
  * Check if an agent uses TOML format.
  */
 export function isTomlAgent(agent: string): boolean {
-  const config = AGENT_CONFIGS[agent];
-  return config?.format === 'toml';
+  return agentConfigOf(agent)?.format === 'toml';
 }
 
 /**
  * Check if an agent uses YAML format.
  */
 export function isYamlAgent(agent: string): boolean {
-  const config = AGENT_CONFIGS[agent];
-  return config?.format === 'yaml';
+  return agentConfigOf(agent)?.format === 'yaml';
 }
 
 /**
  * Get the arguments placeholder for an agent.
  */
 export function getAgentArgsPlaceholder(agent: string): string {
-  const config = AGENT_CONFIGS[agent];
-  return config?.args ?? '$ARGUMENTS';
+  return agentConfigOf(agent)?.args ?? '$ARGUMENTS';
 }

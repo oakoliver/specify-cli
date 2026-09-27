@@ -1,50 +1,44 @@
 /**
- * @oakoliver/specify-cli - Template Management
+ * @oakoliver/specify-cli - Template Management (legacy)
  *
- * Handles bundled templates: copying, placeholder replacement, and file operations.
+ * Backward-compatible helpers over the bundled `core_pack/` assets (the
+ * mirror of upstream's wheel `specify_cli/core_pack/`). The obsolete repo
+ * `templates/` directory is no longer read. New code should use
+ * `shared-infra.ts` (`installSharedInfra`) and the integrations, which
+ * implement the upstream v1.0.12 scaffolding; these helpers remain for
+ * library consumers of the previous API.
  *
  * @module templates
  */
 
 import {
+  chmodSync,
+  copyFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  writeFileSync,
-  copyFileSync,
-  chmodSync,
   statSync,
+  writeFileSync,
 } from 'node:fs';
-import { join, dirname, basename } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { locateCorePack } from './assets.js';
 
 // ============================================================================
 // Path Resolution
 // ============================================================================
 
 /**
- * Get the directory containing bundled templates.
- * Templates are shipped with the npm package.
+ * Directory holding the bundled assets (`core_pack/`: `templates/`,
+ * `commands/`, `scripts/{bash,powershell,python}`, ...).
  */
 export function getTemplatesDir(): string {
-  // In ESM, we need to derive __dirname
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-
-  // Templates are at package root /templates
-  // From dist/templates.js, go up one level
-  const templatesDir = join(__dirname, '..', 'templates');
-
-  // Fallback for development (when running from src/)
-  if (!existsSync(templatesDir)) {
-    const devTemplatesDir = join(__dirname, '..', '..', 'templates');
-    if (existsSync(devTemplatesDir)) {
-      return devTemplatesDir;
-    }
-  }
-
-  return templatesDir;
+  const located = locateCorePack();
+  if (located) return located;
+  // Fallback: <package root>/core_pack relative to this module (src/ or dist/).
+  return join(dirname(fileURLToPath(import.meta.url)), '..', 'core_pack');
 }
 
 // ============================================================================
@@ -52,69 +46,38 @@ export function getTemplatesDir(): string {
 // ============================================================================
 
 /**
- * Copy a directory recursively.
- *
- * @param src - Source directory
- * @param dest - Destination directory
- * @param replacements - Optional placeholder replacements { placeholder: value }
+ * Copy a directory recursively, optionally replacing placeholders in text files.
  */
-export function copyDirectory(
-  src: string,
-  dest: string,
-  replacements?: Record<string, string>
-): void {
-  if (!existsSync(src)) {
-    return;
-  }
-
+export function copyDirectory(src: string, dest: string, replacements?: Record<string, string>): void {
+  if (!existsSync(src)) return;
   mkdirSync(dest, { recursive: true });
-
-  const entries = readdirSync(src, { withFileTypes: true });
-
-  for (const entry of entries) {
+  for (const entry of readdirSync(src, { withFileTypes: true })) {
     const srcPath = join(src, entry.name);
     const destPath = join(dest, entry.name);
-
-    if (entry.isDirectory()) {
-      copyDirectory(srcPath, destPath, replacements);
-    } else {
-      copyFile(srcPath, destPath, replacements);
-    }
+    if (entry.isDirectory()) copyDirectory(srcPath, destPath, replacements);
+    else copyFile(srcPath, destPath, replacements);
   }
 }
 
 /**
  * Copy a single file, optionally replacing placeholders.
  */
-export function copyFile(
-  src: string,
-  dest: string,
-  replacements?: Record<string, string>
-): void {
-  const destDir = dirname(dest);
-  if (!existsSync(destDir)) {
-    mkdirSync(destDir, { recursive: true });
-  }
-
+export function copyFile(src: string, dest: string, replacements?: Record<string, string>): void {
+  mkdirSync(dirname(dest), { recursive: true });
   if (replacements && isTextFile(src)) {
     let content = readFileSync(src, 'utf-8');
-
     for (const [placeholder, value] of Object.entries(replacements)) {
-      content = content.replace(new RegExp(escapeRegex(placeholder), 'g'), value);
+      content = content.split(placeholder).join(value);
     }
-
     writeFileSync(dest, content, 'utf-8');
   } else {
     copyFileSync(src, dest);
   }
 
-  // Preserve executable permissions for scripts
   if (src.endsWith('.sh') || src.endsWith('.ps1')) {
     try {
-      const srcStat = statSync(src);
-      chmodSync(dest, srcStat.mode);
+      chmodSync(dest, statSync(src).mode);
     } catch {
-      // Fallback: make shell scripts executable
       if (src.endsWith('.sh')) {
         try {
           chmodSync(dest, 0o755);
@@ -126,113 +89,76 @@ export function copyFile(
   }
 }
 
-/**
- * Check if a file is likely a text file (for placeholder replacement).
- */
 function isTextFile(filePath: string): boolean {
-  const textExtensions = ['.md', '.txt', '.sh', '.ps1', '.json', '.yml', '.yaml', '.toml', '.ts', '.js'];
-  const ext = filePath.substring(filePath.lastIndexOf('.'));
-  return textExtensions.includes(ext);
-}
-
-/**
- * Escape special regex characters.
- */
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const textExtensions = ['.md', '.txt', '.sh', '.ps1', '.py', '.json', '.yml', '.yaml', '.toml', '.ts', '.js'];
+  const dot = filePath.lastIndexOf('.');
+  return dot >= 0 && textExtensions.includes(filePath.substring(dot));
 }
 
 // ============================================================================
-// Template Copying
+// Template Copying (legacy API)
 // ============================================================================
 
+const SCRIPT_DIRS: Record<string, string> = { sh: 'bash', ps: 'powershell', py: 'python' };
+
 /**
- * Copy all templates to a project.
+ * Copy page templates (`.specify/templates/`) and the script variant
+ * (`.specify/scripts/<variant>/`) from core_pack into a project.
  *
- * @param projectRoot - Absolute path to project root
- * @param options - Copy options
+ * Legacy: does not record a manifest or resolve command references; use
+ * `installSharedInfra()` for upstream-parity scaffolding.
  */
 export function copyTemplatesToProject(
   projectRoot: string,
-  options: {
-    scriptType: 'sh' | 'ps';
-    agent: string;
-    agentArgs: string;
-  }
+  options: { scriptType: 'sh' | 'ps' | 'py'; agent: string; agentArgs: string },
 ): void {
-  const templatesDir = getTemplatesDir();
+  const corePack = getTemplatesDir();
   const specifyDir = join(projectRoot, '.specify');
-
-  // Replacements for template placeholders
   const replacements: Record<string, string> = {
     '{SCRIPT}': options.scriptType,
-    '__AGENT__': options.agent,
+    __AGENT__: options.agent,
     '{ARGS}': options.agentArgs,
-    '$ARGUMENTS': options.agentArgs,
+    $ARGUMENTS: options.agentArgs,
   };
 
-  // Copy template files (.specify/templates/)
-  const templateFilesDir = join(templatesDir, 'files');
-  if (existsSync(templateFilesDir)) {
-    copyDirectory(templateFilesDir, join(specifyDir, 'templates'), replacements);
-  }
-
-  // NOTE: Command templates are NOT copied to .specify/templates/commands/
-  // They are only used to register commands into the agent's commands folder.
-  // This matches Python spec-kit behavior.
-
-  // Copy scripts (.specify/scripts/)
-  const scriptsDir = join(templatesDir, 'scripts');
-  if (existsSync(scriptsDir)) {
-    if (options.scriptType === 'sh') {
-      const bashDir = join(scriptsDir, 'bash');
-      if (existsSync(bashDir)) {
-        copyDirectory(bashDir, join(specifyDir, 'scripts', 'bash'), replacements);
-      }
-    } else {
-      const psDir = join(scriptsDir, 'powershell');
-      if (existsSync(psDir)) {
-        copyDirectory(psDir, join(specifyDir, 'scripts', 'powershell'), replacements);
-      }
+  const templatesSrc = join(corePack, 'templates');
+  if (existsSync(templatesSrc)) {
+    for (const name of readdirSync(templatesSrc)) {
+      if (!name.endsWith('.md')) continue;
+      copyFile(join(templatesSrc, name), join(specifyDir, 'templates', name), replacements);
     }
   }
+
+  const variant = SCRIPT_DIRS[options.scriptType] ?? 'bash';
+  const scriptsSrc = join(corePack, 'scripts', variant);
+  if (existsSync(scriptsSrc)) {
+    copyDirectory(scriptsSrc, join(specifyDir, 'scripts', variant), replacements);
+  }
+}
+
+function commandStem(commandName: string): string {
+  return commandName.startsWith('speckit.') ? commandName.slice('speckit.'.length) : commandName;
 }
 
 /**
- * Get command template content for an agent.
+ * Get a core command template's content with `$ARGUMENTS` replaced.
  *
- * @param commandName - Command name (e.g., "speckit.specify")
- * @param agentArgs - Arguments placeholder for the agent
- * @returns Command content with placeholders replaced
+ * @param commandName - `speckit.<name>` (legacy) or bare `<name>`
  */
 export function getCommandTemplate(commandName: string, agentArgs: string): string | null {
-  const templatesDir = getTemplatesDir();
-  const commandPath = join(templatesDir, 'commands', `${commandName}.md`);
-
-  if (!existsSync(commandPath)) {
-    return null;
-  }
-
-  let content = readFileSync(commandPath, 'utf-8');
-
-  // Replace arguments placeholder
-  content = content.replace(/\$ARGUMENTS/g, agentArgs);
-
-  return content;
+  const commandPath = join(getTemplatesDir(), 'commands', `${commandStem(commandName)}.md`);
+  if (!existsSync(commandPath)) return null;
+  return readFileSync(commandPath, 'utf-8').split('$ARGUMENTS').join(agentArgs);
 }
 
 /**
- * Get all available command names from templates.
+ * Names of the bundled core commands, in the legacy `speckit.<name>` form.
  */
 export function getAvailableCommands(): string[] {
-  const templatesDir = getTemplatesDir();
-  const commandsDir = join(templatesDir, 'commands');
-
-  if (!existsSync(commandsDir)) {
-    return [];
-  }
-
+  const commandsDir = join(getTemplatesDir(), 'commands');
+  if (!existsSync(commandsDir)) return [];
   return readdirSync(commandsDir)
-    .filter(f => f.endsWith('.md'))
-    .map(f => f.replace('.md', ''));
+    .filter((f) => f.endsWith('.md'))
+    .sort()
+    .map((f) => `speckit.${f.slice(0, -'.md'.length)}`);
 }

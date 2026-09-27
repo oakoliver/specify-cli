@@ -1,13 +1,15 @@
 /**
- * Tests for Command Registrar
+ * Tests for the legacy registrar compatibility layer (src/registrar.ts).
  *
- * This test suite matches the coverage from Python's spec-kit tests:
- * - test_extensions.py (CommandRegistrar tests)
- * - test_extension_skills.py (skill registration tests)
+ * The layer now delegates to the upstream-parity CommandRegistrar
+ * (src/agents.ts); behavior intentionally follows upstream v1.0.12:
+ * full YAML frontmatter, skills-first agents (claude/codex/kimi → SKILL.md
+ * with speckit-<name> directories), Copilot prompt files contain only the
+ * `agent:` key, Goose recipes use the upstream header + `prompt: |2`.
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdirSync, rmSync, readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, readFileSync, existsSync, writeFileSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -15,699 +17,188 @@ import {
   parseFrontmatter,
   renderFrontmatter,
   toToml,
+  toYamlRecipe,
   registerCommands,
   registerCommandsForAllAgents,
   unregisterCommands,
-  type CommandDefinition,
-} from '../src/index.js';
+} from '../src/registrar.js';
+import { SUPPORTED_AGENTS, type CommandDefinition } from '../src/types.js';
+import { parseYaml } from '../src/yaml.js';
 
 // ============================================================================
-// Frontmatter Parsing Tests (matches test_extensions.py)
+// Frontmatter
 // ============================================================================
 
 describe('parseFrontmatter', () => {
-  test('parses valid frontmatter', () => {
-    const content = `---
+  test('parses valid frontmatter (full YAML)', () => {
+    const { frontmatter, body } = parseFrontmatter(`---
 description: My command description
 enabled: true
+count: 3
+nothing:
+handoffs:
+  - label: Plan
+    agent: speckit.plan
 ---
 
-Command body here`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    expect(frontmatter.description).toBe('My command description');
-    expect(frontmatter.enabled).toBe(true);
+Command body here
+`);
+    expect(frontmatter).toEqual({
+      description: 'My command description',
+      enabled: true,
+      count: 3,
+      nothing: null,
+      handoffs: [{ label: 'Plan', agent: 'speckit.plan' }],
+    });
     expect(body).toBe('Command body here');
   });
 
-  test('handles content without frontmatter', () => {
-    const content = 'Just some content without frontmatter';
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    expect(frontmatter).toEqual({});
-    expect(body).toBe(content);
+  test('no frontmatter / unterminated frontmatter returns content unchanged', () => {
+    expect(parseFrontmatter('Just a body')).toEqual({ frontmatter: {}, body: 'Just a body' });
+    expect(parseFrontmatter('---\ndescription: x\nbody')).toEqual({ frontmatter: {}, body: '---\ndescription: x\nbody' });
   });
 
-  test('handles empty frontmatter', () => {
-    const content = `---
----
-
-Body content`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    expect(frontmatter).toEqual({});
-    expect(body).toBe('Body content');
+  test('closing delimiter is line-anchored', () => {
+    const { frontmatter, body } = parseFrontmatter('---\ndescription: Separate sections with ---\nb: 1\n---\nbody');
+    expect(frontmatter).toEqual({ description: 'Separate sections with ---', b: 1 });
+    expect(body).toBe('body');
   });
 
-  test('handles frontmatter with arrays', () => {
-    const content = `---
-description: Test command
-handoffs:
-  - label: Next Step
-  - label: Another Step
----
-
-Command body`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    expect(frontmatter.description).toBe('Test command');
-    expect(Array.isArray(frontmatter.handoffs)).toBe(true);
-    expect((frontmatter.handoffs as unknown[]).length).toBe(2);
-  });
-
-  test('handles quoted strings', () => {
-    const content = `---
-description: "A string with: colon"
-title: 'Single quoted'
----
-
-Body`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    expect(frontmatter.description).toBe('A string with: colon');
-    expect(frontmatter.title).toBe('Single quoted');
-  });
-
-  test('handles numeric values', () => {
-    const content = `---
-priority: 10
-score: 3.14
----
-
-Body`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    expect(frontmatter.priority).toBe(10);
-    expect(frontmatter.score).toBe(3.14);
-  });
-
-  test('handles null values', () => {
-    const content = `---
-value1: null
-value2: ~
----
-
-Body`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    expect(frontmatter.value1).toBe(null);
-    expect(frontmatter.value2).toBe(null);
-  });
-
-  test('non-mapping returns empty dict (malformed YAML)', () => {
-    // Content that starts with --- but has invalid YAML
-    const content = `---
-- just an array item
----
-
-Body`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    // Should still parse but may have unexpected structure
-    expect(typeof frontmatter).toBe('object');
-    expect(body).toBe('Body');
-  });
-
-  test('handles missing closing delimiter', () => {
-    const content = `---
-description: unclosed
-This is actually body content`;
-
-    const { frontmatter, body } = parseFrontmatter(content);
-
-    // Should return entire content as body
-    expect(frontmatter).toEqual({});
-    expect(body).toBe(content);
+  test('non-mapping / malformed YAML gives empty dict', () => {
+    expect(parseFrontmatter('---\n- a\n- b\n---\nbody').frontmatter).toEqual({});
+    expect(parseFrontmatter('---\na: [\n---\nbody').frontmatter).toEqual({});
   });
 });
 
 describe('renderFrontmatter', () => {
-  test('renders basic frontmatter', () => {
-    const frontmatter = { description: 'Test command' };
-    const body = 'Command body';
-
-    const result = renderFrontmatter(frontmatter, body);
-
-    expect(result).toContain('---');
-    expect(result).toContain('description: Test command');
-    expect(result).toContain('Command body');
+  test('renders YAML frontmatter followed by body', () => {
+    expect(renderFrontmatter({ description: 'Test', handoffs: ['a', 'b'] }, 'Body')).toBe(
+      '---\ndescription: Test\nhandoffs:\n- a\n- b\n---\n\nBody',
+    );
   });
 
-  test('renders empty frontmatter as body only', () => {
-    const result = renderFrontmatter({}, 'Just body');
-
-    expect(result).toBe('Just body');
-    expect(result).not.toContain('---');
+  test('empty frontmatter renders body only', () => {
+    expect(renderFrontmatter({}, 'Body')).toBe('Body');
+    expect(renderFrontmatter({ x: null }, 'Body')).toBe('Body');
   });
 
-  test('renders arrays', () => {
-    const frontmatter = {
-      description: 'Test',
-      items: ['one', 'two', 'three'],
-    };
-
-    const result = renderFrontmatter(frontmatter, 'Body');
-
-    expect(result).toContain('items:');
-    expect(result).toContain('  - one');
-    expect(result).toContain('  - two');
-    expect(result).toContain('  - three');
-  });
-
-  test('preserves unicode characters', () => {
-    const frontmatter = { description: 'Test with emoji 🚀 and unicode ñ' };
-    const body = 'Body with 日本語';
-
-    const result = renderFrontmatter(frontmatter, body);
-
-    expect(result).toContain('🚀');
-    expect(result).toContain('ñ');
-    expect(result).toContain('日本語');
-  });
-
-  test('round-trip preserves content', () => {
-    const original = `---
-description: Round trip test
-enabled: true
----
-
-This is the body`;
-
-    const { frontmatter, body } = parseFrontmatter(original);
-    const rendered = renderFrontmatter(frontmatter, body);
-    const { frontmatter: fm2, body: b2 } = parseFrontmatter(rendered);
-
-    expect(fm2.description).toBe('Round trip test');
-    expect(fm2.enabled).toBe(true);
-    expect(b2).toBe('This is the body');
+  test('round-trip preserves unicode and special characters', () => {
+    const fm = { description: 'Ünïcödé: with # and "quotes"', n: 1 };
+    const { frontmatter, body } = parseFrontmatter(renderFrontmatter(fm, 'Body'));
+    expect(frontmatter).toEqual(fm);
+    expect(body).toBe('Body');
   });
 });
 
 // ============================================================================
-// TOML Generation Tests
+// Format generation
 // ============================================================================
 
 describe('toToml', () => {
-  test('generates valid TOML', () => {
-    const result = toToml('My description', 'My prompt content');
-
-    expect(result).toContain('description = "My description"');
-    expect(result).toContain('prompt = """');
-    expect(result).toContain('My prompt content');
+  test('description + multiline prompt', () => {
+    expect(toToml('Test description', 'Line 1\nLine 2\n')).toBe('description = "Test description"\n\nprompt = """\nLine 1\nLine 2"""\n');
   });
-
-  test('escapes special characters in description', () => {
-    const result = toToml('A "quoted" description', 'Prompt');
-
-    expect(result).toContain('description = "A \\"quoted\\" description"');
-  });
-
-  test('handles multiline prompts', () => {
-    const prompt = `Line 1
-Line 2
-Line 3`;
-
-    const result = toToml('Desc', prompt);
-
-    expect(result).toContain('"""');
-    expect(result).toContain('Line 1');
-    expect(result).toContain('Line 2');
-    expect(result).toContain('Line 3');
-  });
-
-  test('handles empty description', () => {
-    const result = toToml('', 'Prompt content');
-
-    expect(result).toContain('description = ""');
-    expect(result).toContain('prompt = """');
+  test('escapes description and omits it when empty', () => {
+    expect(toToml('Say "hi" \\ bye', 'x')).toBe('description = "Say \\"hi\\" \\\\ bye"\n\nprompt = "x"\n');
+    expect(toToml('', 'x')).toBe('prompt = "x"\n');
   });
 });
-
-// ============================================================================
-// Command Registration Tests
-// ============================================================================
-
-describe('registerCommands', () => {
-  let testDir: string;
-
-  beforeEach(() => {
-    testDir = join(tmpdir(), `speckit-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(testDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
-  });
-
-  const testCommand: CommandDefinition = {
-    name: 'speckit.specify',
-    description: 'Create a feature specification',
-    content: 'This is the command content.',
-  };
-
-  describe('Claude registration', () => {
-    test('creates command file in correct directory', async () => {
-      const registered = await registerCommands('claude', [testCommand], testDir, 'core');
-
-      expect(registered.claude).toBeDefined();
-      expect(registered.claude.length).toBe(1);
-
-      const filePath = registered.claude[0];
-      expect(filePath).toContain('.claude/commands/speckit.specify.md');
-      expect(existsSync(filePath)).toBe(true);
-    });
-
-    test('command file has correct content', async () => {
-      await registerCommands('claude', [testCommand], testDir, 'core');
-
-      const filePath = join(testDir, '.claude/commands/speckit.specify.md');
-      const content = readFileSync(filePath, 'utf-8');
-
-      expect(content).toContain('description: Create a feature specification');
-      expect(content).toContain('This is the command content.');
-    });
-
-    test('creates directory if it does not exist', async () => {
-      expect(existsSync(join(testDir, '.claude/commands'))).toBe(false);
-
-      await registerCommands('claude', [testCommand], testDir, 'core');
-
-      expect(existsSync(join(testDir, '.claude/commands'))).toBe(true);
-    });
-  });
-
-  describe('Copilot registration', () => {
-    test('creates both .agent.md and .prompt.md files', async () => {
-      const registered = await registerCommands('copilot', [testCommand], testDir, 'core');
-
-      expect(registered.copilot.length).toBe(2);
-
-      const agentFile = join(testDir, '.github/agents/speckit.specify.agent.md');
-      const promptFile = join(testDir, '.github/prompts/speckit.specify.prompt.md');
-
-      expect(existsSync(agentFile)).toBe(true);
-      expect(existsSync(promptFile)).toBe(true);
-    });
-
-    test('prompt file references agent', async () => {
-      await registerCommands('copilot', [testCommand], testDir, 'core');
-
-      const promptFile = join(testDir, '.github/prompts/speckit.specify.prompt.md');
-      const content = readFileSync(promptFile, 'utf-8');
-
-      expect(content).toContain('mode: agent');
-      expect(content).toContain('agent: speckit.specify');
-      expect(content).toContain('@speckit.specify.agent.md');
-    });
-  });
-
-  describe('Gemini/Tabnine registration (TOML)', () => {
-    test('creates TOML file for Gemini', async () => {
-      const registered = await registerCommands('gemini', [testCommand], testDir, 'core');
-
-      expect(registered.gemini.length).toBe(1);
-
-      const filePath = join(testDir, '.gemini/commands/speckit.specify.toml');
-      expect(existsSync(filePath)).toBe(true);
-
-      const content = readFileSync(filePath, 'utf-8');
-      expect(content).toContain('description = "Create a feature specification"');
-      expect(content).toContain('prompt = """');
-    });
-
-    test('creates TOML file for Tabnine', async () => {
-      const registered = await registerCommands('tabnine', [testCommand], testDir, 'core');
-
-      expect(registered.tabnine.length).toBe(1);
-
-      const filePath = join(testDir, '.tabnine/agent/commands/speckit.specify.toml');
-      expect(existsSync(filePath)).toBe(true);
-    });
-  });
-
-  describe('Codex/Kimi registration (SKILL.md)', () => {
-    test('creates directory structure for Codex', async () => {
-      const registered = await registerCommands('codex', [testCommand], testDir, 'core');
-
-      expect(registered.codex.length).toBe(1);
-
-      const skillPath = join(testDir, '.agents/skills/speckit.specify/SKILL.md');
-      expect(existsSync(skillPath)).toBe(true);
-    });
-
-    test('SKILL.md has correct frontmatter', async () => {
-      await registerCommands('codex', [testCommand], testDir, 'core');
-
-      const skillPath = join(testDir, '.agents/skills/speckit.specify/SKILL.md');
-      const content = readFileSync(skillPath, 'utf-8');
-
-      expect(content).toContain('name: speckit.specify');
-      expect(content).toContain('description: Create a feature specification');
-    });
-
-    test('creates directory structure for Kimi', async () => {
-      const registered = await registerCommands('kimi', [testCommand], testDir, 'core');
-
-      expect(registered.kimi.length).toBe(1);
-
-      const skillPath = join(testDir, '.kimi/skills/speckit.specify/SKILL.md');
-      expect(existsSync(skillPath)).toBe(true);
-    });
-  });
-
-  describe('OpenCode registration', () => {
-    test('uses singular command directory', async () => {
-      const registered = await registerCommands('opencode', [testCommand], testDir, 'core');
-
-      expect(registered.opencode.length).toBe(1);
-
-      const filePath = join(testDir, '.opencode/command/speckit.specify.md');
-      expect(existsSync(filePath)).toBe(true);
-    });
-  });
-
-  describe('Multiple commands', () => {
-    test('registers multiple commands', async () => {
-      const commands: CommandDefinition[] = [
-        { name: 'speckit.specify', description: 'Create spec', content: 'Content 1' },
-        { name: 'speckit.plan', description: 'Create plan', content: 'Content 2' },
-        { name: 'speckit.tasks', description: 'Create tasks', content: 'Content 3' },
-      ];
-
-      const registered = await registerCommands('claude', commands, testDir, 'core');
-
-      expect(registered.claude.length).toBe(3);
-
-      for (const cmd of commands) {
-        const filePath = join(testDir, `.claude/commands/${cmd.name}.md`);
-        expect(existsSync(filePath)).toBe(true);
-      }
-    });
-  });
-
-  describe('Command with handoffs', () => {
-    test('preserves handoffs in frontmatter', async () => {
-      const command: CommandDefinition = {
-        name: 'speckit.specify',
-        description: 'Create spec',
-        content: 'Content',
-        handoffs: ['speckit.plan', 'speckit.tasks'],
-      };
-
-      await registerCommands('claude', [command], testDir, 'core');
-
-      const filePath = join(testDir, '.claude/commands/speckit.specify.md');
-      const content = readFileSync(filePath, 'utf-8');
-
-      expect(content).toContain('handoffs:');
-    });
-  });
-
-  describe('Unknown agent', () => {
-    test('throws for unknown agent', async () => {
-      await expect(
-        registerCommands('unknown-agent', [testCommand], testDir, 'core')
-      ).rejects.toThrow('Unknown agent: unknown-agent');
-    });
-  });
-});
-
-// ============================================================================
-// Command Unregistration Tests
-// ============================================================================
-
-describe('unregisterCommands', () => {
-  let testDir: string;
-
-  beforeEach(() => {
-    testDir = join(tmpdir(), `speckit-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(testDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
-  });
-
-  const testCommand: CommandDefinition = {
-    name: 'speckit.specify',
-    description: 'Create a feature specification',
-    content: 'This is the command content.',
-  };
-
-  test('removes registered files', async () => {
-    const registered = await registerCommands('claude', [testCommand], testDir, 'core');
-
-    // Verify file exists
-    expect(existsSync(registered.claude[0])).toBe(true);
-
-    // Unregister
-    await unregisterCommands(registered, testDir);
-
-    // Verify file is removed
-    expect(existsSync(registered.claude[0])).toBe(false);
-  });
-
-  test('removes Copilot companion files', async () => {
-    const registered = await registerCommands('copilot', [testCommand], testDir, 'core');
-
-    expect(registered.copilot.length).toBe(2);
-
-    await unregisterCommands(registered, testDir);
-
-    // Both files should be removed
-    for (const path of registered.copilot) {
-      expect(existsSync(path)).toBe(false);
-    }
-  });
-
-  test('cleans up skill directories for Codex', async () => {
-    const registered = await registerCommands('codex', [testCommand], testDir, 'core');
-
-    const skillDir = join(testDir, '.agents/skills/speckit.specify');
-    expect(existsSync(skillDir)).toBe(true);
-
-    await unregisterCommands(registered, testDir);
-
-    // Skill directory should be removed
-    expect(existsSync(skillDir)).toBe(false);
-  });
-
-  test('handles already deleted files (idempotent)', async () => {
-    const registered = await registerCommands('claude', [testCommand], testDir, 'core');
-
-    // Delete file manually
-    rmSync(registered.claude[0]);
-
-    // Should not throw
-    await expect(unregisterCommands(registered, testDir)).resolves.toBeUndefined();
-  });
-
-  test('preserves other files in directory', async () => {
-    // Register a command
-    await registerCommands('claude', [testCommand], testDir, 'core');
-
-    // Create another file in the same directory
-    const otherFile = join(testDir, '.claude/commands/other-command.md');
-    writeFileSync(otherFile, 'Other content');
-
-    // Unregister speckit command
-    const registered = { claude: [join(testDir, '.claude/commands/speckit.specify.md')] };
-    await unregisterCommands(registered, testDir);
-
-    // Other file should still exist
-    expect(existsSync(otherFile)).toBe(true);
-  });
-});
-
-// ============================================================================
-// Register Commands for All Agents Tests
-// ============================================================================
-
-describe('registerCommandsForAllAgents', () => {
-  let testDir: string;
-
-  beforeEach(() => {
-    testDir = join(tmpdir(), `speckit-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(testDir, { recursive: true });
-  });
-
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
-  });
-
-  const testCommand: CommandDefinition = {
-    name: 'speckit.specify',
-    description: 'Create a feature specification',
-    content: 'Content',
-  };
-
-  test('registers for specific target agent', async () => {
-    const registered = await registerCommandsForAllAgents(
-      [testCommand],
-      testDir,
-      'core',
-      'claude'
-    );
-
-    expect(Object.keys(registered)).toEqual(['claude']);
-    expect(registered.claude.length).toBe(1);
-  });
-
-  test('registers for all agents when no target specified', async () => {
-    const registered = await registerCommandsForAllAgents([testCommand], testDir, 'core');
-
-    // Should have entries for all 28 agents
-    const agentCount = Object.keys(registered).length;
-    expect(agentCount).toBe(28);
-  });
-});
-
-// ============================================================================
-// YAML Recipe Generation Tests (Goose Agent Support)
-// ============================================================================
-
-import { toYamlRecipe, AGENT_CONFIGS, SUPPORTED_AGENTS, isYamlAgent } from '../src/index.js';
 
 describe('toYamlRecipe', () => {
-  test('generates valid YAML recipe structure', () => {
-    const result = toYamlRecipe(
-      'speckit.specify',
-      'Create a feature specification',
-      'You are a helpful assistant.'
-    );
-
-    expect(result).toContain('version: 1.0.0');
-    expect(result).toContain('title: "Spec Kit Specify"');
-    expect(result).toContain('description: "Create a feature specification"');
-    expect(result).toContain('author:');
-    expect(result).toContain('contact: spec-kit');
-    expect(result).toContain('extensions:');
-    expect(result).toContain('type: builtin');
-    expect(result).toContain('name: developer');
-    expect(result).toContain('activities:');
-    expect(result).toContain('Spec-Driven Development');
-    expect(result).toContain('prompt: |');
-    expect(result).toContain('  You are a helpful assistant.');
-  });
-
-  test('escapes double quotes in description', () => {
-    const result = toYamlRecipe(
-      'test.cmd',
-      'Description with "quotes"',
-      'Prompt content'
-    );
-
-    expect(result).toContain('description: "Description with \\"quotes\\""');
-  });
-
-  test('formats multi-word command names correctly', () => {
-    const result = toYamlRecipe(
-      'speckit.create-new-feature',
-      'Test',
-      'Prompt'
-    );
-
-    expect(result).toContain('title: "Spec Kit Create New Feature"');
-  });
-
-  test('handles multi-line prompts', () => {
-    const prompt = `Line 1
-Line 2
-Line 3`;
-
-    const result = toYamlRecipe('test.cmd', 'Test', prompt);
-
-    expect(result).toContain('prompt: |');
-    expect(result).toContain('  Line 1');
-    expect(result).toContain('  Line 2');
-    expect(result).toContain('  Line 3');
-  });
-
-  test('handles empty prompt', () => {
-    const result = toYamlRecipe('test.cmd', 'Test', '');
-
-    expect(result).toContain('prompt: |');
-    expect(result).toContain('version: 1.0.0');
+  test('produces a Goose recipe', () => {
+    const out = toYamlRecipe('speckit.git.commit', 'Commit "things"', 'Line 1\n  indented\n');
+    const parsed = parseYaml(out) as Record<string, unknown>;
+    expect(parsed.title).toBe('Git Commit');
+    expect(parsed.description).toBe('Commit "things"');
+    expect(parsed.prompt).toBe('Line 1\n  indented\n');
+    expect(out).toContain('prompt: |2\n');
+    expect(out.endsWith('# Source: speckit.git.commit\n')).toBe(true);
   });
 });
 
-describe('isYamlAgent', () => {
-  test('returns true for goose', () => {
-    expect(isYamlAgent('goose')).toBe(true);
-  });
+// ============================================================================
+// Registration
+// ============================================================================
 
-  test('returns false for markdown agents', () => {
-    expect(isYamlAgent('claude')).toBe(false);
-    expect(isYamlAgent('cursor')).toBe(false);
-    expect(isYamlAgent('opencode')).toBe(false);
-  });
+const CMD: CommandDefinition = {
+  name: 'speckit.test.cmd',
+  description: 'Test command',
+  content: 'Do things with $ARGUMENTS',
+};
 
-  test('returns false for toml agents', () => {
-    expect(isYamlAgent('codex')).toBe(false);
-  });
-});
-
-describe('goose agent registration', () => {
-  let testDir: string;
-
+describe('registerCommands / unregisterCommands', () => {
+  let root: string;
   beforeEach(() => {
-    testDir = join(tmpdir(), `goose-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    mkdirSync(testDir, { recursive: true });
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'speckit-legacy-reg-')));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  test('markdown agent (opencode)', async () => {
+    const res = await registerCommands('opencode', [CMD], root, 'ext');
+    const path = join(root, '.opencode/commands/speckit.test.cmd.md');
+    expect(res).toEqual({ opencode: [path] });
+    expect(readFileSync(path, 'utf-8')).toBe(
+      '---\ndescription: Test command\n---\n\n\n<!-- Source: ext -->\nDo things with $ARGUMENTS',
+    );
   });
 
-  afterEach(() => {
-    rmSync(testDir, { recursive: true, force: true });
+  test('skills agent (claude) uses speckit-<name>/SKILL.md', async () => {
+    const res = await registerCommands('claude', [CMD], root, 'ext');
+    const path = join(root, '.claude/skills/speckit-test-cmd/SKILL.md');
+    expect(res.claude).toEqual([path]);
+    const content = readFileSync(path, 'utf-8');
+    expect(content.startsWith('---\nname: speckit-test-cmd\ndescription: Test command\n')).toBe(true);
+    expect(content).toContain('  source: ext:speckit.test.cmd.md\n');
   });
 
-  test('goose agent config uses yaml format', () => {
-    expect(AGENT_CONFIGS['goose'].format).toBe('yaml');
-    expect(AGENT_CONFIGS['goose'].dir).toBe('.goose/recipes');
+  test('copilot writes .agent.md and companion prompt', async () => {
+    const res = await registerCommands('copilot', [CMD], root, 'ext');
+    expect(res.copilot).toEqual([
+      join(root, '.github/agents/speckit.test.cmd.agent.md'),
+      join(root, '.github/prompts/speckit.test.cmd.prompt.md'),
+    ]);
+    expect(readFileSync(res.copilot[1], 'utf-8')).toBe('---\nagent: speckit.test.cmd\n---\n');
   });
 
-  test('registers commands for goose in correct directory', async () => {
-    const command: CommandDefinition = {
-      name: 'speckit.specify',
-      description: 'Create a feature specification',
-      content: 'Test prompt content',
-    };
-
-    const registered = await registerCommands('goose', [command], testDir, 'core');
-
-    expect(registered['goose']).toBeDefined();
-    expect(registered['goose'].length).toBe(1);
-    expect(registered['goose'][0]).toContain('.goose/recipes');
-    expect(registered['goose'][0]).toEndWith('.yaml');
+  test('toml agent (gemini) converts $ARGUMENTS', async () => {
+    const res = await registerCommands('gemini', [CMD], root, 'ext');
+    expect(readFileSync(res.gemini[0], 'utf-8')).toBe(
+      'description = "Test command"\n\n# Source: ext\n\nprompt = """\nDo things with {{args}}\n"""',
+    );
   });
 
-  test('creates valid yaml recipe file', async () => {
-    const command: CommandDefinition = {
-      name: 'speckit.specify',
-      description: 'Create a feature specification',
-      content: 'You are a spec generator.',
-    };
-
-    const registered = await registerCommands('goose', [command], testDir, 'core');
-    const filePath = registered['goose'][0];
-
-    expect(existsSync(filePath)).toBe(true);
-
-    const content = readFileSync(filePath, 'utf-8');
-    expect(content).toContain('version: 1.0.0');
-    expect(content).toContain('title: "Spec Kit Specify"');
-    expect(content).toContain('description: "Create a feature specification"');
-    expect(content).toContain('prompt: |');
-    expect(content).toContain('  You are a spec generator.');
+  test('yaml agent (goose)', async () => {
+    const res = await registerCommands('goose', [CMD], root, 'ext');
+    const parsed = parseYaml(readFileSync(res.goose[0], 'utf-8')) as Record<string, unknown>;
+    expect(parsed.title).toBe('Test Cmd');
+    expect(parsed.prompt).toBe('Do things with {{args}}\n');
   });
 
-  test('goose is in SUPPORTED_AGENTS', () => {
-    expect(SUPPORTED_AGENTS).toContain('goose');
+  test('handoffs preserved', async () => {
+    const res = await registerCommands('qwen', [{ ...CMD, handoffs: ['speckit.plan'] }], root, 'ext');
+    expect(readFileSync(res.qwen[0], 'utf-8')).toContain('handoffs:\n- speckit.plan\n');
+  });
+
+  test('unknown agent throws', async () => {
+    await expect(registerCommands('nope', [CMD], root, 'ext')).rejects.toThrow('Unknown agent: nope');
+  });
+
+  test('unregister removes files, prunes empty dirs, is idempotent, preserves others', async () => {
+    const res = await registerCommands('codex', [CMD], root, 'ext');
+    const copilot = await registerCommands('copilot', [CMD], root, 'ext');
+    mkdirSync(join(root, '.github/agents'), { recursive: true });
+    writeFileSync(join(root, '.github/agents/other.md'), 'keep');
+    await unregisterCommands({ ...res, ...copilot }, root);
+    expect(existsSync(join(root, '.agents/skills/speckit-test-cmd'))).toBe(false);
+    expect(existsSync(copilot.copilot[0])).toBe(false);
+    expect(existsSync(copilot.copilot[1])).toBe(false);
+    expect(existsSync(join(root, '.github/agents/other.md'))).toBe(true);
+    await unregisterCommands(res, root);
+  });
+
+  test('registerCommandsForAllAgents with and without a target', async () => {
+    expect(Object.keys(await registerCommandsForAllAgents([CMD], root, 'ext', 'gemini'))).toEqual(['gemini']);
+    const all = await registerCommandsForAllAgents([CMD], root, 'ext');
+    expect(Object.keys(all).sort()).toEqual([...SUPPORTED_AGENTS].sort());
   });
 });

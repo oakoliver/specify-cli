@@ -1,7 +1,7 @@
 {
   "name": "@oakoliver/specify-cli",
-  "version": "1.1.0",
-  "description": "Spec-Driven Development CLI for AI coding agents. Multi-runtime.",
+  "version": "2.0.0",
+  "description": "Spec-Driven Development CLI for AI coding agents. Zero-dependency TypeScript port of github/spec-kit v1.0.12. Multi-runtime.",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,7 +19,7 @@
   "files": [
     "dist",
     "src",
-    "templates"
+    "core_pack"
   ],
   "scripts": {
     "build": "npm run build:esm && npm run build:cjs && npm run build:types",
@@ -41,7 +41,9 @@
     "opencode",
     "specification",
     "tui",
-    "terminal"
+    "terminal",
+    "workflows",
+    "spec-kit"
   ],
   "author": "Antonio Oliveira <antonio@oakoliver.com> (https://oakoliver.com)",
   "license": "MIT",

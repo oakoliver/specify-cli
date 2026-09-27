@@ -1,0 +1,1022 @@
+{
+ "yaml_quote": [
+  [
+   "plain",
+   "\"plain\""
+  ],
+  [
+   "with \"quotes\" and \\ backslash",
+   "\"with \\\"quotes\\\" and \\\\ backslash\""
+  ],
+  [
+   "multi\nline\n\nparagraph",
+   "\"multi\\nline\\n\\nparagraph\""
+  ],
+  [
+   "tab\there",
+   "\"tab\\there\""
+  ],
+  [
+   "ctrl\u0001\u0007\u001b",
+   "\"ctrl\\x01\\a\\e\\x7F\""
+  ],
+  [
+   "unicode ü — é 中文 😀",
+   "\"unicode ü — é 中文 \\U0001F600\""
+  ],
+  [
+   "nbsp x",
+   "\"nbsp x\""
+  ],
+  [
+   "nel ls  ps  bom﻿",
+   "\"nel\\N ls\\L ps\\P bom\\uFEFF\""
+  ],
+  [
+   "  leading and trailing  ",
+   "\"  leading and trailing  \""
+  ],
+  [
+   "",
+   "\"\""
+  ],
+  [
+   "a: b # c",
+   "\"a: b # c\""
+  ],
+  [
+   "'single'",
+   "\"'single'\""
+  ],
+  [
+   "- dash",
+   "\"- dash\""
+  ],
+  [
+   "null",
+   "\"null\""
+  ],
+  [
+   "true",
+   "\"true\""
+  ],
+  [
+   "123",
+   "\"123\""
+  ]
+ ],
+ "toml_string": [
+  [
+   "plain",
+   "\"plain\""
+  ],
+  [
+   "with \"quotes\" and \\ backslash",
+   "\"with \\\"quotes\\\" and \\\\ backslash\""
+  ],
+  [
+   "multi\nline\n\nparagraph",
+   "\"\"\"\nmulti\nline\n\nparagraph\"\"\""
+  ],
+  [
+   "tab\there",
+   "\"tab\there\""
+  ],
+  [
+   "ctrl\u0001\u0007\u001b",
+   "\"ctrl\\u0001\\u0007\\u001b\\u007f\""
+  ],
+  [
+   "unicode ü — é 中文 😀",
+   "\"unicode ü — é 中文 😀\""
+  ],
+  [
+   "nbsp x",
+   "\"nbsp x\""
+  ],
+  [
+   "nel ls  ps  bom﻿",
+   "\"nel ls  ps  bom﻿\""
+  ],
+  [
+   "  leading and trailing  ",
+   "\"  leading and trailing  \""
+  ],
+  [
+   "",
+   "\"\""
+  ],
+  [
+   "a: b # c",
+   "\"a: b # c\""
+  ],
+  [
+   "'single'",
+   "\"'single'\""
+  ],
+  [
+   "- dash",
+   "\"- dash\""
+  ],
+  [
+   "null",
+   "\"null\""
+  ],
+  [
+   "true",
+   "\"true\""
+  ],
+  [
+   "123",
+   "\"123\""
+  ],
+  [
+   "ends with quote\"",
+   "\"ends with quote\\\"\""
+  ],
+  [
+   "has \"\"\" triple\nline",
+   "'''\nhas \"\"\" triple\nline'''"
+  ],
+  [
+   "has ''' and \"\"\" both\nx",
+   "\"has ''' and \\\"\\\"\\\" both\\nx\""
+  ],
+  [
+   "ends'\nwith\"\"\"",
+   "'''\nends'\nwith\"\"\"'''"
+  ],
+  [
+   "back\\slash\nline",
+   "\"\"\"\nback\\\\slash\nline\"\"\""
+  ],
+  [
+   "cr\r\nlf",
+   "\"\"\"\ncr\r\nlf\"\"\""
+  ],
+  [
+   "lone\rcr",
+   "\"lone\\rcr\""
+  ]
+ ],
+ "render_toml": [
+  [
+   "",
+   "\n# Title\n\nBody $ARGUMENTS\n\n",
+   "prompt = \"\"\"\n\n# Title\n\nBody $ARGUMENTS\"\"\"\n"
+  ],
+  [
+   "",
+   "line1\nline2\\x\n",
+   "prompt = \"\"\"\nline1\nline2\\\\x\"\"\"\n"
+  ],
+  [
+   "",
+   "has \"\"\" inside\n",
+   "prompt = \"has \\\"\\\"\\\" inside\"\n"
+  ],
+  [
+   "",
+   "has ''' and \"\"\" \n",
+   "prompt = \"has ''' and \\\"\\\"\\\" \"\n"
+  ],
+  [
+   "",
+   "ctrl\u0001\n",
+   "prompt = \"ctrl\\u0001\"\n"
+  ],
+  [
+   "",
+   "",
+   "prompt = \"\"\n"
+  ],
+  [
+   "Desc",
+   "\n# Title\n\nBody $ARGUMENTS\n\n",
+   "description = \"Desc\"\n\nprompt = \"\"\"\n\n# Title\n\nBody $ARGUMENTS\"\"\"\n"
+  ],
+  [
+   "Desc",
+   "line1\nline2\\x\n",
+   "description = \"Desc\"\n\nprompt = \"\"\"\nline1\nline2\\\\x\"\"\"\n"
+  ],
+  [
+   "Desc",
+   "has \"\"\" inside\n",
+   "description = \"Desc\"\n\nprompt = \"has \\\"\\\"\\\" inside\"\n"
+  ],
+  [
+   "Desc",
+   "has ''' and \"\"\" \n",
+   "description = \"Desc\"\n\nprompt = \"has ''' and \\\"\\\"\\\" \"\n"
+  ],
+  [
+   "Desc",
+   "ctrl\u0001\n",
+   "description = \"Desc\"\n\nprompt = \"ctrl\\u0001\"\n"
+  ],
+  [
+   "Desc",
+   "",
+   "description = \"Desc\"\n\nprompt = \"\"\n"
+  ],
+  [
+   "multi\nline desc",
+   "\n# Title\n\nBody $ARGUMENTS\n\n",
+   "description = \"\"\"\nmulti\nline desc\"\"\"\n\nprompt = \"\"\"\n\n# Title\n\nBody $ARGUMENTS\"\"\"\n"
+  ],
+  [
+   "multi\nline desc",
+   "line1\nline2\\x\n",
+   "description = \"\"\"\nmulti\nline desc\"\"\"\n\nprompt = \"\"\"\nline1\nline2\\\\x\"\"\"\n"
+  ],
+  [
+   "multi\nline desc",
+   "has \"\"\" inside\n",
+   "description = \"\"\"\nmulti\nline desc\"\"\"\n\nprompt = \"has \\\"\\\"\\\" inside\"\n"
+  ],
+  [
+   "multi\nline desc",
+   "has ''' and \"\"\" \n",
+   "description = \"\"\"\nmulti\nline desc\"\"\"\n\nprompt = \"has ''' and \\\"\\\"\\\" \"\n"
+  ],
+  [
+   "multi\nline desc",
+   "ctrl\u0001\n",
+   "description = \"\"\"\nmulti\nline desc\"\"\"\n\nprompt = \"ctrl\\u0001\"\n"
+  ],
+  [
+   "multi\nline desc",
+   "",
+   "description = \"\"\"\nmulti\nline desc\"\"\"\n\nprompt = \"\"\n"
+  ]
+ ],
+ "registrar_toml": [
+  [
+   {},
+   "\n# Title\n\nBody $ARGUMENTS\n\n",
+   "# Source: src\n\nprompt = \"\"\"\n\n# Title\n\nBody $ARGUMENTS\n\n\n\"\"\""
+  ],
+  [
+   {},
+   "line1\nline2\\x\n",
+   "# Source: src\n\nprompt = '''\nline1\nline2\\x\n\n'''"
+  ],
+  [
+   {},
+   "has \"\"\" inside\n",
+   "# Source: src\n\nprompt = '''\nhas \"\"\" inside\n\n'''"
+  ],
+  [
+   {},
+   "has ''' and \"\"\" \n",
+   "# Source: src\n\nprompt = \"has ''' and \\\"\\\"\\\" \\n\""
+  ],
+  [
+   {},
+   "ctrl\u0001\n",
+   "# Source: src\n\nprompt = \"ctrl\\u0001\\n\""
+  ],
+  [
+   {},
+   "",
+   "# Source: src\n\nprompt = \"\"\"\n\n\"\"\""
+  ],
+  [
+   {
+    "description": "D"
+   },
+   "\n# Title\n\nBody $ARGUMENTS\n\n",
+   "description = \"D\"\n\n# Source: src\n\nprompt = \"\"\"\n\n# Title\n\nBody $ARGUMENTS\n\n\n\"\"\""
+  ],
+  [
+   {
+    "description": "D"
+   },
+   "line1\nline2\\x\n",
+   "description = \"D\"\n\n# Source: src\n\nprompt = '''\nline1\nline2\\x\n\n'''"
+  ],
+  [
+   {
+    "description": "D"
+   },
+   "has \"\"\" inside\n",
+   "description = \"D\"\n\n# Source: src\n\nprompt = '''\nhas \"\"\" inside\n\n'''"
+  ],
+  [
+   {
+    "description": "D"
+   },
+   "has ''' and \"\"\" \n",
+   "description = \"D\"\n\n# Source: src\n\nprompt = \"has ''' and \\\"\\\"\\\" \\n\""
+  ],
+  [
+   {
+    "description": "D"
+   },
+   "ctrl\u0001\n",
+   "description = \"D\"\n\n# Source: src\n\nprompt = \"ctrl\\u0001\\n\""
+  ],
+  [
+   {
+    "description": "D"
+   },
+   "",
+   "description = \"D\"\n\n# Source: src\n\nprompt = \"\"\"\n\n\"\"\""
+  ],
+  [
+   {
+    "description": null
+   },
+   "\n# Title\n\nBody $ARGUMENTS\n\n",
+   "description = \"\"\n\n# Source: src\n\nprompt = \"\"\"\n\n# Title\n\nBody $ARGUMENTS\n\n\n\"\"\""
+  ],
+  [
+   {
+    "description": null
+   },
+   "line1\nline2\\x\n",
+   "description = \"\"\n\n# Source: src\n\nprompt = '''\nline1\nline2\\x\n\n'''"
+  ],
+  [
+   {
+    "description": null
+   },
+   "has \"\"\" inside\n",
+   "description = \"\"\n\n# Source: src\n\nprompt = '''\nhas \"\"\" inside\n\n'''"
+  ],
+  [
+   {
+    "description": null
+   },
+   "has ''' and \"\"\" \n",
+   "description = \"\"\n\n# Source: src\n\nprompt = \"has ''' and \\\"\\\"\\\" \\n\""
+  ],
+  [
+   {
+    "description": null
+   },
+   "ctrl\u0001\n",
+   "description = \"\"\n\n# Source: src\n\nprompt = \"ctrl\\u0001\\n\""
+  ],
+  [
+   {
+    "description": null
+   },
+   "",
+   "description = \"\"\n\n# Source: src\n\nprompt = \"\"\"\n\n\"\"\""
+  ],
+  [
+   {
+    "description": 2
+   },
+   "\n# Title\n\nBody $ARGUMENTS\n\n",
+   "description = \"2\"\n\n# Source: src\n\nprompt = \"\"\"\n\n# Title\n\nBody $ARGUMENTS\n\n\n\"\"\""
+  ],
+  [
+   {
+    "description": 2
+   },
+   "line1\nline2\\x\n",
+   "description = \"2\"\n\n# Source: src\n\nprompt = '''\nline1\nline2\\x\n\n'''"
+  ],
+  [
+   {
+    "description": 2
+   },
+   "has \"\"\" inside\n",
+   "description = \"2\"\n\n# Source: src\n\nprompt = '''\nhas \"\"\" inside\n\n'''"
+  ],
+  [
+   {
+    "description": 2
+   },
+   "has ''' and \"\"\" \n",
+   "description = \"2\"\n\n# Source: src\n\nprompt = \"has ''' and \\\"\\\"\\\" \\n\""
+  ],
+  [
+   {
+    "description": 2
+   },
+   "ctrl\u0001\n",
+   "description = \"2\"\n\n# Source: src\n\nprompt = \"ctrl\\u0001\\n\""
+  ],
+  [
+   {
+    "description": 2
+   },
+   "",
+   "description = \"2\"\n\n# Source: src\n\nprompt = \"\"\"\n\n\"\"\""
+  ]
+ ],
+ "render_yaml": [
+  [
+   "Plan",
+   "",
+   "  indented first\nnot indented\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: ''\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n    indented first\n  not indented\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "",
+   "ctrl \u0007 char\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: ''\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\n\"prompt\": \"ctrl \\a char\\n\"\n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "",
+   "normal\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: ''\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  normal\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "Create a plan: with colon",
+   "  indented first\nnot indented\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: 'Create a plan: with colon'\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n    indented first\n  not indented\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "Create a plan: with colon",
+   "ctrl \u0007 char\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: 'Create a plan: with colon'\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\n\"prompt\": \"ctrl \\a char\\n\"\n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "Create a plan: with colon",
+   "normal\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: 'Create a plan: with colon'\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  normal\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "A very long description A very long description A very long description A very long description A very long description A very long description ",
+   "  indented first\nnot indented\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: 'A very long description A very long description A very long description\n  A very long description A very long description A very long description '\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n    indented first\n  not indented\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "A very long description A very long description A very long description A very long description A very long description A very long description ",
+   "ctrl \u0007 char\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: 'A very long description A very long description A very long description\n  A very long description A very long description A very long description '\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\n\"prompt\": \"ctrl \\a char\\n\"\n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Plan",
+   "A very long description A very long description A very long description A very long description A very long description A very long description ",
+   "normal\n",
+   "version: 1.0.0\ntitle: Plan\ndescription: 'A very long description A very long description A very long description\n  A very long description A very long description A very long description '\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  normal\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "",
+   "  indented first\nnot indented\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: ''\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n    indented first\n  not indented\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "",
+   "ctrl \u0007 char\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: ''\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\n\"prompt\": \"ctrl \\a char\\n\"\n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "",
+   "normal\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: ''\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  normal\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "Create a plan: with colon",
+   "  indented first\nnot indented\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: 'Create a plan: with colon'\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n    indented first\n  not indented\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "Create a plan: with colon",
+   "ctrl \u0007 char\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: 'Create a plan: with colon'\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\n\"prompt\": \"ctrl \\a char\\n\"\n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "Create a plan: with colon",
+   "normal\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: 'Create a plan: with colon'\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  normal\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "A very long description A very long description A very long description A very long description A very long description A very long description ",
+   "  indented first\nnot indented\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: 'A very long description A very long description A very long description\n  A very long description A very long description A very long description '\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n    indented first\n  not indented\n  \n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "A very long description A very long description A very long description A very long description A very long description A very long description ",
+   "ctrl \u0007 char\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: 'A very long description A very long description A very long description\n  A very long description A very long description A very long description '\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\n\"prompt\": \"ctrl \\a char\\n\"\n\n# Source: templates/commands/x.md\n"
+  ],
+  [
+   "Ünïcode: title",
+   "A very long description A very long description A very long description A very long description A very long description A very long description ",
+   "normal\n",
+   "version: 1.0.0\ntitle: 'Ünïcode: title'\ndescription: 'A very long description A very long description A very long description\n  A very long description A very long description A very long description '\nauthor:\n  contact: spec-kit\nparameters:\n- key: args\n  input_type: string\n  requirement: optional\n  default: ''\n  description: User input passed to the command.\nextensions:\n- type: builtin\n  name: developer\nactivities:\n- Spec-Driven Development\nprompt: |2\n  normal\n  \n\n# Source: templates/commands/x.md\n"
+  ]
+ ],
+ "human_title": [
+  [
+   "speckit.plan",
+   "Plan"
+  ],
+  [
+   "speckit.git.commit",
+   "Git Commit"
+  ],
+  [
+   "my-ext_cmd",
+   "My Ext Cmd"
+  ],
+  [
+   "plan",
+   "Plan"
+  ],
+  [
+   "o'neil",
+   "O'Neil"
+  ]
+ ],
+ "rewrite_paths": [
+  [
+   "Run scripts/bash/x.sh",
+   null,
+   "Run .specify/scripts/bash/x.sh"
+  ],
+  [
+   "Run scripts/bash/x.sh",
+   "git",
+   "Run .specify/extensions/git/scripts/bash/x.sh"
+  ],
+  [
+   "../../scripts/bash/y.sh",
+   null,
+   ".specify/scripts/bash/y.sh"
+  ],
+  [
+   "../../scripts/bash/y.sh",
+   "git",
+   ".specify/scripts/bash/y.sh"
+  ],
+  [
+   "../scripts/z",
+   null,
+   "../scripts/z"
+  ],
+  [
+   "../scripts/z",
+   "git",
+   "../scripts/z"
+  ],
+  [
+   "not../scripts/a",
+   null,
+   "not../scripts/a"
+  ],
+  [
+   "not../scripts/a",
+   "git",
+   "not../scripts/a"
+  ],
+  [
+   "....//scripts/",
+   null,
+   "....//scripts/"
+  ],
+  [
+   "....//scripts/",
+   "git",
+   "....//scripts/"
+  ],
+  [
+   "myscripts/foo",
+   null,
+   "myscripts/foo"
+  ],
+  [
+   "myscripts/foo",
+   "git",
+   "myscripts/foo"
+  ],
+  [
+   "`templates/t.md`",
+   null,
+   "`.specify/templates/t.md`"
+  ],
+  [
+   "`templates/t.md`",
+   "git",
+   "`.specify/templates/t.md`"
+  ],
+  [
+   ".specify/scripts/ok",
+   null,
+   ".specify/scripts/ok"
+  ],
+  [
+   ".specify/scripts/ok",
+   "git",
+   ".specify/scripts/ok"
+  ],
+  [
+   "./memory/constitution.md",
+   null,
+   ".specify/memory/constitution.md"
+  ],
+  [
+   "./memory/constitution.md",
+   "git",
+   ".specify/memory/constitution.md"
+  ],
+  [
+   "(scripts/a) [templates/b] {memory/c} <scripts/d> =scripts/e",
+   null,
+   "(.specify/scripts/a) [.specify/templates/b] {.specify/memory/c} <.specify/scripts/d> =.specify/scripts/e"
+  ],
+  [
+   "(scripts/a) [templates/b] {memory/c} <scripts/d> =scripts/e",
+   "git",
+   "(.specify/extensions/git/scripts/a) [.specify/templates/b] {.specify/memory/c} <.specify/extensions/git/scripts/d> =.specify/extensions/git/scripts/e"
+  ],
+  [
+   "\"scripts/q\" 'memory/r'",
+   null,
+   "\".specify/scripts/q\" '.specify/memory/r'"
+  ],
+  [
+   "\"scripts/q\" 'memory/r'",
+   "git",
+   "\".specify/extensions/git/scripts/q\" '.specify/memory/r'"
+  ],
+  [
+   "ünscripts/x",
+   null,
+   "ünscripts/x"
+  ],
+  [
+   "ünscripts/x",
+   "git",
+   "ünscripts/x"
+  ],
+  [
+   "x\nscripts/y",
+   null,
+   "x\n.specify/scripts/y"
+  ],
+  [
+   "x\nscripts/y",
+   "git",
+   "x\n.specify/extensions/git/scripts/y"
+  ]
+ ],
+ "command_refs": [
+  [
+   "__SPECKIT_COMMAND_PLAN__ and __SPECKIT_COMMAND_GIT_COMMIT__ and __SPECKIT_COMMAND_AGENT-CONTEXT_UPDATE__ __SPECKIT_COMMAND___",
+   ".",
+   "/",
+   "/speckit.plan and /speckit.git.commit and /speckit.agent-context.update __SPECKIT_COMMAND___"
+  ],
+  [
+   "__SPECKIT_COMMAND_PLAN__ and __SPECKIT_COMMAND_GIT_COMMIT__ and __SPECKIT_COMMAND_AGENT-CONTEXT_UPDATE__ __SPECKIT_COMMAND___",
+   ".",
+   "$",
+   "$speckit.plan and $speckit.git.commit and $speckit.agent-context.update __SPECKIT_COMMAND___"
+  ],
+  [
+   "__SPECKIT_COMMAND_PLAN__ and __SPECKIT_COMMAND_GIT_COMMIT__ and __SPECKIT_COMMAND_AGENT-CONTEXT_UPDATE__ __SPECKIT_COMMAND___",
+   ".",
+   "/skill:",
+   "/skill:speckit.plan and /skill:speckit.git.commit and /skill:speckit.agent-context.update __SPECKIT_COMMAND___"
+  ],
+  [
+   "__SPECKIT_COMMAND_PLAN__ and __SPECKIT_COMMAND_GIT_COMMIT__ and __SPECKIT_COMMAND_AGENT-CONTEXT_UPDATE__ __SPECKIT_COMMAND___",
+   "-",
+   "/",
+   "/speckit-plan and /speckit-git-commit and /speckit-agent-context-update __SPECKIT_COMMAND___"
+  ],
+  [
+   "__SPECKIT_COMMAND_PLAN__ and __SPECKIT_COMMAND_GIT_COMMIT__ and __SPECKIT_COMMAND_AGENT-CONTEXT_UPDATE__ __SPECKIT_COMMAND___",
+   "-",
+   "$",
+   "$speckit-plan and $speckit-git-commit and $speckit-agent-context-update __SPECKIT_COMMAND___"
+  ],
+  [
+   "__SPECKIT_COMMAND_PLAN__ and __SPECKIT_COMMAND_GIT_COMMIT__ and __SPECKIT_COMMAND_AGENT-CONTEXT_UPDATE__ __SPECKIT_COMMAND___",
+   "-",
+   "/skill:",
+   "/skill:speckit-plan and /skill:speckit-git-commit and /skill:speckit-agent-context-update __SPECKIT_COMMAND___"
+  ]
+ ],
+ "argument_hint": [
+  [
+   "---\nname: x\ndescription: short\n---\nbody\n",
+   "Hint \"quoted\" \\ back",
+   "---\nname: x\ndescription: short\nargument-hint: \"Hint \\\"quoted\\\" \\\\ back\"\n---\nbody\n"
+  ],
+  [
+   "---\nname: x\ndescription: >-\n  folded long\n  text\n\n  more\nother: 1\n---\nbody",
+   "Hint \"quoted\" \\ back",
+   "---\nname: x\ndescription: >-\n  folded long\n  text\n\n  more\nargument-hint: \"Hint \\\"quoted\\\" \\\\ back\"\nother: 1\n---\nbody"
+  ],
+  [
+   "---\r\nname: x\r\ndescription: crlf\r\n---\r\nb",
+   "Hint \"quoted\" \\ back",
+   "---\r\nname: x\r\ndescription: crlf\r\nargument-hint: \"Hint \\\"quoted\\\" \\\\ back\"\r\n---\r\nb"
+  ],
+  [
+   "---\nname: x\nargument-hint: \"already\"\ndescription: d\n---\n",
+   "Hint \"quoted\" \\ back",
+   "---\nname: x\nargument-hint: \"already\"\ndescription: d\n---\n"
+  ],
+  [
+   "---\ndescription: last",
+   "Hint \"quoted\" \\ back",
+   "---\ndescription: lastargument-hint: \"Hint \\\"quoted\\\" \\\\ back\""
+  ]
+ ],
+ "frontmatter_flag": [
+  [
+   "---\nname: x\n---\nbody",
+   "---\nname: x\nuser-invocable: true\n---\nbody"
+  ],
+  [
+   "---\nname: x\n---",
+   "---\nname: x\nuser-invocable: true\n---"
+  ],
+  [
+   "---\r\nname: x\r\n---\r\n",
+   "---\r\nname: x\r\nuser-invocable: true\r\n---\r\n"
+  ],
+  [
+   "---\nuser-invocable: false\n---\n",
+   "---\nuser-invocable: false\n---\n"
+  ],
+  [
+   "no frontmatter",
+   "no frontmatter"
+  ]
+ ],
+ "hook_note": [
+  [
+   "## H\n- For each executable hook, output the following\n  x\n",
+   "/",
+   "## H\n- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n- For each executable hook, output the following\n  x\n"
+  ],
+  [
+   "## H\n- For each executable hook, output the following\n  x\n",
+   "$",
+   "## H\n- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `$speckit-git-commit`.\n- For each executable hook, output the following\n  x\n"
+  ],
+  [
+   "  - For each executable hook, output the following:\r\n",
+   "/",
+   "  - When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\r\n  - For each executable hook, output the following:\r\n"
+  ],
+  [
+   "  - For each executable hook, output the following:\r\n",
+   "$",
+   "  - When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `$speckit-git-commit`.\r\n  - For each executable hook, output the following:\r\n"
+  ],
+  [
+   "- For each executable hook, output the following",
+   "/",
+   "- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n- For each executable hook, output the following\n"
+  ],
+  [
+   "- For each executable hook, output the following",
+   "$",
+   "- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `$speckit-git-commit`.\n- For each executable hook, output the following\n"
+  ],
+  [
+   "\n\n- For each executable hook, output the following\n- For each executable hook, output the following\n",
+   "/",
+   "\n\n- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n- For each executable hook, output the following\n- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `/speckit-git-commit`.\n- For each executable hook, output the following\n"
+  ],
+  [
+   "\n\n- For each executable hook, output the following\n- For each executable hook, output the following\n",
+   "$",
+   "\n\n- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `$speckit-git-commit`.\n- For each executable hook, output the following\n- When constructing command invocations from hook command names, replace dots (`.`) with hyphens (`-`). For example, `speckit.git.commit` → `$speckit-git-commit`.\n- For each executable hook, output the following\n"
+  ]
+ ],
+ "parse_frontmatter": [
+  [
+   "---\ndescription: a\nscripts:\n  sh: x\n---\nbody\n",
+   [
+    {
+     "description": "a",
+     "scripts": {
+      "sh": "x"
+     }
+    },
+    "body"
+   ]
+  ],
+  [
+   "no fm",
+   [
+    {},
+    "no fm"
+   ]
+  ],
+  [
+   "---\ndescription: Separate sections with ---\nb: 1\n---\n  body  \n",
+   [
+    {
+     "description": "Separate sections with ---",
+     "b": 1
+    },
+    "body"
+   ]
+  ],
+  [
+   "---\n- a\n---\nbody",
+   [
+    {},
+    "body"
+   ]
+  ],
+  [
+   "---\n: bad: yaml: [\n---\nbody",
+   [
+    {},
+    "body"
+   ]
+  ],
+  [
+   "---\nunterminated",
+   [
+    {},
+    "---\nunterminated"
+   ]
+  ]
+ ],
+ "render_frontmatter": [
+  [
+   {
+    "description": "x",
+    "handoffs": [
+     {
+      "label": "L",
+      "agent": "speckit.plan",
+      "send": true
+     }
+    ],
+    "scripts": {
+     "sh": "a"
+    }
+   },
+   "---\ndescription: x\nhandoffs:\n- label: L\n  agent: speckit.plan\n  send: true\nscripts:\n  sh: a\n---\n"
+  ],
+  [
+   {
+    "description": "ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long "
+   },
+   "---\ndescription: 'ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long ü long '\n---\n"
+  ],
+  [
+   {
+    "n": null,
+    "b": true,
+    "i": 3,
+    "f": 1.5,
+    "e": "",
+    "l": []
+   },
+   "---\nn: null\nb: true\ni: 3\nf: 1.5\ne: ''\nl: []\n---\n"
+  ]
+ ],
+ "process_template": [
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "claude",
+   "sh",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/bash/a.sh --json $ARGUMENTS with $ARGUMENTS for claude, then /speckit-tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "claude",
+   "ps",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/powershell/a.ps1 -Json $ARGUMENTS with $ARGUMENTS for claude, then /speckit-tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "gemini",
+   "sh",
+   "{{args}}",
+   ".",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/bash/a.sh --json {{args}} with {{args}} for gemini, then /speckit.tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "gemini",
+   "ps",
+   "{{args}}",
+   ".",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/powershell/a.ps1 -Json {{args}} with {{args}} for gemini, then /speckit.tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "codex",
+   "sh",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/bash/a.sh --json $ARGUMENTS with $ARGUMENTS for codex, then $speckit-tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "codex",
+   "ps",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/powershell/a.ps1 -Json $ARGUMENTS with $ARGUMENTS for codex, then $speckit-tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "kimi",
+   "sh",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/bash/a.sh --json $ARGUMENTS with $ARGUMENTS for kimi, then /skill:speckit-tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\nscripts:\n  sh: scripts/bash/a.sh --json {ARGS}\n  ps: scripts/powershell/a.ps1 -Json {ARGS}\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun {SCRIPT} with $ARGUMENTS for __AGENT__, then __SPECKIT_COMMAND_TASKS__.\nSee templates/plan-template.md\n",
+   "kimi",
+   "ps",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\nhandoffs:\n  - agent: speckit.plan\n---\n\nRun .specify/scripts/powershell/a.ps1 -Json $ARGUMENTS with $ARGUMENTS for kimi, then /skill:speckit-tasks.\nSee .specify/templates/plan-template.md\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "claude",
+   "sh",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "claude",
+   "ps",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "gemini",
+   "sh",
+   "{{args}}",
+   ".",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} {{args}}\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "gemini",
+   "ps",
+   "{{args}}",
+   ".",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} {{args}}\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "codex",
+   "sh",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "codex",
+   "ps",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "kimi",
+   "sh",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n"
+  ],
+  [
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n",
+   "kimi",
+   "ps",
+   "$ARGUMENTS",
+   "-",
+   "---\ndescription: t\n---\nno scripts {SCRIPT} $ARGUMENTS\n"
+  ]
+ ]
+}

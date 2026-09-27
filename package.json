@@ -65,7 +65,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@oakoliver/huh": "^1.0.0",
     "@oakoliver/lipgloss": "^1.0.0"
   },
   "engines": {

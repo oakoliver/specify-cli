@@ -243,13 +243,32 @@ export function printStep(name: string, status: 'pending' | 'done' | 'error' | '
       style = dimStyle;
   }
 
-  console.log(`  ${style.render(icon)} ${name}`);
+  const line = `  ${style.render(icon)} ${name}`;
+  const interactive = Boolean(process.stdout.isTTY);
+
+  if (status === 'pending') {
+    // Like upstream's live StepTracker: on a terminal the pending line is
+    // replaced by the result; in logs only the result is printed.
+    pendingStep = name;
+    if (interactive) console.log(line);
+    return;
+  }
+
+  if (interactive && pendingStep === name) {
+    process.stdout.write('\x1b[1A\r\x1b[2K');
+  }
+  pendingStep = null;
+  console.log(line);
 }
+
+/** The step whose pending line is the last line printed, if any. */
+let pendingStep: string | null = null;
 
 /**
  * Print a success message.
  */
 export function printSuccess(message: string): void {
+  pendingStep = null;
   console.log();
   console.log(successStyle.render(`✓ ${message}`));
 }
@@ -258,6 +277,7 @@ export function printSuccess(message: string): void {
  * Print an error message.
  */
 export function printError(message: string): void {
+  pendingStep = null;
   console.log();
   console.log(errorStyle.render(`✗ ${message}`));
 }
@@ -266,6 +286,7 @@ export function printError(message: string): void {
  * Print a warning message.
  */
 export function printWarning(message: string): void {
+  pendingStep = null;
   console.log(warningStyle.render(`⚠ ${message}`));
 }
 
@@ -273,6 +294,7 @@ export function printWarning(message: string): void {
  * Print an info message.
  */
 export function printInfo(message: string): void {
+  pendingStep = null;
   console.log(dimStyle.render(`  ${message}`));
 }
 
@@ -284,6 +306,7 @@ export function printInfo(message: string): void {
  * Print next steps after init completes.
  */
 export function printNextSteps(projectPath: string, agent: string): void {
+  pendingStep = null;
   console.log();
   console.log(titleStyle.render('Next Steps'));
   console.log();

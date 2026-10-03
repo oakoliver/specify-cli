@@ -2,6 +2,12 @@
 
 Spec-Driven Development CLI for AI coding agents. Zero runtime dependencies, multi-runtime (Node.js 18+, Bun, Deno).
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/init.gif" width="720" alt="specify init my-app --integration claude: the SPECIFY banner and project setup panel, the script type picker moved with the arrow keys and confirmed, then Project ready with the agent folder security note, next steps and enhancement skills">
+</p>
+
+<p align="center"><sub>Every picture in this README is recorded from this repository with <a href="https://github.com/oakoliver/vhs">@oakoliver/vhs</a>; the tapes are in <code>assets/tapes/</code>.</sub></p>
+
 Ported from [github/spec-kit](https://github.com/github/spec-kit) (Python) to TypeScript, at **1:1 parity with spec-kit v1.0.12** (run `specify version` to see the parity line).
 
 > **v2.0.0 is a breaking release**, mirroring upstream's 1.0 line: the legacy `--ai`, `--ai-commands-dir`, `--ai-skills` and `--no-git` init flags are gone (use `--integration` / `--integration-options`; git is now the opt-in `git` extension), the roo/windsurf/iflow agents were retired upstream, and extensions/presets use `extension.yml` / `preset.yml` manifests.
@@ -33,6 +39,12 @@ specify init my-project --integration claude --extension git --preset lean
 specify check
 specify integration status
 ```
+
+`specify status` and `specify doctor` (specify-cli additions) summarize and check a project:
+
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/status.png" width="560" alt="specify status: project root, integration claude, scripts sh, initialized and CLI version 2.0.0 with spec-kit 1.0.12 parity, one healthy claude integration with 10 files, no extensions or presets, one installed workflow and one memory file">
+
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/doctor.png" width="560" alt="specify doctor: checks for the project, its template, script and memory directories, the saved init options, the claude integration's tracked files, extensions and presets, and a warning that the project has no git repository">
 
 ## The Spec-Driven Development Workflow
 
@@ -520,6 +532,10 @@ Creates `checklists/security.md`:
 
 41 integrations (upstream spec-kit v1.0.12 registry, including `generic`). Skills-based integrations install one `<name>/SKILL.md` per command and invoke as `/speckit-<name>`; command-based ones use `/speckit.<name>`.
 
+`specify integration list` shows them all, and which are installed in a project:
+
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/integrations.png" width="640" alt="specify integration list: a table of all 41 integrations with name, status, whether a CLI is required and whether multiple installs are safe; claude is installed and the default">
+
 | Key | Agent | Commands / skills directory | Format |
 |-----|-------|-----------------------------|--------|
 | agy | Antigravity | `.agents/skills` | SKILL.md |
@@ -568,6 +584,8 @@ Creates `checklists/security.md`:
 
 ## CLI Reference
 
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/help.png" width="560" alt="specify --help: the SPECIFY banner, usage, options, and the thirteen commands from init to status">
+
 ```text
 specify init [PROJECT_NAME]   Initialize a new Specify project
 specify check                 Check that all required tools are installed
@@ -599,6 +617,10 @@ Every command supports `--help`. Key `specify init` options:
 ```
 
 ## Project Structure
+
+What `specify init my-app --integration claude` generates:
+
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/tree.png" width="480" alt="tree of a freshly initialized project: .claude/skills with ten speckit skills, and .specify with init options, integration manifests, memory, bash scripts, templates and the bundled speckit workflow">
 
 ```
 my-project/

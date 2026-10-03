@@ -532,6 +532,10 @@ Creates `checklists/security.md`:
 
 41 integrations (upstream spec-kit v1.0.12 registry, including `generic`). Skills-based integrations install one `<name>/SKILL.md` per command and invoke as `/speckit-<name>`; command-based ones use `/speckit.<name>`.
 
+Without `--integration`, `specify init` asks which one to use. The picker scrolls to fit the terminal:
+
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/picker.gif" width="560" alt="specify init my-app in an 80 by 24 terminal: the integration picker shows 15 of 41 integrations with more-above and more-below counts, scrolls down to gemini and back up to claude, then the script picker and the Project ready panels">
+
 `specify integration list` shows them all, and which are installed in a project:
 
 <img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/integrations.png" width="640" alt="specify integration list: a table of all 41 integrations with name, status, whether a CLI is required and whether multiple installs are safe; claude is installed and the default">

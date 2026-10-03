@@ -526,13 +526,13 @@ Creates `checklists/security.md`:
 | alquimia | Alquimia AI | `.alquimia/skills` | SKILL.md |
 | amp | Amp | `.agents/commands` | Markdown |
 | auggie | Auggie CLI | `.augment/commands` | Markdown |
-| bob | IBM Bob | `.bob/commands` | Markdown |
+| bob | IBM Bob | `.bob/skills` | SKILL.md |
 | claude | Claude Code | `.claude/skills` | SKILL.md |
 | cline | Cline | `.clinerules/workflows` | Markdown |
 | codebuddy | CodeBuddy | `.codebuddy/commands` | Markdown |
 | codex | Codex CLI | `.agents/skills` | SKILL.md |
 | command-code | Command Code | `.commandcode/skills` | SKILL.md |
-| copilot | GitHub Copilot | `.github/agents` | Markdown |
+| copilot | GitHub Copilot | `.github/skills` | SKILL.md |
 | cursor-agent | Cursor | `.cursor/skills` | SKILL.md |
 | devin | Devin for Terminal | `.devin/skills` | SKILL.md |
 | docker-agent | Docker Agent | `.agents/skills` | SKILL.md |
@@ -564,7 +564,7 @@ Creates `checklists/security.md`:
 | zcode | ZCode | `.zcode/skills` | SKILL.md |
 | zed | Zed | `.agents/skills` | SKILL.md |
 
-`copilot` installs skills (`.github/skills/`) by default; pass `--integration-options="--commands"` for legacy `.github/agents/` prompt files. `generic` requires `--integration-options="--commands-dir <dir>"`.
+`copilot` installs skills (`.github/skills/`) by default; pass `--integration-options="--commands"` for legacy `.github/agents/` prompt files. `bob` likewise installs skills (`.bob/skills/`); `--integration-options="--legacy-commands"` keeps the deprecated Bob 1.x `.bob/commands/` layout. `generic` requires `--integration-options="--commands-dir <dir>"`.
 
 ## CLI Reference
 

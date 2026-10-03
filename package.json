@@ -56,16 +56,16 @@
     "url": "https://github.com/oakoliver/specify-cli/issues"
   },
   "devDependencies": {
-    "@oakoliver/bubbletea": "^1.0.0",
-    "@oakoliver/bubbles": "^1.0.0",
-    "@oakoliver/glamour": "^1.0.0",
+    "@oakoliver/bubbletea": "^1.2.0",
+    "@oakoliver/bubbles": "^1.2.2",
+    "@oakoliver/glamour": "^2.0.0",
     "@types/bun": "^1.0.0",
     "@types/node": "^20.0.0",
     "esbuild": "^0.27.4",
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@oakoliver/lipgloss": "^1.0.0"
+    "@oakoliver/lipgloss": "^1.1.2"
   },
   "engines": {
     "node": ">=18.0.0"

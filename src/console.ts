@@ -1355,6 +1355,56 @@ function readKey(): Promise<Key> {
 }
 
 /**
+ * Rows the selection panel needs besides the options: the blank line printed
+ * before it, the panel's border and padding (4), the "more" indicators (2),
+ * and the blank line and key hint (2).
+ */
+export const SELECTION_CHROME_ROWS = 9;
+
+/**
+ * The slice of `total` options to show so that `selected` stays visible,
+ * keeping the previous `start` while the selection is inside the window.
+ */
+export function selectionWindow(
+  total: number,
+  selected: number,
+  maxVisible: number,
+  start = 0,
+): { start: number; end: number; hiddenAbove: number; hiddenBelow: number } {
+  const size = Math.max(3, Math.min(total, maxVisible));
+  if (total <= size) return { start: 0, end: total, hiddenAbove: 0, hiddenBelow: 0 };
+  let from = Math.min(Math.max(0, start), total - size);
+  if (selected < from) from = selected;
+  else if (selected >= from + size) from = selected - size + 1;
+  return { start: from, end: from + size, hiddenAbove: from, hiddenBelow: total - from - size };
+}
+
+/** The selection panel for a terminal `rows` tall, scrolled to keep `selectedIndex` visible. */
+export function selectionPanel(
+  options: Record<string, string>,
+  promptText: string,
+  selectedIndex: number,
+  rows: number,
+  windowStart = 0,
+): { panel: Panel; start: number } {
+  const optionKeys = Object.keys(options);
+  const view = selectionWindow(optionKeys.length, selectedIndex, rows - SELECTION_CHROME_ROWS, windowStart);
+  const table = Table.grid({ padding: [0, 2] });
+  table.addColumn('', { style: 'cyan', justify: 'left', width: 3 });
+  table.addColumn('', { style: 'white', justify: 'left' });
+  if (view.hiddenAbove) table.addRow('', `[dim]↑ ${view.hiddenAbove} more[/dim]`);
+  for (let i = view.start; i < view.end; i++) {
+    const key = optionKeys[i];
+    table.addRow(i === selectedIndex ? '▶' : ' ', `[cyan]${key}[/cyan] [dim](${options[key]})[/dim]`);
+  }
+  if (view.hiddenBelow) table.addRow('', `[dim]↓ ${view.hiddenBelow} more[/dim]`);
+  table.addRow('', '');
+  table.addRow('', '[dim]Use ↑/↓ to navigate, Enter to select, Esc to cancel[/dim]');
+  const panel = new Panel(table, { title: `[bold]${promptText}[/bold]`, borderStyle: 'cyan', padding: [1, 2] });
+  return { panel, start: view.start };
+}
+
+/**
  * Interactive selection using arrow keys (port of `select_with_arrows`).
  * @param options Map of option key -> description.
  * @returns The selected key. Throws {@link CliExit}(1) on cancel or non-TTY stdin.
@@ -1378,16 +1428,14 @@ export async function selectWithArrows(
     throw new CliExit(1);
   }
   let selectedIndex = defaultKey && optionKeys.includes(defaultKey) ? optionKeys.indexOf(defaultKey) : 0;
+  // Upstream lists every option, and Rich crops a Live display taller than the
+  // terminal, so with ~40 integrations the selection can scroll out of view.
+  // Show a window of options that follows the selection instead.
+  let windowStart = 0;
   const createSelectionPanel = (): Panel => {
-    const table = Table.grid({ padding: [0, 2] });
-    table.addColumn('', { style: 'cyan', justify: 'left', width: 3 });
-    table.addColumn('', { style: 'white', justify: 'left' });
-    optionKeys.forEach((key, i) => {
-      table.addRow(i === selectedIndex ? '▶' : ' ', `[cyan]${key}[/cyan] [dim](${options[key]})[/dim]`);
-    });
-    table.addRow('', '');
-    table.addRow('', '[dim]Use ↑/↓ to navigate, Enter to select, Esc to cancel[/dim]');
-    return new Panel(table, { title: `[bold]${promptText}[/bold]`, borderStyle: 'cyan', padding: [1, 2] });
+    const view = selectionPanel(options, promptText, selectedIndex, process.stdout.rows || 24, windowStart);
+    windowStart = view.start;
+    return view.panel;
   };
   console.print();
   const live = new Live(createSelectionPanel(), { console, transient: process.platform !== 'win32' });

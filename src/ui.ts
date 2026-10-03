@@ -8,6 +8,7 @@
  */
 
 import { Style } from '@oakoliver/lipgloss';
+import { Console } from './console.js';
 
 // ============================================================================
 // Styles
@@ -126,12 +127,13 @@ export async function printBanner(): Promise<void> {
     finalLines.push(renderGradientLine(line, startColor, endColor));
   }
 
-  // Check if stdout is a TTY — skip animation if piped/redirected
+  // Skip the animation when piped/redirected, and colour by the same rule as
+  // every other line the CLI prints (NO_COLOR, FORCE_COLOR, TERM=dumb, TTY).
   const isTTY = process.stdout.isTTY ?? false;
-  if (!isTTY) {
-    const plain = !!process.env.NO_COLOR || process.env.TERM === 'dumb';
+  const color = new Console().colorEnabled;
+  if (!isTTY || !color) {
     console.log();
-    for (let i = 0; i < finalLines.length; i++) console.log(plain ? BANNER_LINES[i] : finalLines[i]);
+    for (let i = 0; i < finalLines.length; i++) console.log(color ? finalLines[i] : BANNER_LINES[i]);
     console.log();
     return;
   }

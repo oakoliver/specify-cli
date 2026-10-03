@@ -2,8 +2,8 @@
  * Tests for src/yaml.ts — PyYAML safe_load / safe_dump parity.
  *
  * Expected values were generated with PyYAML 6.0.3 (`yaml.safe_load`,
- * `yaml.safe_dump`). When the upstream spec-kit clone is present in the
- * session scratchpad, every upstream *.yml / frontmatter is also checked.
+ * `yaml.safe_dump`). When SPEC_KIT_UPSTREAM points at a clone of upstream
+ * spec-kit, every upstream *.yml / frontmatter is also checked.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -61,7 +61,7 @@ function frontmatter(text: string): string | null {
 }
 
 const REPO = path.resolve(import.meta.dir, '..');
-const UPSTREAM = '/private/tmp/claude-501/-Users-oliveiraantoniocc-Documents-projects/658c0d18-93d4-4738-8248-e938ff40d25e/scratchpad/upstream/spec-kit';
+const UPSTREAM = process.env.SPEC_KIT_UPSTREAM ?? '';
 
 function walk(dir: string, out: string[] = []): string[] {
   if (!fs.existsSync(dir)) return out;
@@ -249,7 +249,7 @@ describe('every repo core_pack YAML/frontmatter parses', () => {
   });
 });
 
-describe.skipIf(!fs.existsSync(UPSTREAM))('upstream clone YAML parses without error', () => {
+describe.skipIf(!UPSTREAM || !fs.existsSync(UPSTREAM))('upstream clone YAML parses without error', () => {
   test('extensions/ presets/ workflows/ bundles/ templates/ yml + md frontmatter', () => {
     let count = 0;
     for (const sub of ['extensions', 'presets', 'workflows', 'bundles', 'templates', 'integrations', 'src/specify_cli/core_pack']) {

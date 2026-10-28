@@ -12,6 +12,8 @@ Ported from [github/spec-kit](https://github.com/github/spec-kit) (Python) to Ty
 
 > **v2.0.0 is a breaking release**, mirroring upstream's 1.0 line: the legacy `--ai`, `--ai-commands-dir`, `--ai-skills` and `--no-git` init flags are gone (use `--integration` / `--integration-options`; git is now the opt-in `git` extension), the roo/windsurf/iflow agents were retired upstream, and extensions/presets use `extension.yml` / `preset.yml` manifests.
 
+**Read the article:** [Getting Started with specify-cli](https://engineering.oakoliver.com/articles/getting-started-specify-cli-spec-driven-development) · [Porting spec-kit from Python to TypeScript](https://engineering.oakoliver.com/articles/porting-python-spec-kit-to-typescript-sdd-with-sdd)
+
 ## Install
 
 ```bash

@@ -1,6 +1,6 @@
 {
   "name": "@oakoliver/specify-cli",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "Spec-Driven Development CLI for AI coding agents. Zero-dependency TypeScript port of github/spec-kit v1.2.5. Multi-runtime.",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -56,8 +56,8 @@
     "url": "https://github.com/oakoliver/specify-cli/issues"
   },
   "devDependencies": {
-    "@oakoliver/bubbletea": "^1.2.0",
     "@oakoliver/bubbles": "^1.2.2",
+    "@oakoliver/bubbletea": "^1.2.0",
     "@oakoliver/glamour": "^2.0.0",
     "@types/bun": "^1.0.0",
     "@types/node": "^20.0.0",

@@ -10,7 +10,7 @@ Spec-Driven Development CLI for AI coding agents. Zero runtime dependencies, mul
 
 Ported from [github/spec-kit](https://github.com/github/spec-kit) (Python) to TypeScript, at **1:1 parity with spec-kit v1.2.5** (run `specify version` to see the parity line). See [CHANGELOG.md](CHANGELOG.md) for what each upstream release brought and the few places the port differs.
 
-> **v2.1.0** follows upstream's 1.1 and 1.2 lines: a `specify mcp` server, exact catalog releases (`--version` / `--versions`), workflow composition and output capture, bundles that reference other bundles, the `mcode` and `none` integrations, and a persisted symlink policy (`init --allow-symlinks`).
+> **v2.1.1** follows upstream's 1.1 and 1.2 lines: a `specify mcp` server, exact catalog releases (`--version` / `--versions`), workflow composition and output capture, bundles that reference other bundles, the `mcode` and `none` integrations, and a persisted symlink policy (`init --allow-symlinks`).
 >
 > **v2.0.0 was a breaking release**, mirroring upstream's 1.0 line: the legacy `--ai`, `--ai-commands-dir`, `--ai-skills` and `--no-git` init flags are gone (use `--integration` / `--integration-options`; git is now the opt-in `git` extension), the roo/windsurf/iflow agents were retired upstream, and extensions/presets use `extension.yml` / `preset.yml` manifests.
 

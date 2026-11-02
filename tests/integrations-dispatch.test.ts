@@ -62,7 +62,9 @@ describe('registry metadata parity', () => {
 
   for (const [key, exp] of Object.entries(fixture)) {
     test(`${key} metadata`, () => {
-      const integ = getIntegration(key)!;
+      // A fresh instance: other test files run setup() on the shared registry
+      // instances, which changes per-project state such as Copilot's skills mode.
+      const integ = new (getIntegration(key)!.constructor as new () => ReturnType<typeof getIntegration> & object)();
       expect(integ.config).toEqual(exp.config as never);
       const reg = { ...(integ.registrarConfig ?? {}) } as Record<string, unknown>;
       delete reg.format_name;

@@ -1,6 +1,7 @@
 # Render from the repo root: vhs assets/tapes/init.tape
 Output assets/init.gif
 
+Set Framerate 25
 Set Shell bash
 Set FontSize 15
 Set Width 1000

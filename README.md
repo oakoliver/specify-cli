@@ -46,7 +46,7 @@ specify integration status
 
 `specify status` and `specify doctor` (specify-cli additions) summarize and check a project:
 
-<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/status.png" width="560" alt="specify status: project root, integration claude, scripts sh, initialized and CLI version 2.0.0 with spec-kit 1.0.12 parity, one healthy claude integration with 10 files, no extensions or presets, one installed workflow and one memory file">
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/status.png" width="560" alt="specify status: project root, integration claude, scripts sh, initialized and CLI version 2.1.1 with spec-kit 1.2.5 parity, one healthy claude integration with 10 files, no extensions or presets, one installed workflow and one memory file">
 
 <img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/doctor.png" width="560" alt="specify doctor: checks for the project, its template, script and memory directories, the saved init options, the claude integration's tracked files, extensions and presets, and a warning that the project has no git repository">
 
@@ -538,11 +538,11 @@ Creates `checklists/security.md`:
 
 Without `--integration`, `specify init` asks which one to use. The picker scrolls to fit the terminal:
 
-<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/picker.gif" width="560" alt="specify init my-app in an 80 by 24 terminal: the integration picker shows 15 of 41 integrations with more-above and more-below counts, scrolls down to gemini and back up to claude, then the script picker and the Project ready panels">
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/picker.gif" width="560" alt="specify init my-app in an 80 by 24 terminal: the integration picker shows 15 of 43 integrations with more-above and more-below counts, scrolls down to gemini and back up to claude, then the script picker and the Project ready panels">
 
 `specify integration list` shows them all, and which are installed in a project:
 
-<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/integrations.png" width="640" alt="specify integration list: a table of all 41 integrations with name, status, whether a CLI is required and whether multiple installs are safe; claude is installed and the default">
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/integrations.png" width="640" alt="specify integration list: a table of all 43 integrations with name, status, whether a CLI is required and whether multiple installs are safe; claude is installed and the default">
 
 | Key | Agent | Commands / skills directory | Format |
 |-----|-------|-----------------------------|--------|
@@ -594,7 +594,7 @@ Without `--integration`, `specify init` asks which one to use. The picker scroll
 
 ## CLI Reference
 
-<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/help.png" width="560" alt="specify --help: the SPECIFY banner, usage, options, and the thirteen commands from init to status">
+<img src="https://raw.githubusercontent.com/oakoliver/specify-cli/main/assets/help.png" width="560" alt="specify --help: the SPECIFY banner, usage, options, and the fourteen commands from init to status">
 
 ```text
 specify init [PROJECT_NAME]   Initialize a new Specify project

@@ -2,6 +2,7 @@
 # A bare `specify init` in an 80x24 terminal: the integration picker scrolls.
 Output assets/picker.gif
 
+Set Framerate 25
 Set Shell bash
 Set FontSize 14
 Set Width 782

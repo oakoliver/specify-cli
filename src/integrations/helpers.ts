@@ -16,6 +16,7 @@ import { SCRIPT_TYPE_CHOICES } from '../agent-config.js';
 import { getSpeckitVersion as assetsGetSpeckitVersion } from '../assets.js';
 import { CliExit, console, escapeMarkup } from '../console.js';
 import { ExtensionManager } from '../extensions/index.js';
+import { readProjectOptions } from '../file-policy.js';
 import { loadInitOptions, saveInitOptions } from '../init-options.js';
 import {
   invokePrefixForIntegration,
@@ -138,7 +139,7 @@ export function writeIntegrationJson(
 
 /** Refresh only the Spec Kit version recorded in init-options.json. */
 export function refreshInitOptionsSpeckitVersion(projectRoot: string): void {
-  const opts = loadInitOptions(projectRoot) as Record<string, unknown>;
+  const opts = readProjectOptions(projectRoot);
   if (!opts || typeof opts !== 'object' || Object.keys(opts).length === 0) return;
   opts.speckit_version = getSpeckitVersion();
   saveInitOptions(projectRoot, opts);
@@ -146,7 +147,7 @@ export function refreshInitOptionsSpeckitVersion(projectRoot: string): void {
 
 /** Clear active integration keys from init-options.json when they match. */
 export function clearInitOptionsForIntegration(projectRoot: string, integrationKey: string): void {
-  const opts = loadInitOptions(projectRoot) as Record<string, unknown>;
+  const opts = readProjectOptions(projectRoot);
   if (opts.integration === integrationKey || opts.ai === integrationKey) {
     delete opts.integration;
     delete opts.ai;
@@ -316,7 +317,7 @@ export function updateInitOptionsForIntegration(
   scriptType: string | null = null,
   parsedOptions: ParsedOptions | null = null,
 ): void {
-  const opts = loadInitOptions(projectRoot) as Record<string, unknown>;
+  const opts = readProjectOptions(projectRoot);
   opts.integration = integration.key;
   opts.ai = integration.key;
   opts.speckit_version = getSpeckitVersion();

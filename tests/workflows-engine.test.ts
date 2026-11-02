@@ -72,9 +72,9 @@ workflow:
 
 describe('step registry', () => {
   test('all built-in step types are registered', () => {
-    const expected = ['command', 'shell', 'prompt', 'gate', 'if', 'switch', 'while', 'do-while', 'fan-out', 'fan-in', 'init', 'slot'];
+    const expected = ['command', 'shell', 'prompt', 'gate', 'github', 'if', 'switch', 'while', 'do-while', 'fan-out', 'fan-in', 'init', 'slot', 'workflow'];
     for (const key of expected) expect(STEP_REGISTRY.has(key)).toBe(true);
-    expect(BUILTIN_STEP_TYPES.size).toBe(12);
+    expect(BUILTIN_STEP_TYPES.size).toBe(14);
     expect(getStepType('command')?.typeKey).toBe('command');
     expect(getStepType('nonexistent')).toBeNull();
   });
@@ -292,7 +292,9 @@ describe('RunState', () => {
     expect(raw.run_id).toBe('abc123');
     expect(raw.current_step_index).toBe(2);
     expect(raw.installed_workflow_id).toBeNull();
-    expect(readFileSync(join(projectDir, '.specify/workflows/runs/abc123/inputs.json'), 'utf8')).toContain('\\u00e9');
+    // Non-ASCII stays readable in run artifacts (upstream #4877).
+    expect(readFileSync(join(projectDir, '.specify/workflows/runs/abc123/inputs.json'), 'utf8')).toContain('"a": "é"');
+    expect(raw.inputs).toEqual({ a: 'é' });
     const loaded = RunState.load('abc123', projectDir);
     expect(loaded.status).toBe(RunStatus.PAUSED);
     expect(loaded.currentStepId).toBe('gate');
@@ -368,7 +370,7 @@ steps:
     expect((rec.output as Dict).command).toBe('speckit.specify');
     expect(((rec.output as Dict).input as Dict).args).toBe('login');
     expect(state.error).toBe(
-      "Cannot dispatch command 'speckit.specify': integration 'claude' CLI not found or not installed. Install the CLI tool or check 'specify integration list'.",
+      "Cannot dispatch command 'speckit.specify': integration 'claude' CLI not found or not installed, or the integration does not support CLI dispatch. If the CLI is missing, install it or check 'specify integration list'; if the integration does not support CLI dispatch, set the step's 'integration' to one that does.",
     );
     expect(rec.integration).toBe('claude');
   });

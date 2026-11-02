@@ -1,10 +1,13 @@
 /**
  * @oakoliver/specify-cli - Installed-bundle records
  *
- * Provenance for precise list/remove/update. Records are stored as JSON at
- * ``.specify/bundle-records.json``. Each record captures exactly which
- * components a bundle contributed so removal touches only that bundle's
- * components and never collateral (FR-022, SC-004).
+ * Requirements and ownership for list/remove/update. Records are stored as
+ * JSON at ``.specify/bundle-records.json``. Each record stores every required
+ * component for conflict detection and separately records which components
+ * the bundle contributed, so removal never touches independently installed
+ * components (FR-022, SC-004). Known installed versions are stored separately
+ * from requested pins to make patch substitutions visible without changing
+ * bundle ownership or manifest identity.
  *
  * Port of ``specify_cli/bundles/records.py``.
  *
@@ -16,7 +19,7 @@ import * as path from 'node:path';
 
 import { BundlerError } from './index.js';
 import { dumpJson, ensureWithin, loadJson } from './yamlio.js';
-import { COMPONENT_KINDS, ComponentRef, pyInt, text } from './manifest.js';
+import { BundleRef, COMPONENT_KINDS, ComponentRef, pyInt, text } from './manifest.js';
 import { dget, isMapping, pyRepr, pyStr, pyTruthy } from './pycompat.js';
 
 export const RECORDS_FILENAME = 'bundle-records.json';
@@ -31,24 +34,38 @@ export interface InstalledBundleRecordDict {
   version: string;
   installed_at: string;
   contributed_components: Array<Record<string, unknown>>;
+  required_components: Array<Record<string, unknown>>;
+  installed_versions?: Record<string, string>;
+  bundle_references?: Array<Record<string, unknown>>;
 }
 
 export class InstalledBundleRecord {
   readonly bundle_id: string;
   readonly version: string;
   readonly contributed_components: readonly ComponentRef[];
+  readonly required_components: readonly ComponentRef[];
   readonly installed_at: string;
+  readonly installed_versions: Readonly<Record<string, string>>;
+  readonly bundle_references: readonly BundleRef[];
 
   constructor(init: {
     bundle_id: string;
     version: string;
     contributed_components: readonly ComponentRef[];
+    required_components?: readonly ComponentRef[];
     installed_at: string;
+    installed_versions?: Record<string, string>;
+    bundle_references?: readonly BundleRef[];
   }) {
     this.bundle_id = init.bundle_id;
     this.version = init.version;
     this.contributed_components = Object.freeze([...init.contributed_components]);
+    // ADAPTATION: Python's dataclass makes this field required; defaulting to
+    // the contributed components keeps older direct constructions valid.
+    this.required_components = Object.freeze([...(init.required_components ?? init.contributed_components)]);
     this.installed_at = init.installed_at;
+    this.installed_versions = Object.freeze({ ...(init.installed_versions ?? {}) });
+    this.bundle_references = Object.freeze([...(init.bundle_references ?? [])]);
     Object.freeze(this);
   }
 
@@ -57,22 +74,54 @@ export class InstalledBundleRecord {
     version: string,
     components: ComponentRef[],
     installedAt: string | null = null,
+    opts: {
+      requiredComponents?: ComponentRef[] | null;
+      installedVersions?: Record<string, string> | null;
+      bundleReferences?: BundleRef[] | null;
+    } = {},
   ): InstalledBundleRecord {
     return new InstalledBundleRecord({
       bundle_id: bundleId,
       version,
       contributed_components: components,
+      required_components: opts.requiredComponents ?? components,
       installed_at: installedAt || utcNow(),
+      installed_versions: opts.installedVersions ?? {},
+      bundle_references: opts.bundleReferences ?? [],
+    });
+  }
+
+  /** ``dataclasses.replace``. */
+  replace(changes: {
+    contributed_components?: readonly ComponentRef[];
+    required_components?: readonly ComponentRef[];
+    installed_versions?: Record<string, string>;
+    bundle_references?: readonly BundleRef[];
+    version?: string;
+    installed_at?: string;
+  }): InstalledBundleRecord {
+    return new InstalledBundleRecord({
+      bundle_id: this.bundle_id,
+      version: changes.version ?? this.version,
+      contributed_components: changes.contributed_components ?? this.contributed_components,
+      required_components: changes.required_components ?? this.required_components,
+      installed_at: changes.installed_at ?? this.installed_at,
+      installed_versions: changes.installed_versions ?? { ...this.installed_versions },
+      bundle_references: changes.bundle_references ?? this.bundle_references,
     });
   }
 
   toDict(): InstalledBundleRecordDict {
-    return {
+    const data: InstalledBundleRecordDict = {
       bundle_id: this.bundle_id,
       version: this.version,
       installed_at: this.installed_at,
       contributed_components: this.contributed_components.map(componentToDict),
+      required_components: this.required_components.map(componentToDict),
     };
+    if (Object.keys(this.installed_versions).length) data.installed_versions = { ...this.installed_versions };
+    if (this.bundle_references.length) data.bundle_references = this.bundle_references.map(bundleReferenceToDict);
+    return data;
   }
 
   static fromDict(data: unknown): InstalledBundleRecord {
@@ -84,6 +133,14 @@ export class InstalledBundleRecord {
       componentsRaw = [];
     } else if (!Array.isArray(componentsRaw)) {
       throw new BundlerError("Corrupt record: 'contributed_components' must be a list.");
+    }
+    // Older records contain only contributed components. Retain those known
+    // pins until a successful reinstall writes the full requirements.
+    const requiredRaw = Object.prototype.hasOwnProperty.call(data, 'required_components')
+      ? dget(data, 'required_components')
+      : componentsRaw;
+    if (!Array.isArray(requiredRaw)) {
+      throw new BundlerError("Corrupt record: 'required_components' must be a list.");
     }
     // An explicit null is treated as missing (not the literal "None").
     const bundleId = text(dget(data, 'bundle_id'));
@@ -98,11 +155,45 @@ export class InstalledBundleRecord {
         `Corrupt records file: record for bundle '${bundleId}' is missing its 'version'.`,
       );
     }
+    const contributed = (componentsRaw as unknown[]).map((c) => componentFromDict(c));
+    const required = (requiredRaw as unknown[]).map((c) => componentFromDict(c, 'required'));
+    const requiredIds = new Set(required.map((c) => c.identity()));
+    if (!contributed.every((c) => requiredIds.has(c.identity()))) {
+      throw new BundlerError(
+        "Corrupt record: 'required_components' must include all 'contributed_components'.",
+      );
+    }
+    const installedVersions = Object.prototype.hasOwnProperty.call(data, 'installed_versions')
+      ? dget(data, 'installed_versions')
+      : {};
+    if (!isMapping(installedVersions)) {
+      throw new BundlerError("Corrupt record: 'installed_versions' must be a mapping.");
+    }
+    const bundleReferencesRaw = dget(data, 'bundle_references');
+    let bundleReferences: BundleRef[];
+    if (bundleReferencesRaw === undefined || bundleReferencesRaw === null) {
+      bundleReferences = [];
+    } else if (!Array.isArray(bundleReferencesRaw)) {
+      throw new BundlerError("Corrupt record: 'bundle_references' must be a list.");
+    } else {
+      bundleReferences = bundleReferencesRaw.map(bundleReferenceFromDict);
+    }
+    const keys = new Set(required.map((c) => `${c.kind}:${c.id}`));
+    for (const [key, actual] of Object.entries(installedVersions)) {
+      if (!keys.has(key) || typeof actual !== 'string' || !actual.trim()) {
+        throw new BundlerError(
+          "Corrupt record: 'installed_versions' must map required component keys (kind:id) to non-empty version strings.",
+        );
+      }
+    }
     return new InstalledBundleRecord({
       bundle_id: bundleId,
       version,
       installed_at: text(dget(data, 'installed_at')),
-      contributed_components: (componentsRaw as unknown[]).map(componentFromDict),
+      contributed_components: contributed,
+      required_components: required,
+      installed_versions: { ...(installedVersions as Record<string, string>) },
+      bundle_references: bundleReferences,
     });
   }
 }
@@ -183,6 +274,34 @@ export function removeRecord(records: InstalledBundleRecord[], bundleId: string)
   return records.filter((r) => r.bundle_id !== bundleId);
 }
 
+/** Keep a bundle-installed component attributed while another bundle needs it. */
+export function transferContributions(
+  records: InstalledBundleRecord[],
+  released: readonly ComponentRef[],
+): InstalledBundleRecord[] {
+  const updated = [...records];
+  const owned = new Set<string>();
+  for (const record of updated) {
+    for (const component of record.contributed_components) owned.add(componentKey(component.kind, component.id));
+  }
+  for (const component of released) {
+    const key = componentKey(component.kind, component.id);
+    if (owned.has(key)) continue;
+    for (let index = 0; index < updated.length; index++) {
+      const record = updated[index];
+      const required = record.required_components.find((ref) => componentKey(ref.kind, ref.id) === key);
+      if (required !== undefined) {
+        updated[index] = record.replace({
+          contributed_components: [...record.contributed_components, required],
+        });
+        owned.add(key);
+        break;
+      }
+    }
+  }
+  return updated;
+}
+
 /** ``(kind, id)`` key used by the set helpers below. */
 export function componentKey(kind: string, id: string): string {
   return JSON.stringify([kind, id]);
@@ -193,7 +312,7 @@ export function componentsStillNeeded(records: InstalledBundleRecord[], excludeB
   const needed = new Set<string>();
   for (const record of records) {
     if (record.bundle_id === excludeBundleId) continue;
-    for (const component of record.contributed_components) {
+    for (const component of record.required_components) {
       needed.add(componentKey(component.kind, component.id));
     }
   }
@@ -213,9 +332,33 @@ function componentToDict(ref: ComponentRef): Record<string, unknown> {
   return data;
 }
 
-function componentFromDict(data: unknown): ComponentRef {
+function bundleReferenceToDict(reference: BundleRef): Record<string, unknown> {
+  return { id: reference.id, version: reference.version, source: reference.source };
+}
+
+function bundleReferenceFromDict(data: unknown): BundleRef {
   if (!isMapping(data)) {
-    throw new BundlerError('Each contributed component must be a mapping.');
+    throw new BundlerError("Corrupt record: 'bundle_references' entries must be mappings.");
+  }
+  const bundleId = dget(data, 'id');
+  const version = dget(data, 'version');
+  if (typeof bundleId !== 'string' || !bundleId.trim() || typeof version !== 'string' || !version.trim()) {
+    throw new BundlerError(
+      "Corrupt record: 'bundle_references' entries must have non-empty string 'id' and 'version'.",
+    );
+  }
+  let source = dget(data, 'source');
+  if (source === '') {
+    source = null;
+  } else if (source !== undefined && source !== null && typeof source !== 'string') {
+    throw new BundlerError("Corrupt record: 'bundle_references' entry 'source' must be a string.");
+  }
+  return new BundleRef({ id: bundleId, version, source: (source as string | null | undefined) ?? null });
+}
+
+function componentFromDict(data: unknown, label = 'contributed'): ComponentRef {
+  if (!isMapping(data)) {
+    throw new BundlerError(`Each ${label} component must be a mapping.`);
   }
   const kind = text(dget(data, 'kind'));
   const cid = text(dget(data, 'id'));
@@ -226,7 +369,7 @@ function componentFromDict(data: unknown): ComponentRef {
     );
   }
   if (!cid) {
-    throw new BundlerError("Corrupt records file: a contributed component is missing its 'id'.");
+    throw new BundlerError(`Corrupt records file: a ${label} component is missing its 'id'.`);
   }
   const opt = (key: string): string | null => {
     const value = dget(data, key);

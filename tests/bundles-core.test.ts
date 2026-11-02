@@ -246,7 +246,7 @@ describe('manifest schema', () => {
 
   test('unsupported schema version', () => {
     const errors = manifest({ schema_version: '2.0' }).structuralErrors();
-    expect(errors[0]).toBe("schema_version '2.0' is not supported (supported: ['1.0']).");
+    expect(errors[0]).toBe("schema_version '2.0' is not supported (supported: ['1.0', '1.1']).");
   });
 
   test('non-semver bundle version', () => {
@@ -432,9 +432,17 @@ describe('conflict', () => {
   });
 
   test('overlap with other bundle is reported; same bundle is not', () => {
-    const other = record('other', [new ComponentRef({ kind: 'extensions', id: 'ext-a' })]);
+    const other = record('other', [new ComponentRef({ kind: 'extensions', id: 'ext-a', version: '1.0.0' })]);
     expect(detectConflicts(manifest(), null, [other]).overlaps).toEqual([
-      "extension 'ext-a' is already provided by bundle 'other'.",
+      "extension 'ext-a' is already required by bundle 'other'.",
+    ]);
+    // A different (or unknown) pin held by another bundle is a blocking clash.
+    const unpinned = record('other', [new ComponentRef({ kind: 'extensions', id: 'ext-a' })]);
+    const report = detectConflicts(manifest(), null, [unpinned]);
+    expect(report.hasBlockingConflict).toBe(true);
+    expect(report.version_clashes).toEqual([
+      "extension 'ext-a' requires version 1.0.0, but bundle 'other' already requires version <unknown>. " +
+        'Only one version can be installed per ID.',
     ]);
     const same = record('demo-bundle', [new ComponentRef({ kind: 'extensions', id: 'ext-a' })]);
     expect(detectConflicts(manifest(), null, [same]).overlaps).toEqual([]);

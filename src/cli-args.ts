@@ -111,6 +111,8 @@ export class UsageError extends Error {
   exitCode = 2;
   /** Suppress the "Usage:/Try" header (Click BadOptionUsage-style errors). */
   noUsage = false;
+  /** Click ``MissingParameter``: the parameter name (``str(exc)`` is ``Missing parameter: <name>``). */
+  missingParameter: string | null = null;
   constructor(message: string, public command?: CommandSpec, public progName?: string) {
     super(message);
     this.name = 'UsageError';
@@ -383,7 +385,9 @@ export function parseArgs(spec: CommandSpec, argv: string[], progName?: string):
       }
       p++;
     } else if (a.required) {
-      throw err(`Missing argument ${label}.`);
+      const e = err(`Missing argument ${label}.`);
+      e.missingParameter = a.name;
+      throw e;
     } else {
       result.args[a.name] = a.default ?? null;
     }

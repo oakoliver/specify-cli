@@ -33,16 +33,8 @@ import {
 // Errors
 // ============================================================================
 
-/** Equivalent of `urllib.error.URLError`. */
-export class URLError extends Error {
-  reason: unknown;
-  constructor(reason: unknown) {
-    super(typeof reason === 'string' ? reason : reason instanceof Error ? reason.message : String(reason));
-    this.name = 'URLError';
-    this.reason = reason;
-    this.message = `<urlopen error ${typeof reason === 'string' ? reason : reason instanceof Error ? reason.message : String(reason)}>`;
-  }
-}
+export { URLError } from './errors.js';
+import { URLError } from './errors.js';
 
 /** A redirect rejected because it violates the client's security policy. */
 export class RedirectPolicyError extends URLError {

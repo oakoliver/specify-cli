@@ -14,12 +14,15 @@ import * as path from 'node:path';
 
 import { parseYaml, YAMLError } from '../yaml.js';
 import { BundlerError } from './index.js';
-import { BundleManifest } from './manifest.js';
+import { isHttpsOrLocalhostHttp } from '../download-security.js';
+import { BundleManifest, type BundleRef } from './manifest.js';
 import type { CatalogEntry } from './catalogs.js';
-import type { ResolvedBundle } from './catalog-stack.js';
+import { BundleNotFoundError, ReleaseNotFoundError, type CatalogStack, type ResolvedBundle } from './catalog-stack.js';
+import { LoadedBundle, SourceMismatchError } from './expansion.js';
+import { sameVersion } from './versioning.js';
 import { validateManifestSync } from './validator.js';
 import { decodeUtf8 } from './yamlio.js';
-import { expandUser, pathSuffix, pyRepr, urlHostname, urlparse, urlPort, type ParsedUrl } from './pycompat.js';
+import { expandUser, pathSuffix, pyRepr, urlparse, type ParsedUrl } from './pycompat.js';
 
 // ZIP magic-byte signatures cover local headers, empty archives, and spanning markers.
 const ZIP_SIGNATURES = ['504b0304', '504b0506', '504b0708'];
@@ -107,7 +110,7 @@ export async function localManifestSource(arg: string): Promise<BundleManifest |
     return BundleManifest.fromFile(manifestPath);
   }
 
-  if (pathSuffix(candidate) === '.zip') {
+  if (pathSuffix(candidate).toLowerCase() === '.zip') {
     const raw = await sourceDeps.readZipManifest(candidate);
     if (raw === null) throw new BundlerError(`Artifact '${candidate}' does not contain a bundle.yml.`);
     // Decode as UTF-8 explicitly (a UTF-16 BOM must be rejected exactly like
@@ -145,6 +148,100 @@ export async function localManifestSource(arg: string): Promise<BundleManifest |
 // ============================================================================
 // Remote sources
 // ============================================================================
+
+export type ManifestDownloader = (resolved: ResolvedBundle, opts: { offline: boolean }) => Promise<BundleManifest>;
+
+/**
+ * Load referenced bundles from an already-resolved catalog stack.
+ *
+ * The caller owns construction of the effective stack. In particular, this
+ * loader must not create a second stack: source precedence and project/user
+ * overrides are part of the resolution contract for bundle references.
+ */
+export class CatalogBundleLoader {
+  private readonly stack: CatalogStack;
+  private readonly offline: boolean;
+  private readonly download: ManifestDownloader | null;
+
+  constructor(stack: CatalogStack, opts: { offline: boolean; download?: ManifestDownloader | null }) {
+    this.stack = stack;
+    this.offline = opts.offline;
+    this.download = opts.download ?? null;
+  }
+
+  /**
+   * Whether going online could change a miss. Offline, a built-in catalog is
+   * the packaged snapshot, which can lag the live catalog. Matching goes
+   * through the source, never its id, so a project catalog named ``default``
+   * is not mistaken for the built-in.
+   */
+  private offlineSnapshotMayLag(sourceId: string | null = null): boolean {
+    if (!this.offline) return false;
+    return this.stack.sources.some((source) => (sourceId === null || source.id === sourceId) && source.isBuiltin);
+  }
+
+  /**
+   * Resolve and download the exact release named by *ref*. A source pin is an
+   * assertion about the winning catalog rather than a selector: it is checked
+   * after stack resolution and before the manifest download.
+   */
+  async load(ref: BundleRef, chain: readonly string[]): Promise<LoadedBundle> {
+    let resolved: ResolvedBundle;
+    try {
+      resolved = await this.stack.resolve(ref.id, ref.version);
+    } catch (exc) {
+      if (exc instanceof BundleNotFoundError) {
+        if (this.offlineSnapshotMayLag()) {
+          throw new BundlerError(
+            `${exc.message} Network access disabled; a built-in catalog may be ` +
+              `outdated, so ${ref.id}@${ref.version || '<unpinned>'} may ` +
+              'resolve online. Re-run without --offline.',
+            { cause: exc },
+          );
+        }
+        throw exc;
+      }
+      if (exc instanceof ReleaseNotFoundError) {
+        const missing = missingReleaseError(ref, chain, exc, {
+          snapshotMayLag: this.offlineSnapshotMayLag(exc.sourceId),
+        });
+        if (missing !== null) throw missing;
+        throw exc;
+      }
+      throw exc;
+    }
+
+    if (ref.source && resolved.source.id !== ref.source) {
+      throw new SourceMismatchError(ref, resolved.source.id, chain);
+    }
+
+    const download = this.download ?? downloadManifest;
+    const manifest = await download(resolved, { offline: this.offline });
+    return new LoadedBundle(manifest, resolved.source.id, resolved.installAllowed, resolved.entry.verified);
+  }
+}
+
+/** Format the catalog stack's exact-release failure for bundle authors. */
+export function missingReleaseError(
+  ref: BundleRef,
+  chain: readonly string[],
+  error: ReleaseNotFoundError,
+  opts: { snapshotMayLag?: boolean } = {},
+): BundlerError | null {
+  if (ref.version === null) return null;
+  const parent = chain.length ? chain[chain.length - 1] : '<root>';
+  const offered = error.advertised.join(', ');
+  const advice = opts.snapshotMayLag
+    ? 'Network access disabled; the built-in catalog may be outdated, so ' +
+      'the pin may resolve online. Re-run without --offline.'
+    : 'Update the reference to an advertised version.';
+  const result = new BundlerError(
+    `'${parent}' pins ${error.bundleId} ${error.version}, but catalog ` +
+      `'${error.sourceId}' offers ${offered}. ${advice}`,
+    { cause: error },
+  );
+  return result;
+}
 
 /**
  * Resolve a bundle's manifest from its catalog ``download_url``. Catalog
@@ -190,20 +287,9 @@ export async function downloadManifest(resolved: ResolvedBundle, opts: { offline
 
 /** Refuse non-HTTPS (except localhost http), host-less, or malformed URLs. */
 export function requireHttps(label: string, url: string): void {
-  let parsed: ParsedUrl;
-  let hostname: string | null;
-  try {
-    parsed = urlparse(url);
-    hostname = urlHostname(parsed);
-    urlPort(parsed);
-  } catch {
-    throw new BundlerError(`Refusing to download ${label}: URL is malformed: ${url}`);
-  }
-  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-  if (parsed.scheme !== 'https' && !(parsed.scheme === 'http' && isLocalhost)) {
+  if (!isHttpsOrLocalhostHttp(url)) {
     throw new BundlerError(`Refusing to download ${label} over non-HTTPS URL: ${url}`);
   }
-  if (!hostname) throw new BundlerError(`Refusing to download ${label} from URL with no host: ${url}`);
 }
 
 function responseUrl(resp: unknown, fallback: string): string {
@@ -332,7 +418,7 @@ export function validateCatalogManifest(entry: CatalogEntry, manifest: BundleMan
         `a manifest for ${pyRepr(manifest.bundle.id)}.`,
     );
   }
-  if (manifest.bundle.version !== entry.version) {
+  if (!sameVersion(manifest.bundle.version, entry.version)) {
     throw new BundlerError(
       `Downloaded bundle version mismatch for ${pyRepr(entry.id)}: catalog declares ` +
         `${pyRepr(entry.version)}, but the manifest declares ${pyRepr(manifest.bundle.version)}.`,

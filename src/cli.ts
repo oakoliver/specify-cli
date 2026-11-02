@@ -3,7 +3,7 @@
  * @oakoliver/specify-cli - CLI Entry Point
  *
  * Root command app — port of the Typer `app` assembled in upstream
- * spec-kit `specify_cli/__init__.py` (v1.0.12). Every sub-command is
+ * spec-kit `specify_cli/__init__.py` (v1.2.5). Every sub-command is
  * implemented in its own domain module; this file only wires them up.
  *
  * Usage: specify <command> [options]
@@ -17,6 +17,7 @@ import { printVersion, showRootBanner } from './app.js';
 import { runInitCommand } from './init.js';
 import { runCheckCommand } from './command-check.js';
 import { runVersionCommand } from './command-version.js';
+import { runMcpCommand } from './command-mcp.js';
 import { runSelfCommand } from './selfs/commands.js';
 import { runExtensionCommand } from './extensions/commands.js';
 import { runIntegrationCommand } from './integrations/commands.js';
@@ -26,6 +27,7 @@ import { runArtifactCommand } from './artifacts/commands.js';
 import { runBundleCommand } from './bundles/commands.js';
 import { runWorkflowCommand } from './workflows/commands.js';
 import { runDoctorCommand, runStatusCommand } from './doctor.js';
+import { projectErrorContext } from './project.js';
 
 // ============================================================================
 // Root App
@@ -40,6 +42,7 @@ export const ROOT_APP: GroupSpec = {
     { name: 'init', help: 'Initialize a new Specify project.', run: (a) => runInitCommand(a) },
     { name: 'check', help: 'Check that all required tools are installed.', run: (a) => runCheckCommand(a) },
     { name: 'version', help: 'Display version and system information.', run: (a) => runVersionCommand(a) },
+    { name: 'mcp', help: 'Run the experimental MCP server over stdio.', run: (a) => runMcpCommand(a) },
     {
       name: 'self',
       help: 'Manage the specify CLI itself: check for newer releases, preview upgrades with --dry-run, and upgrade in place.',
@@ -82,6 +85,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     console.write(formatGroupHelp(ROOT_APP, 'specify'));
     return 0;
   }
+  // Upstream `render_project_error` reads the click context's json params.
+  projectErrorContext.json = argv.includes('--json');
   return dispatchGroup(ROOT_APP, argv, 'specify');
 }
 

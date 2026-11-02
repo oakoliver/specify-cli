@@ -222,7 +222,7 @@ export class NotASpecKitProjectError extends ArtifactError {
 }
 
 export class ArtifactResolutionError extends ArtifactError {
-  constructor() {
-    super('artifact resolution failed');
+  constructor(detail: string | null = null) {
+    super(detail ? `artifact resolution failed: ${detail}` : 'artifact resolution failed');
   }
 }

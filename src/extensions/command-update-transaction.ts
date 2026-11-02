@@ -118,6 +118,8 @@ export async function runUpdateCommand(extension: string | null, deps: UpdateCom
       let newSkillNames: string[] = [];
       const newSkillPathsAbsentBeforeUpdate: string[] = [];
       let installationModified = false;
+      let scaffolded: string[] = [];
+      let unscaffolded: string[] = [];
       let zipCleanupError: Error | null = null;
       let backupCreatedByAttempt = false;
 
@@ -376,6 +378,10 @@ export async function runUpdateCommand(extension: string | null, deps: UpdateCom
             }
           }
 
+          // Scaffold config templates the new version declares, as
+          // `extension add` does; the configs restored above are kept.
+          [scaffolded, , unscaffolded] = manager.scaffoldConfig(extensionId);
+
           // 9. Restore metadata from backup (installed_at, enabled state)
           if (backupRegistryEntry && isMapping(backupRegistryEntry)) {
             const currentMetadata = manager.registry.get(extensionId);
@@ -422,6 +428,15 @@ export async function runUpdateCommand(extension: string | null, deps: UpdateCom
           }
         }
         console.print(`   [green]✓[/green] Updated to v${update.available}`);
+        const configHome = `.specify/extensions/${escapeMarkup(extensionId)}`;
+        for (const cfg of scaffolded) console.print(`   Config scaffolded: ${configHome}/${escapeMarkup(cfg)}`);
+        if (unscaffolded.length) {
+          console.print(
+            '   [yellow]Warning:[/yellow] Config templates not scaffolded: ' +
+              `${escapeMarkup(unscaffolded.join(', '))}. ` +
+              'Verify the extension manifest and template files.',
+          );
+        }
         if (cleanupError !== null) {
           console.print(
             '   [yellow]Warning:[/yellow] Could not fully remove update backup: ' +

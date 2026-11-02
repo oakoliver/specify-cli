@@ -9,13 +9,13 @@
  * Installation is idempotent and stops on first failure with no partial
  * record write (FR-018).
  *
- * Port of ``specify_cli/bundles/installer.py``.
+ * Port of ``specify_cli/bundles/installer.py`` (spec-kit v1.2.5).
  *
  * @module bundles/installer
  */
 
 import { BundlerError } from './index.js';
-import type { BundleManifest, ComponentRef } from './manifest.js';
+import { BundleRef, type BundleManifest, type ComponentRef } from './manifest.js';
 import {
   InstalledBundleRecord,
   componentKey,
@@ -24,10 +24,13 @@ import {
   loadRecords,
   removeRecord,
   saveRecords,
+  transferContributions,
   upsertRecord,
 } from './records.js';
-import { detectConflicts } from './conflict.js';
+import { componentSettingDifferences, detectConflicts, sameRequirement } from './conflict.js';
+import type { BundledPatchWarning } from './primitives.js';
 import type { InstallPlan } from './resolver.js';
+import { sameVersion } from './versioning.js';
 
 // ============================================================================
 // Types
@@ -38,17 +41,28 @@ type MaybePromise<T> = T | Promise<T>;
 /** Adapter over the existing Spec Kit primitive install/remove machinery. */
 export interface PrimitiveInstaller {
   isInstalled(projectRoot: string, component: ComponentRef): MaybePromise<boolean>;
-  install(projectRoot: string, component: ComponentRef): MaybePromise<void>;
+  /**
+   * Installed version recorded by the primitive registry (null = unknown).
+   * ADAPTATION: optional so minimal fakes stay valid; absent means unknown.
+   */
+  installedVersion?(projectRoot: string, component: ComponentRef): MaybePromise<string | null>;
+  /** Verify a ``source``-pinned component against its winning catalog. */
+  validateSource?(projectRoot: string, component: ComponentRef): MaybePromise<void>;
+  install(projectRoot: string, component: ComponentRef): MaybePromise<BundledPatchWarning | null | void>;
   remove(projectRoot: string, component: ComponentRef): MaybePromise<void>;
   /** Optional refresh hook (falls back to ``install``). */
-  refresh?(projectRoot: string, component: ComponentRef): MaybePromise<void>;
+  refresh?(projectRoot: string, component: ComponentRef): MaybePromise<BundledPatchWarning | null | void>;
+  /** Optional: accept a newer packaged patch with a warning. */
+  bundledPatchWarning?(component: ComponentRef, actual: string): MaybePromise<BundledPatchWarning | null>;
 }
 
+/** Bundle changes and structured warnings for presentation by the caller. */
 export class InstallResult {
   installed: ComponentRef[] = [];
   skipped: ComponentRef[] = [];
   refreshed: ComponentRef[] = [];
   uninstalled: ComponentRef[] = [];
+  warnings: BundledPatchWarning[] = [];
 
   constructor(readonly bundle_id: string) {}
 
@@ -65,6 +79,15 @@ function errMessage(exc: unknown): string {
   return exc instanceof Error ? exc.message : String(exc);
 }
 
+async function installedVersionOf(
+  installer: PrimitiveInstaller,
+  projectRoot: string,
+  component: ComponentRef,
+): Promise<string | null> {
+  if (typeof installer.installedVersion !== 'function') return null;
+  return (await installer.installedVersion(projectRoot, component)) ?? null;
+}
+
 // ============================================================================
 // Install / remove
 // ============================================================================
@@ -75,10 +98,15 @@ function errMessage(exc: unknown): string {
  * On failure only the components newly installed during *this* call are
  * rolled back, and the provenance record is written solely on full success.
  * When *refresh* is true (``specify bundle update``), already-installed owned
- * components are re-applied, and components the bundle used to own that the
- * new manifest drops are uninstalled (unless another bundle still needs them).
- * Changes to a recorded bundle's version or owned components are rejected
- * unless *refresh* is true.
+ * components are re-applied to the plan's pinned versions (or compatible newer
+ * packaged patches, with a warning), and components the bundle used to own
+ * that the new manifest drops are uninstalled unless another bundle still
+ * needs them.
+ *
+ * Already-installed components must match their pins before they can be
+ * skipped. A refresh may repair drift in components owned exclusively by this
+ * bundle, but cannot change a version required by another bundle or an
+ * independently installed component.
  */
 export async function installBundle(
   projectRoot: string,
@@ -90,25 +118,40 @@ export async function installBundle(
   const records = loadRecords(projectRoot);
 
   if (manifest !== null) {
-    const report = detectConflicts(manifest, plan.effective_integration, records);
-    if (report.hasBlockingConflict) throw new BundlerError(report.integration_clash!);
+    const report = detectConflicts(manifest, plan.effective_integration, records, plan.components);
+    if (report.hasBlockingConflict) {
+      throw new BundlerError(
+        [...(report.integration_clash ? [report.integration_clash] : []), ...report.version_clashes].join('; '),
+      );
+    }
   }
 
   const result = new InstallResult(plan.bundle_id);
   const existing = findRecord(records, plan.bundle_id);
-  if (existing !== null && !refresh) {
-    const planned = new Set(plan.components.map((c) => c.identity()));
-    const subset = existing.contributed_components.every((c) => planned.has(c.identity()));
-    if (existing.version !== plan.version || !subset) {
-      throw new BundlerError(
-        `Bundle '${plan.bundle_id}' is already installed at version ` +
-          `${existing.version}, but the requested manifest changes the bundle ` +
-          'version or changes/removes owned components. ' +
-          "Use 'specify bundle update <id>' for a catalog bundle, or " +
-          "'specify bundle install <path> --refresh' for a local source, " +
-          'to refresh owned components before advancing the installed record.',
-      );
-    }
+  const plannedByKey = new Map<string, ComponentRef[]>();
+  for (const planned of plan.components) {
+    const key = componentKey(planned.kind, planned.id);
+    if (!plannedByKey.has(key)) plannedByKey.set(key, []);
+    plannedByKey.get(key)!.push(planned);
+  }
+  if (
+    existing !== null &&
+    !refresh &&
+    (existing.version !== plan.version ||
+      !existing.contributed_components.every((component) =>
+        (plannedByKey.get(componentKey(component.kind, component.id)) ?? []).some((candidate) =>
+          sameRequirement(component, candidate),
+        ),
+      ))
+  ) {
+    throw new BundlerError(
+      `Bundle '${plan.bundle_id}' is already installed at version ` +
+        `${existing.version}, but the requested manifest changes the bundle ` +
+        'version or changes/removes owned components. ' +
+        "Use 'specify bundle update <id>' for a catalog bundle, or " +
+        "'specify bundle install <path> --refresh' for a local source, " +
+        'to refresh owned components before advancing the installed record.',
+    );
   }
 
   const priorOurs = new Set<string>(
@@ -123,16 +166,39 @@ export async function installBundle(
     if (r.bundle_id === plan.bundle_id) continue;
     for (const c of r.contributed_components) otherTracked.add(componentKey(c.kind, c.id));
   }
+  const otherPins = new Map<string, Set<string>>();
+  const otherRequirements = new Map<string, Array<[string, ComponentRef]>>();
+  for (const record of records) {
+    if (record.bundle_id === plan.bundle_id) continue;
+    for (const component of record.required_components) {
+      const key = componentKey(component.kind, component.id);
+      if (!otherRequirements.has(key)) otherRequirements.set(key, []);
+      otherRequirements.get(key)!.push([record.bundle_id, component]);
+      if (component.version) {
+        if (!otherPins.has(key)) otherPins.set(key, new Set());
+        otherPins.get(key)!.add(component.version);
+      }
+    }
+  }
 
   const contributed: ComponentRef[] = [];
   const done: ComponentRef[] = [];
+  const installedVersions: Record<string, string> = {};
   try {
+    result.warnings.push(
+      ...(await checkInstalledPins(projectRoot, plan, installer, priorOurs, otherTracked, otherPins, otherRequirements, {
+        refresh,
+      })),
+    );
     for (const component of plan.components) {
       const key = componentKey(component.kind, component.id);
       if (await installer.isInstalled(projectRoot, component)) {
+        // Independently-installed components are never attributed and never
+        // refreshed, so ``bundle update`` cannot make collateral changes.
         const owned = priorOurs.has(key) || otherTracked.has(key);
         if (refresh && owned) {
-          await refreshComponent(projectRoot, installer, component);
+          const warning = await refreshComponent(projectRoot, installer, component);
+          if (warning) result.warnings.push(warning);
           result.refreshed.push(component);
         } else {
           result.skipped.push(component);
@@ -140,14 +206,16 @@ export async function installBundle(
         if (owned) contributed.push(component);
         continue;
       }
-      await installer.install(projectRoot, component);
+      const warning = await installer.install(projectRoot, component);
+      if (warning) result.warnings.push(warning);
       done.push(component);
       result.installed.push(component);
       contributed.push(component);
     }
 
     // On update (refresh), uninstall components this bundle used to own that
-    // the new version no longer ships (otherwise they would be orphaned).
+    // the new version no longer ships (otherwise they would be orphaned). A
+    // stale component still owned by another bundle is kept installed.
     if (refresh && existing !== null) {
       const planned = new Set(plan.components.map((c) => componentKey(c.kind, c.id)));
       const stillNeeded = componentsStillNeeded(records, plan.bundle_id);
@@ -159,6 +227,12 @@ export async function installBundle(
           await installer.remove(projectRoot, component);
           result.uninstalled.push(component);
         }
+      }
+    }
+    if (typeof installer.installedVersion === 'function') {
+      for (const component of plan.components) {
+        const actual = await installer.installedVersion(projectRoot, component);
+        if (actual !== null && actual !== undefined) installedVersions[`${component.kind}:${component.id}`] = actual;
       }
     }
   } catch (exc) {
@@ -176,8 +250,23 @@ export async function installBundle(
     contributed,
     // Preserve the original install time across refresh/update.
     existing !== null ? existing.installed_at : null,
+    {
+      requiredComponents: plan.components,
+      installedVersions,
+      bundleReferences: plan.references.map(
+        (reference) => new BundleRef({ id: reference.id, version: reference.version, source: reference.source_id }),
+      ),
+    },
   );
-  saveRecords(projectRoot, upsertRecord(records, record));
+  let updated = upsertRecord(records, record);
+  if (refresh && existing !== null) {
+    const planned = new Set(plan.components.map((c) => componentKey(c.kind, c.id)));
+    updated = transferContributions(
+      updated,
+      existing.contributed_components.filter((c) => !planned.has(componentKey(c.kind, c.id))),
+    );
+  }
+  saveRecords(projectRoot, updated);
   return result;
 }
 
@@ -208,7 +297,8 @@ export async function removeBundle(
         result.uninstalled.push(component);
       }
     }
-    saveRecords(projectRoot, removeRecord(records, bundleId));
+    const remaining = transferContributions(removeRecord(records, bundleId), target.contributed_components);
+    saveRecords(projectRoot, remaining);
   } catch (exc) {
     let detail: string;
     if (result.uninstalled.length) {
@@ -232,6 +322,87 @@ export async function removeBundle(
   return result;
 }
 
+/** Check installed pins and other bundles' requirements before mutation. */
+async function checkInstalledPins(
+  projectRoot: string,
+  plan: InstallPlan,
+  installer: PrimitiveInstaller,
+  priorOurs: Set<string>,
+  otherTracked: Set<string>,
+  otherPins: Map<string, Set<string>>,
+  otherRequirements: Map<string, Array<[string, ComponentRef]>>,
+  opts: { refresh: boolean },
+): Promise<BundledPatchWarning[]> {
+  const { refresh } = opts;
+  const mismatches: string[] = [];
+  const warnings: BundledPatchWarning[] = [];
+  for (const component of plan.components) {
+    const key = componentKey(component.kind, component.id);
+    const singular = component.kind.slice(0, -1);
+    for (const [bundleId, required] of otherRequirements.get(key) ?? []) {
+      // Installed bundles keep the flat-bundle rule: extension priority is
+      // never compared; only preset priority is.
+      const different = componentSettingDifferences(component, required, { extensionPriority: false });
+      if (different.length) {
+        throw new BundlerError(
+          `Cannot install or refresh shared ${singular} ` +
+            `'${component.id}': bundle '${bundleId}' requires different ` +
+            `${different.join(', ')}. Shared components must agree on ` +
+            'install-affecting requirements.',
+        );
+      }
+    }
+    if (component.source && typeof installer.validateSource === 'function') {
+      await installer.validateSource(projectRoot, component);
+    }
+    if (refresh && !component.version && otherTracked.has(key)) {
+      throw new BundlerError(
+        `Cannot refresh unpinned shared ${singular} ` +
+          `'${component.id}': another bundle may require its installed ` +
+          'version. Pin this component before refreshing.',
+      );
+    }
+    if (!component.version) {
+      const pins = otherPins.get(key);
+      if (pins && pins.size) {
+        const installed = await installer.isInstalled(projectRoot, component);
+        const actual = installed ? await installedVersionOf(installer, projectRoot, component) : null;
+        if ((refresh && priorOurs.has(key)) || !actual || [...pins].some((pin) => !sameVersion(actual, pin))) {
+          throw new BundlerError(
+            `Cannot install or refresh unpinned ${singular} ` +
+              `'${component.id}': another bundle requires version ` +
+              `${[...pins].sort().join(', ')}. Pin this component to a ` +
+              'compatible version before installing or refreshing.',
+          );
+        }
+      }
+      continue;
+    }
+    if (!(await installer.isInstalled(projectRoot, component))) continue;
+    const actual = await installedVersionOf(installer, projectRoot, component);
+    if (actual && sameVersion(actual, component.version)) continue;
+    if (actual && (priorOurs.has(key) || otherTracked.has(key)) && typeof installer.bundledPatchWarning === 'function') {
+      const warning = await installer.bundledPatchWarning(component, actual);
+      if (warning) {
+        if (!refresh) warnings.push(warning);
+        continue;
+      }
+    }
+    if (refresh && priorOurs.has(key) && !otherTracked.has(key)) continue;
+    const pinned = `${singular} '${component.id}' to ${component.version}`;
+    if (!actual) mismatches.push(`${pinned}, but its installed version is unknown`);
+    else mismatches.push(`${pinned}, but ${actual} is installed`);
+  }
+  if (mismatches.length) {
+    throw new BundlerError(
+      `Bundle '${plan.bundle_id}' pins ${mismatches.join('; ')}. Only one ` +
+        'version can be installed per ID; independently installed and ' +
+        "other bundles' components cannot be replaced by this bundle.",
+    );
+  }
+  return warnings;
+}
+
 /**
  * Re-apply an already-installed component to bring it up to its pinned
  * version. Prefers a primitive-provided ``refresh`` hook when available.
@@ -240,12 +411,11 @@ async function refreshComponent(
   projectRoot: string,
   installer: PrimitiveInstaller,
   component: ComponentRef,
-): Promise<void> {
+): Promise<BundledPatchWarning | null> {
   if (typeof installer.refresh === 'function') {
-    await installer.refresh(projectRoot, component);
-  } else {
-    await installer.install(projectRoot, component);
+    return (await installer.refresh(projectRoot, component)) ?? null;
   }
+  return (await installer.install(projectRoot, component)) ?? null;
 }
 
 async function rollback(projectRoot: string, installer: PrimitiveInstaller, done: ComponentRef[]): Promise<void> {
@@ -253,7 +423,7 @@ async function rollback(projectRoot: string, installer: PrimitiveInstaller, done
     try {
       await installer.remove(projectRoot, component);
     } catch {
-      // best-effort rollback
+      // rollback cannot mask the original failure
     }
   }
 }

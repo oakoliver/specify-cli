@@ -562,11 +562,14 @@ function pyJsonInner(value: unknown, indent: number | null, level: number): stri
 }
 
 /**
- * Serialize like Python ``json.dumps(data, indent=indent)`` (default
- * separators, ``ensure_ascii=True``).
+ * Serialize like Python ``json.dumps(data, indent=indent,
+ * ensure_ascii=ensureAscii)`` (default separators). Lone surrogates are
+ * always written as ``\uXXXX`` escapes (``errors="backslashreplace"``).
  */
-export function pyJsonDumps(data: unknown, indent: number | null = null): string {
-  return pyJsonInner(data, indent, 0).replace(
+export function pyJsonDumps(data: unknown, indent: number | null = null, ensureAscii = true): string {
+  const text = pyJsonInner(data, indent, 0);
+  if (!ensureAscii) return text;
+  return text.replace(
     /[\u0080-￿]/g,
     (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'),
   );

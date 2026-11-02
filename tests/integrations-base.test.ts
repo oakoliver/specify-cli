@@ -172,7 +172,7 @@ describe('base helpers', () => {
   });
 
   test('events option only for event-capable integrations', () => {
-    expect(getIntegration('claude')!.options().map((o) => o.name)).toEqual(['--events']);
+    expect(getIntegration('claude')!.options().map((o) => o.name)).toEqual(['--events', '--no-model-invocation']);
     expect(getIntegration('codex')!.options().map((o) => o.name)).toEqual(['--events', '--skills']);
     expect(getIntegration('auggie')!.options()).toEqual([]);
   });

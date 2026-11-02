@@ -34,7 +34,9 @@ import {
   locateBundledWorkflow,
 } from './assets.js';
 import { checkTool } from './utils.js';
-import { isDollarSkillsAgent, isSlashSkillsAgent } from './invocation-style.js';
+import { resolvePathLoose } from './download-security.js';
+import { FileHelperError, isOsError } from './file-helper.js';
+import { ProjectPolicyError, absoluteLexical, prepareInitRoot, readProjectOptions } from './file-policy.js';
 import { invokePrefixForIntegration, withIntegrationSetting } from './integration-runtime.js';
 import { INTEGRATION_REGISTRY, getIntegration } from './integrations/index.js';
 import type { IntegrationBase, SetupOptions } from './integrations/base.js';
@@ -83,6 +85,8 @@ export interface InitCommandOptions {
   here?: boolean;
   /** `--force` */
   force?: boolean;
+  /** `--allow-symlinks`: persist permission for contained symlinks (default: deny). */
+  allowSymlinks?: boolean;
   /** `--non-interactive` */
   nonInteractive?: boolean;
   /** `--skip-tls` (hidden, deprecated no-op) */
@@ -193,6 +197,12 @@ export const INIT_COMMAND_SPEC: CommandSpec = {
     { name: 'here', flags: ['--here'], type: 'boolean', help: 'Initialize project in the current directory instead of creating a new one' },
     { name: 'force', flags: ['--force'], type: 'boolean', help: 'Force merge/overwrite when using --here (skip confirmation)' },
     {
+      name: 'allowSymlinks',
+      flags: ['--allow-symlinks'],
+      type: 'boolean',
+      help: 'Persist permission for contained symlinks in migrated FileHelper operations (default: deny).',
+    },
+    {
       name: 'nonInteractive',
       flags: ['--non-interactive'],
       type: 'boolean',
@@ -246,6 +256,7 @@ function toInitOptions(parsed: ParsedArgs): InitCommandOptions {
     ignoreAgentTools: Boolean(o['ignoreAgentTools']),
     here: Boolean(o['here']),
     force: Boolean(o['force']),
+    allowSymlinks: Boolean(o['allowSymlinks']),
     nonInteractive: Boolean(o['nonInteractive']),
     skipTls: Boolean(o['skipTls']),
     debug: Boolean(o['debug']),
@@ -587,6 +598,7 @@ export async function initOrExit(options: InitCommandOptions = {}): Promise<void
   const ignoreAgentTools = options.ignoreAgentTools ?? false;
   let here = options.here ?? false;
   const force = options.force ?? false;
+  const allowSymlinks = options.allowSymlinks ?? false;
   const nonInteractive = options.nonInteractive ?? false;
   const debug = options.debug ?? false;
   const preset = options.preset ?? null;
@@ -672,9 +684,10 @@ export async function initOrExit(options: InitCommandOptions = {}): Promise<void
       }
     }
   } else {
-    projectPath = resolve(projectName as string);
+    // #4934: keep the original spelling (Path.absolute()); the root is resolved after preparation.
+    projectPath = absoluteLexical(projectName as string);
     dirExistedBefore = existsSync(projectPath);
-    if (existsSync(projectPath)) {
+    if (dirExistedBefore) {
       const safeName = escapeMarkup(String(projectName));
       if (!statSync(projectPath).isDirectory()) {
         console.print(`[red]Error:[/red] '${safeName}' exists but is not a directory.`);
@@ -703,6 +716,18 @@ export async function initOrExit(options: InitCommandOptions = {}): Promise<void
         throw new CliExit(1);
       }
     }
+  }
+
+  let previousInitOptions: Record<string, unknown>;
+  try {
+    // Existing targets are checked before any integration or scaffold mutation.
+    previousInitOptions = dirExistedBefore ? readProjectOptions(projectPath) : {};
+  } catch (exc) {
+    if (exc instanceof ProjectPolicyError) {
+      console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+      throw new CliExit(1);
+    }
+    throw exc;
   }
 
   const agentConfigs = AGENT_CONFIG as Record<string, Record<string, unknown>>;
@@ -853,11 +878,26 @@ export async function initOrExit(options: InitCommandOptions = {}): Promise<void
   // hangs when the cursor state is restored via VT escape sequences.
   const transient = process.platform !== 'win32';
 
+  // Upstream creates the project root up front (``prepare_init_root``) so an
+  // integration that renders no files (``none``) can still save its manifest.
+  // Thin seam until the FileHelper policy port provides prepareInitRoot.
+  mkdirSync(projectPath, { recursive: true });
+
   // Upstream shows the tracker in a Rich Live display (transient except on
   // win32) and re-prints the final tree afterwards. The minimal console Live
   // cannot redraw around interleaved warnings (e.g. preserved shared-infra
   // files, preset failures), so the tree is rendered once when the steps
   // finish -- identical to upstream's final output in both modes.
+
+  try {
+    projectPath = resolvePathLoose(prepareInitRoot(projectPath));
+  } catch (exc) {
+    if (isOsError(exc) || exc instanceof FileHelperError) {
+      console.print(`[red]Error:[/red] Cannot create project root: ${escapeMarkup(errorText(exc))}`);
+      throw new CliExit(1);
+    }
+    throw exc;
+  }
 
   const integrationParsedOptions: Record<string, unknown> = {};
   try {
@@ -943,15 +983,20 @@ export async function initOrExit(options: InitCommandOptions = {}): Promise<void
     }
 
     const initOpts: Record<string, unknown> = {
+      ...previousInitOptions,
       ai: selectedAi,
       integration: integ.key,
       here,
       script: selectedScript,
-      feature_numbering: 'sequential',
+      // #5101: preserve feature numbering across re-initialization.
+      feature_numbering: previousInitOptions['feature_numbering'] ?? 'sequential',
       speckit_version: initHooks.getSpeckitVersion(),
+      allow_symlinks: allowSymlinks,
     };
     if (integ.isSkillsMode(parsedOrNull, projectPath)) {
       initOpts['ai_skills'] = true;
+    } else {
+      delete initOpts['ai_skills'];
     }
     saveInitOptions(projectPath, initOpts);
 
@@ -1034,14 +1079,15 @@ export async function initOrExit(options: InitCommandOptions = {}): Promise<void
     }
   }
 
+  const nextStepsOptions = Object.keys(integrationParsedOptions).length ? integrationParsedOptions : null;
   printNextSteps({
     here,
     projectName: String(projectName),
     selectedAi,
-    isSkillsIntegration: integ.isSkillsMode(
-      Object.keys(integrationParsedOptions).length ? integrationParsedOptions : null,
-      projectPath,
-    ),
+    isSkillsIntegration: integ.isSkillsMode(nextStepsOptions, projectPath),
+    hasCommandTemplates: integ.listCommandTemplates().length > 0,
+    invokePrefix: invokePrefixForIntegration(integ, integ.key, nextStepsOptions, projectPath),
+    invokeSeparator: integ.effectiveInvokeSeparator(nextStepsOptions, projectPath),
   });
 }
 
@@ -1122,6 +1168,10 @@ function printNextSteps(opts: {
   projectName: string;
   selectedAi: string;
   isSkillsIntegration: boolean;
+  /** False for integrations that install no command templates (e.g. `none`). */
+  hasCommandTemplates?: boolean;
+  invokePrefix: string;
+  invokeSeparator: string;
 }): void {
   const { here, projectName, selectedAi } = opts;
   const isSkills = opts.isSkillsIntegration;
@@ -1137,10 +1187,21 @@ function printNextSteps(opts: {
     stepNum = 2;
   }
 
+  // #5041: an integration without command templates (shared scaffolding only)
+  // points at choosing a real integration instead of listing commands.
+  if (opts.hasCommandTemplates === false) {
+    stepsLines.push(`${stepNum}. Choose an integration: [cyan]specify integration list[/cyan]`);
+    stepsLines.push(`${stepNum + 1}. Switch this project to it: [cyan]specify integration switch <key>[/cyan]`);
+    console.print();
+    console.print(new Panel(stepsLines.join('\n'), { title: 'Next Steps', borderStyle: 'cyan', padding: [1, 2] }));
+    return;
+  }
+
   const codexSkillMode = selectedAi === 'codex' && isSkills;
   const zcodeSkillMode = selectedAi === 'zcode' && isSkills;
   const claudeSkillMode = selectedAi === 'claude' && isSkills;
   const kimiSkillMode = selectedAi === 'kimi';
+  const mcodeSkillMode = selectedAi === 'mcode' && isSkills;
   const agySkillMode = selectedAi === 'agy' && isSkills;
   const traeSkillMode = selectedAi === 'trae';
   const cursorAgentSkillMode = selectedAi === 'cursor-agent' && isSkills;
@@ -1150,14 +1211,13 @@ function printNextSteps(opts: {
   const museSkillMode = selectedAi === 'muse' && isSkills;
   const grokSkillMode = selectedAi === 'grok' && isSkills;
   const dshSkillMode = selectedAi === 'dsh' && isSkills;
-  const clineSkillMode = selectedAi === 'cline';
-  const forgeSkillMode = selectedAi === 'forge';
   const bobSkillMode = selectedAi === 'bob' && isSkills;
   const nativeSkillMode =
     codexSkillMode ||
     zcodeSkillMode ||
     claudeSkillMode ||
     kimiSkillMode ||
+    mcodeSkillMode ||
     agySkillMode ||
     traeSkillMode ||
     cursorAgentSkillMode ||
@@ -1186,6 +1246,10 @@ function printNextSteps(opts: {
       'Start DSH ([cyan]dsh web[/cyan]) in this project directory; spec-kit skills were installed to [cyan].dsh/skills[/cyan]',
     ],
     [bobSkillMode, 'Start Bob in this project directory; spec-kit skills were installed to [cyan].bob/skills[/cyan]'],
+    [
+      mcodeSkillMode,
+      'Start MiniMax Code in this project directory; spec-kit skills were installed to [cyan].minimax/skills[/cyan]',
+    ],
   ];
   for (const [enabled, text] of startLines) {
     if (enabled) {
@@ -1195,15 +1259,8 @@ function printNextSteps(opts: {
   }
   const usageLabel = nativeSkillMode ? 'skills' : 'slash commands';
 
-  const aiSkillsEnabled = isSkills;
-  const displayCmd = (name: string): string => {
-    if (isDollarSkillsAgent(selectedAi, aiSkillsEnabled)) return `$speckit-${name}`;
-    if (kimiSkillMode) return `/skill:speckit-${name}`;
-    if (isSlashSkillsAgent(selectedAi, aiSkillsEnabled) || clineSkillMode || forgeSkillMode) {
-      return `/speckit-${name}`;
-    }
-    return `/speckit.${name}`;
-  };
+  // #4910: derive the shown names from the integration's invoke prefix and separator.
+  const displayCmd = (name: string): string => `${opts.invokePrefix}speckit${opts.invokeSeparator}${name}`;
 
   stepsLines.push(`${stepNum}. Start using ${usageLabel} with your coding agent:`);
   stepsLines.push(`   ${stepNum}.1 [cyan]${displayCmd('constitution')}[/] - Establish project principles`);

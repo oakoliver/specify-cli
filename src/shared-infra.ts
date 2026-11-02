@@ -18,6 +18,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import {
   chmodSync,
   closeSync,
+  constants as fsConstants,
   lstatSync,
   mkdirSync,
   openSync,
@@ -26,13 +27,15 @@ import {
   readSync,
   realpathSync,
   renameSync,
+  rmdirSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath, sep } from 'node:path';
 
-import { IntegrationManifest } from './integrations/manifest.js';
+import { IntegrationManifest, resolvePath as resolvePathReal } from './integrations/manifest.js';
+import { registrationDirectory } from './integrations/generic.js';
 import { console as defaultConsole, CliExit } from './console.js';
 import { getSpeckitVersion, locateCorePack, repoRoot as defaultRepoRoot } from './assets.js';
 import { loadInitOptions, isAiSkillsEnabled } from './init-options.js';
@@ -62,6 +65,10 @@ export interface SharedInfraTracker {
  * Managed `.specify/.gitignore`. Keeps machine-local Spec Kit state out of
  * version control while leaving shareable project files tracked. Patterns are
  * relative to the `.specify/` directory the file lives in.
+ *
+ * ADAPTATION: the `integrations/packages` lines belong to upstream's
+ * catalog-installed adapter packages (#4862), which this port does not
+ * install. They are kept so a project scaffolded by either CLI is identical.
  */
 export const SPECIFY_GITIGNORE_CONTENT = `# Machine-local Spec Kit state — not meant to be shared.
 # Managed by the Specify CLI; safe to edit (your changes are preserved on refresh).
@@ -72,6 +79,11 @@ feature.json
 
 # Per-machine extension config overrides.
 extensions/*/local-config.yml
+
+# Executable adapter packages and their per-checkout provenance registry.
+# Execution consent is stored separately in the user's local trust registry.
+integrations/packages/
+integrations/packages.json
 `;
 
 const SHA256_HEX_RE = /^[0-9a-f]{64}$/;
@@ -383,6 +395,118 @@ export function ensureSafeSharedDirectory(
       throw new Error(`${capitalize(context)} escapes project root: ${label}`);
     }
   }
+}
+
+// ============================================================================
+// Exclusive project lock (``_exclusive_project_lock``)
+// ============================================================================
+
+const LOCK_O_NOFOLLOW = (fsConstants as unknown as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+const LOCK_STALE_MS = 10 * 60 * 1000;
+
+function lockOsError(message: string, code: string): NodeJS.ErrnoException {
+  const e = new Error(message) as NodeJS.ErrnoException;
+  e.code = code;
+  e.name = 'OSError';
+  return e;
+}
+
+function lockSleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Hold an exclusive inter-process lock on ``.specify/<lockName>`` while
+ * ``fn`` runs (sync or async body).
+ *
+ * Callers use one lock file per mutable project resource so that its
+ * directory and registry changes are serialized across processes. Every
+ * failure to acquire the lock is raised as an ``OSError``-like error (with a
+ * Node errno ``code``); errors raised by ``fn`` propagate unchanged.
+ *
+ * ADAPTATION: upstream holds ``fcntl.flock`` / ``msvcrt.locking`` on the lock
+ * file. Node has neither, so the port keeps the same (symlink-checked) lock
+ * file and serializes on an exclusively created sibling directory
+ * ``<lockName>.d`` (removed on exit; reclaimed when stale).
+ */
+export function exclusiveProjectLock<T>(
+  projectRoot: string,
+  lockName: string,
+  opts: { context: string },
+  fn: () => T,
+): T {
+  const context = opts.context;
+  const lockDir = join(projectRoot, '.specify');
+  try {
+    ensureSafeSharedDirectory(projectRoot, lockDir, { context: `${context} lock directory` });
+  } catch (exc) {
+    const code = (exc as NodeJS.ErrnoException)?.code;
+    if (exc instanceof Error && typeof code === 'string' && /^E[A-Z0-9]+$/.test(code)) throw exc;
+    throw lockOsError(exc instanceof Error ? exc.message : String(exc), 'EPERM');
+  }
+  const lockFile = join(lockDir, lockName);
+  if (isSymlink(lockFile)) throw lockOsError(`Refusing to use symlinked ${context} lock: ${lockFile}`, 'ELOOP');
+
+  const fd = openSync(lockFile, fsConstants.O_RDWR | fsConstants.O_CREAT | LOCK_O_NOFOLLOW, 0o600);
+  let mutex: string | null = null;
+  const release = (): void => {
+    if (mutex !== null) {
+      try {
+        rmdirSync(mutex);
+      } catch {
+        // ignore
+      }
+      mutex = null;
+    }
+    try {
+      closeSync(fd);
+    } catch {
+      // ignore
+    }
+  };
+  try {
+    if (isSymlink(lockFile)) throw lockOsError(`Refusing to use symlinked ${context} lock: ${lockFile}`, 'ELOOP');
+    const mutexPath = `${lockFile}.d`;
+    for (;;) {
+      try {
+        mkdirSync(mutexPath);
+        mutex = mutexPath;
+        break;
+      } catch (exc) {
+        if ((exc as NodeJS.ErrnoException).code !== 'EEXIST') throw exc;
+        try {
+          if (Date.now() - statSync(mutexPath).mtimeMs > LOCK_STALE_MS) rmdirSync(mutexPath);
+        } catch {
+          // Raced with the holder; retry.
+        }
+        lockSleepSync(50);
+      }
+    }
+  } catch (exc) {
+    release();
+    throw exc;
+  }
+  let result: T;
+  try {
+    result = fn();
+  } catch (exc) {
+    release();
+    throw exc;
+  }
+  if (result && typeof (result as unknown as Promise<unknown>).then === 'function') {
+    return (result as unknown as Promise<unknown>).then(
+      (v) => {
+        release();
+        return v;
+      },
+      (e: unknown) => {
+        release();
+        throw e;
+      },
+    ) as unknown as T;
+  }
+  release();
+  return result;
 }
 
 /** Validate existing directory parents while allowing missing directories. */
@@ -1119,6 +1243,10 @@ export function ensureExecutableScripts(
  * falling back to `<project>/.agents/skills` for unknown agents.
  */
 export function getSkillsDir(projectPath: string, selectedAi: string): string {
+  if (selectedAi === 'generic') {
+    // The generic output root is the persisted --commands-dir (#4785).
+    return join(projectPath, relative(resolvePathReal(projectPath), registrationDirectory(projectPath)));
+  }
   const agentConfig = (AGENT_CONFIG as Record<string, Record<string, unknown> | undefined>)[selectedAi] ?? {};
   const folder = agentConfig['folder'];
   if (typeof folder === 'string' && folder) {
@@ -1139,7 +1267,6 @@ export function resolveActiveSkillsDir(projectRoot: string): string | null {
 
   const agent = record['ai'];
   if (typeof agent !== 'string' || !agent) return null;
-  if (agent === 'generic') return null;
 
   const aiSkillsEnabled = isAiSkillsEnabled(record);
   if (!aiSkillsEnabled && agent !== 'kimi') return null;

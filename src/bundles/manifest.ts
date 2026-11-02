@@ -20,7 +20,7 @@ import { dget, isMapping, pyRepr, pyStr, pyTruthy } from './pycompat.js';
 // Constants
 // ============================================================================
 
-export const SUPPORTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['1.0']);
+export const SUPPORTED_SCHEMA_VERSIONS: ReadonlySet<string> = new Set(['1.0', '1.1']);
 export const PRESET_STRATEGIES: ReadonlySet<string> = new Set(['replace', 'prepend', 'append', 'wrap']);
 
 export const COMPONENT_KINDS = ['extensions', 'presets', 'steps', 'workflows'] as const;
@@ -80,6 +80,25 @@ export class ComponentRef {
   }
 }
 
+/** A pointer to another bundle, pinned to an exact version. */
+export class BundleRef {
+  readonly id: string;
+  readonly version: string | null;
+  /** Expected winning bundle catalog ID. */
+  readonly source: string | null;
+
+  constructor(init: { id: string; version?: string | null; source?: string | null }) {
+    this.id = init.id;
+    this.version = init.version ?? null;
+    this.source = init.source ?? null;
+    Object.freeze(this);
+  }
+
+  label(): string {
+    return `bundle:${this.id}@${this.version || 'unpinned'}`;
+  }
+}
+
 export interface IntegrationRef {
   readonly id: string;
 }
@@ -109,6 +128,7 @@ export class BundleManifest {
   presets: ComponentRef[];
   steps: ComponentRef[];
   workflows: ComponentRef[];
+  bundles: BundleRef[];
   tags: readonly string[];
   source_path: string | null;
 
@@ -121,6 +141,7 @@ export class BundleManifest {
     presets?: ComponentRef[];
     steps?: ComponentRef[];
     workflows?: ComponentRef[];
+    bundles?: BundleRef[];
     tags?: readonly string[];
     source_path?: string | null;
   }) {
@@ -132,11 +153,16 @@ export class BundleManifest {
     this.presets = init.presets ?? [];
     this.steps = init.steps ?? [];
     this.workflows = init.workflows ?? [];
+    this.bundles = init.bundles ?? [];
     this.tags = init.tags ?? [];
     this.source_path = init.source_path ?? null;
   }
 
-  /** All installable component references in deterministic order. */
+  /**
+   * Own installable component references in deterministic order.
+   *
+   * Excludes ``bundles``: referenced bundles are expanded separately.
+   */
   get components(): ComponentRef[] {
     return [...this.extensions, ...this.presets, ...this.steps, ...this.workflows];
   }
@@ -191,8 +217,14 @@ export class BundleManifest {
     if (integrationRaw !== undefined && integrationRaw !== null && !isMapping(integrationRaw)) {
       throw new BundlerError("'integration' must be a mapping when present.");
     }
-    if (isMapping(integrationRaw) && pyTruthy(dget(integrationRaw, 'id'))) {
-      integration = Object.freeze({ id: pyStr(dget(integrationRaw, 'id')).trim() });
+    if (isMapping(integrationRaw)) {
+      // A mapping without a usable id (missing, empty or whitespace-only) is
+      // rejected rather than silently dropped or kept as ``id: ""``.
+      const integrationId = text(dget(integrationRaw, 'id'));
+      if (!integrationId) {
+        throw new BundlerError("'integration' mapping must include a non-empty 'id'.");
+      }
+      integration = Object.freeze({ id: integrationId });
     }
 
     let provides = dget(data, 'provides');
@@ -216,6 +248,7 @@ export class BundleManifest {
       presets: parseRefs('presets', dget(prov, 'presets')),
       steps: parseRefs('steps', dget(prov, 'steps')),
       workflows: parseRefs('workflows', dget(prov, 'workflows')),
+      bundles: parseBundleRefs(dget(prov, 'bundles')),
       tags: tagsRaw.map((t) => String(t)),
     });
   }
@@ -258,14 +291,59 @@ export class BundleManifest {
       );
     }
 
+    const seenComponents = new Set<string>();
     for (const ref of this.components) {
       const singular = ref.kind.slice(0, -1);
-      if (!ref.id) errors.push(`A ${singular} entry is missing its 'id'.`);
+      const key = `${ref.kind}\u0000${ref.id}`;
+      if (!ref.id) {
+        errors.push(`A ${singular} entry is missing its 'id'.`);
+      } else if (seenComponents.has(key)) {
+        errors.push(`Duplicate ${singular} '${ref.id}' in provides; declare each component ID only once per kind.`);
+      } else {
+        seenComponents.add(key);
+      }
       if (ref.kind !== 'steps' && !ref.version) {
         errors.push(`${singular} '${ref.id || '<unknown>'}' must be pinned to a 'version'.`);
       }
       if (ref.version && !isSemver(ref.version)) {
         errors.push(`${singular} '${ref.id}' has invalid version '${ref.version}'.`);
+      }
+      // Preset and extension installs refuse a priority below 1, which would
+      // otherwise surface only mid-install, after earlier components.
+      if ((ref.kind === 'extensions' || ref.kind === 'presets') && ref.priority !== null && ref.priority < 1) {
+        errors.push(`${singular} '${ref.id}' priority must be 1 or higher, got ${ref.priority}.`);
+      }
+    }
+
+    if (this.bundles.length && this.schema_version !== '1.1') {
+      errors.push('Bundle references require schema_version "1.1".');
+    }
+
+    const seenBundles = new Set<string>();
+    for (const bundleRef of this.bundles) {
+      if (!bundleRef.id) {
+        errors.push("A bundle reference is missing its 'id'.");
+      } else {
+        if (!SAFE_BUNDLE_ID.test(bundleRef.id)) {
+          errors.push(
+            `Bundle reference id '${bundleRef.id}' must be a slug ` +
+              "(lowercase letters, digits, '.', '_', '-'; no path separators).",
+          );
+        }
+        if (seenBundles.has(bundleRef.id)) {
+          errors.push(
+            `Duplicate bundle reference '${bundleRef.id}' in provides; declare each bundle reference only once.`,
+          );
+        }
+        seenBundles.add(bundleRef.id);
+        if (bundleRef.id === this.bundle.id) {
+          errors.push(`Bundle reference '${bundleRef.id}' is invalid: a bundle cannot reference itself.`);
+        }
+      }
+      if (!bundleRef.version) {
+        errors.push(`bundle reference '${bundleRef.id || '<unknown>'}' must be pinned to a 'version'.`);
+      } else if (!isSemver(bundleRef.version)) {
+        errors.push(`bundle reference '${bundleRef.id}' has invalid version '${bundleRef.version}'.`);
       }
     }
 
@@ -346,6 +424,29 @@ function parseRefs(kind: string, raw: unknown): ComponentRef[] {
     );
   }
   return refs;
+}
+
+function parseBundleRefs(raw: unknown): BundleRef[] {
+  if (raw === null || raw === undefined) return [];
+  if (!Array.isArray(raw)) throw new BundlerError('provides.bundles must be a list when present.');
+  const refs: BundleRef[] = [];
+  for (const item of raw) {
+    if (!isMapping(item)) throw new BundlerError('Each provides.bundles entry must be a mapping.');
+    refs.push(
+      new BundleRef({
+        id: text(dget(item, 'id')),
+        version: optionalTextOrNone(dget(item, 'version')),
+        source: optionalTextOrNone(dget(item, 'source')),
+      }),
+    );
+  }
+  return refs;
+}
+
+/** Stripped text, with unset, empty and whitespace-only values as ``null``. */
+function optionalTextOrNone(raw: unknown): string | null {
+  if (!pyTruthy(raw)) return null;
+  return pyStr(raw).trim() || null;
 }
 
 /** Python ``int(raw)`` for an ``int | str`` value; ``null`` when not parseable. */

@@ -66,15 +66,26 @@ export function validateManifestSync(manifest: BundleManifest): ValidationReport
 export async function validateManifest(
   manifest: BundleManifest,
   referenceChecker: ReferenceChecker | null = null,
+  components: ComponentRef[] | null = null,
+  origins: Map<string, string[]> | null = null,
 ): Promise<ValidationReport> {
   const report = structuralReport(manifest);
   if (referenceChecker !== null) {
-    for (const component of manifest.components) {
+    const selected = components === null ? manifest.components : components;
+    for (const component of selected) {
       const problem = await referenceChecker(component);
       if (problem) {
-        report.errors.push(`Unresolved reference ${component.label()}: ${problem}`);
+        const origin = origins ? origins.get(originKey(component.kind, component.id)) : undefined;
+        const chainText =
+          origin && origin.length ? ` (from ${[manifest.bundle.id, ...origin].join(' → ')})` : '';
+        report.errors.push(`Unresolved reference ${component.label()}${chainText}: ${problem}`);
       }
     }
   }
   return report;
+}
+
+/** Key for the ``origins`` map: Python keys it by ``(kind, id)`` tuples. */
+export function originKey(kind: string, id: string): string {
+  return `${kind}\u0000${id}`;
 }

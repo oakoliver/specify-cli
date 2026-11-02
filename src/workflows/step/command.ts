@@ -24,6 +24,10 @@ import {
   type Dict,
 } from '../base.js';
 import { evaluateExpression } from '../expressions.js';
+import { captureErrors, captureFailure, captureLimit, recordCapture, timeoutError } from './capture.js';
+
+/** Default timeout for a captured command step (a streaming step has none). */
+const DEFAULT_CAPTURE_TIMEOUT = 600;
 
 // ============================================================================
 // Integration dispatch seam
@@ -64,6 +68,8 @@ export interface DispatchableIntegration {
       stream?: boolean;
       integrationArgs?: string[] | null;
       integrationOptions?: Dict | null;
+      outputJson?: boolean | null;
+      captureMaxBytes?: number | null;
     },
   ): unknown;
 }
@@ -72,11 +78,15 @@ export interface DispatchableIntegration {
 export function normalizeDispatchResult(raw: unknown): DispatchResult {
   const r = (isDict(raw) ? raw : {}) as Dict;
   const exitCode = dhas(r, 'exit_code') ? r.exit_code : r.exitCode;
-  return {
+  const result: DispatchResult = {
     exit_code: typeof exitCode === 'number' ? exitCode : Number(exitCode ?? 1),
     stdout: typeof r.stdout === 'string' ? r.stdout : pyStr(r.stdout ?? ''),
     stderr: typeof r.stderr === 'string' ? r.stderr : pyStr(r.stderr ?? ''),
   };
+  for (const field of ['stdout_truncated', 'stderr_truncated', 'timed_out', 'interrupted']) {
+    if (dhas(r, field)) (result as unknown as Dict)[field] = r[field];
+  }
+  return result;
 }
 
 /**
@@ -184,6 +194,20 @@ export class CommandStep extends StepBase {
     }
     const [integrationArgs, integrationOptions] = runtimeConfig;
 
+    // Fail the step on a malformed capture/timeout rather than dispatch with a
+    // coerced default. 'timeout' only applies to a captured step (#4957).
+    const captureConfigErrors = captureErrors(config, 'Command');
+    if (captureConfigErrors.length) {
+      return new StepResult({ status: StepStatus.FAILED, error: captureConfigErrors[0] as string });
+    }
+    const captureMaxBytes = captureLimit(config);
+    let timeout = DEFAULT_CAPTURE_TIMEOUT;
+    if (captureMaxBytes !== null) {
+      const invalidTimeout = timeoutError(config, 'Command');
+      if (invalidTimeout !== null) return new StepResult({ status: StepStatus.FAILED, error: invalidTimeout });
+      timeout = dget(config, 'timeout', DEFAULT_CAPTURE_TIMEOUT) as number;
+    }
+
     const argsStr = pyStr(dget(resolvedInput, 'args', ''));
     const output: Dict = {
       command,
@@ -205,6 +229,7 @@ export class CommandStep extends StepBase {
         context,
         integrationArgs,
         integrationOptions,
+        { captureMaxBytes, timeout },
       );
     } catch (exc) {
       if (exc instanceof ValueError || (exc instanceof Error && exc.name === 'ValueError')) {
@@ -224,12 +249,13 @@ export class CommandStep extends StepBase {
       output.stdout = dispatchResult.stdout;
       output.stderr = dispatchResult.stderr;
       output.dispatched = true;
+      if (captureMaxBytes !== null) recordCapture(output, dispatchResult as unknown as Dict);
       if (dispatchResult.exit_code !== 0) {
-        return new StepResult({
-          status: StepStatus.FAILED,
-          output,
-          error: dispatchResult.stderr || `Command exited with code ${dispatchResult.exit_code}`,
-        });
+        const error =
+          captureMaxBytes !== null
+            ? captureFailure(dispatchResult as unknown as Dict, 'Command', timeout)
+            : dispatchResult.stderr || `Command exited with code ${dispatchResult.exit_code}`;
+        return new StepResult({ status: StepStatus.FAILED, output, error });
       }
       return new StepResult({ status: StepStatus.COMPLETED, output });
     }
@@ -240,8 +266,11 @@ export class CommandStep extends StepBase {
       output,
       error:
         `Cannot dispatch command ${pyRepr(command)}: ` +
-        `integration ${pyRepr(integration ?? null)} CLI not found or not installed. ` +
-        "Install the CLI tool or check 'specify integration list'.",
+        `integration ${pyRepr(integration ?? null)} CLI not found or not installed, ` +
+        'or the integration does not support CLI dispatch. ' +
+        "If the CLI is missing, install it or check 'specify integration list'; " +
+        "if the integration does not support CLI dispatch, set the step's " +
+        "'integration' to one that does.",
     });
   }
 
@@ -261,6 +290,7 @@ export class CommandStep extends StepBase {
     context: StepContext,
     integrationArgs: string[],
     integrationOptions: Dict,
+    capture: { captureMaxBytes?: number | null; timeout?: number } = {},
   ): Promise<DispatchResult | null> => {
     if (!integrationKey || typeof integrationKey !== 'string') return null;
 
@@ -281,6 +311,11 @@ export class CommandStep extends StepBase {
     const fallbackCliPath = execArgs && execArgs.length ? which(execArgs[0] as string) : null;
     if (cliPath === null && fallbackCliPath === null) return null;
 
+    const captureMaxBytes = capture.captureMaxBytes ?? null;
+    const captureOptions =
+      captureMaxBytes !== null
+        ? { stream: false, outputJson: false, timeout: capture.timeout ?? DEFAULT_CAPTURE_TIMEOUT, captureMaxBytes }
+        : {};
     try {
       const raw = await impl.dispatchCommand(command, {
         args,
@@ -288,6 +323,7 @@ export class CommandStep extends StepBase {
         model,
         integrationArgs,
         integrationOptions,
+        ...captureOptions,
       });
       return normalizeDispatchResult(raw);
     } catch (exc) {
@@ -362,6 +398,13 @@ export class CommandStep extends StepBase {
     const model = dget(config, 'model', null);
     if (model !== null && model !== undefined && typeof model !== 'string') {
       errors.push(`Command step ${id}: 'model' must be a string, got ${pyTypeName(model)}.`);
+    }
+    errors.push(...captureErrors(config, 'Command'));
+    // 'timeout' only applies to a captured step; a streaming step's value is
+    // left unchecked as it always was.
+    if (dget(config, 'capture', null) === true) {
+      const invalidTimeout = timeoutError(config, 'Command');
+      if (invalidTimeout !== null) errors.push(invalidTimeout);
     }
     return errors;
   }

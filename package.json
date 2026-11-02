@@ -1,7 +1,7 @@
 {
   "name": "@oakoliver/specify-cli",
-  "version": "2.0.0",
-  "description": "Spec-Driven Development CLI for AI coding agents. Zero-dependency TypeScript port of github/spec-kit v1.0.12. Multi-runtime.",
+  "version": "2.1.0",
+  "description": "Spec-Driven Development CLI for AI coding agents. Zero-dependency TypeScript port of github/spec-kit v1.2.5. Multi-runtime.",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",

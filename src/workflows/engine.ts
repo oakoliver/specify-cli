@@ -34,8 +34,6 @@ import {
   RunStatus,
   StepBase,
   StepContext,
-  StepResult,
-  StepStatus,
   ValueError,
   dget,
   dhas,
@@ -55,7 +53,8 @@ import {
   utcIsoNow,
   type Dict,
 } from './base.js';
-import { evaluateCondition } from './expressions.js';
+import { validateOutputs } from './composition.js';
+import { CheckpointError, Execution, activeStep, newExecution, runStatusFor, validateExecution } from './execution.js';
 import { STEP_REGISTRY } from './index.js';
 import { WorkflowResolver } from './overlay/resolver.js';
 import { dumpYaml, parseYaml, YAMLError } from '../yaml.js';
@@ -103,6 +102,8 @@ export class WorkflowDefinition {
    */
   requires: unknown;
   inputs: unknown;
+  /** Declared outputs a calling workflow can read (upstream #4764). */
+  outputs: unknown;
   steps: unknown;
 
   constructor(data: Dict, sourcePath: string | null = null) {
@@ -126,6 +127,7 @@ export class WorkflowDefinition {
 
     this.requires = dget(data, 'requires', {});
     this.inputs = dget(data, 'inputs', {});
+    this.outputs = dget(data, 'outputs', {});
     this.steps = dget(data, 'steps', []);
   }
 
@@ -161,6 +163,18 @@ export class WorkflowDefinition {
   }
 }
 
+/** The resolved parent directory of a workflow definition's source, or ``null``. */
+export function workflowDirFor(definition: WorkflowDefinition): string | null {
+  if (definition.sourcePath === null) return null;
+  let resolved: string;
+  try {
+    resolved = realpathSync(definition.sourcePath);
+  } catch {
+    resolved = pathResolve(definition.sourcePath);
+  }
+  return dirname(resolved);
+}
+
 // ============================================================================
 // Workflow Validation
 // ============================================================================
@@ -179,7 +193,7 @@ function getValidStepTypes(): Set<string> {
   if (STEP_REGISTRY.size) return new Set(STEP_REGISTRY.keys());
   return new Set([
     'command', 'shell', 'prompt', 'gate', 'if', 'init', 'slot',
-    'switch', 'while', 'do-while', 'fan-out', 'fan-in',
+    'switch', 'while', 'do-while', 'fan-out', 'fan-in', 'workflow',
   ]);
 }
 
@@ -208,7 +222,7 @@ export function dispatchDefaultErrors(definition: WorkflowDefinition): string[] 
  * An empty list means the workflow is valid.
  */
 export function validateWorkflow(definition: WorkflowDefinition): string[] {
-  const errors: string[] = [];
+  const errors: string[] = validateOutputs(definition.outputs);
 
   if (pyStr(definition.schemaVersion) !== '1.0') {
     errors.push(`Unsupported schema_version ${pyRepr(definition.schemaVersion)}. Expected '1.0'.`);
@@ -468,7 +482,8 @@ function atomicWriteJson(path: string, data: Dict): void {
   const base = path.slice(dir.length + 1);
   const tmp = join(dir, `.${base}.${randomBytes(6).toString('hex')}.tmp`);
   try {
-    writeFileSync(tmp, pyJsonDumps(data, 2), { encoding: 'utf8', flag: 'wx' });
+    // Keep non-ASCII text readable in these human-auditable records (#4877).
+    writeFileSync(tmp, pyJsonDumps(data, 2, false), { encoding: 'utf8', flag: 'wx' });
     renameSync(tmp, path);
   } catch (exc) {
     try {
@@ -478,6 +493,24 @@ function atomicWriteJson(path: string, data: Dict): void {
     }
     throw exc;
   }
+}
+
+/** Python ``str(OSError)`` for a failed checkpoint write (best effort). */
+function checkpointErrorText(exc: unknown): string {
+  const e = exc as NodeJS.ErrnoException;
+  const errno: Record<string, [number, string]> = {
+    ENOENT: [2, 'No such file or directory'],
+    EACCES: [13, 'Permission denied'],
+    EPERM: [1, 'Operation not permitted'],
+    EISDIR: [21, 'Is a directory'],
+    ENOTDIR: [20, 'Not a directory'],
+    ENOSPC: [28, 'No space left on device'],
+  };
+  if (exc instanceof Error && typeof e.code === 'string' && errno[e.code] && e.path) {
+    const [num, text] = errno[e.code] as [number, string];
+    return `[Errno ${num}] ${text}: ${pyRepr(e.path)}`;
+  }
+  return errorMessage(exc);
 }
 
 /** ``json.load`` with a ValueError on malformed content (JSONDecodeError). */
@@ -524,6 +557,15 @@ export class RunState {
   updatedAt: string;
   logEntries: Dict[];
   error: string | null;
+  /** The persisted execution tree (upstream #4764), or ``null`` before the first step. */
+  execution: Dict | null = null;
+  /** Set once a checkpoint write fails; the in-memory state is then stale. */
+  checkpointFailed = false;
+  /**
+   * The exception this process just recorded as the run's failure (never
+   * persisted), so the CLI can tell it apart from an older failure (#5015).
+   */
+  recordedException: unknown = null;
 
   /** Raise ``ValueError`` if ``runId`` is not a safe path component. */
   static validateRunId(runId: unknown): void {
@@ -595,21 +637,11 @@ export class RunState {
     return join(this.projectRoot, '.specify', 'workflows', 'runs', this.runId);
   }
 
-  /** Record one step's result. */
-  recordStepResult(stepId: string, data: Dict): void {
-    this.stepResults[stepId] = data;
-  }
-
-  /** Replace an already-recorded step's ``output``. */
-  setStepOutput(stepId: string, output: unknown): void {
-    const rec = this.stepResults[stepId];
-    if (rec !== undefined) rec.output = output;
-  }
-
   /** Persist current state to disk (atomically). */
   save(): void {
     const runsDir = this.runsDir;
     mkdirSync(runsDir, { recursive: true });
+    if (this.checkpointFailed) throw new CheckpointError('A previous checkpoint failed; reload the run');
     this.updatedAt = utcIsoNow();
     const stateData: Dict = {
       run_id: this.runId,
@@ -624,9 +656,17 @@ export class RunState {
       created_at: this.createdAt,
       updated_at: this.updatedAt,
       error: this.error,
+      inputs: this.inputs,
     };
-    atomicWriteJson(join(runsDir, 'state.json'), stateData);
-    atomicWriteJson(join(runsDir, 'inputs.json'), { inputs: this.inputs });
+    if (this.execution !== null) stateData.execution = this.execution;
+    try {
+      atomicWriteJson(join(runsDir, 'state.json'), stateData);
+      atomicWriteJson(join(runsDir, 'inputs.json'), { inputs: this.inputs });
+    } catch (exc) {
+      // Only write failures poison the instance; reload before retrying.
+      this.checkpointFailed = true;
+      throw new CheckpointError(checkpointErrorText(exc));
+    }
   }
 
   /** Load a run state from disk. */
@@ -708,14 +748,21 @@ export class RunState {
     state.createdAt = dget(stateData, 'created_at', '') as string;
     state.updatedAt = dget(stateData, 'updated_at', '') as string;
     state.error = (dget(stateData, 'error', null) as string | null) ?? null;
+    state.execution = (dget(stateData, 'execution', null) as Dict | null) ?? null;
+    if (dhas(stateData, 'execution')) validateExecution(state.execution);
 
     const inputsPath = join(runsDir, 'inputs.json');
-    if (existsSync(inputsPath)) {
+    if (!dhas(stateData, 'inputs') && existsSync(inputsPath)) {
       const inputsData = loadJsonFile(inputsPath);
       if (!isDict(inputsData)) throw new ValueError('Invalid run inputs: expected a JSON object');
       const inputs = dget(inputsData, 'inputs', {});
       if (!isDict(inputs)) throw new ValueError("Invalid run inputs: 'inputs' must be a JSON object");
       state.inputs = inputs;
+    }
+
+    if (dhas(stateData, 'inputs')) {
+      if (!isDict(stateData.inputs)) throw new ValueError("Invalid run inputs: 'inputs' must be a JSON object");
+      state.inputs = stateData.inputs;
     }
 
     return state;
@@ -726,21 +773,15 @@ export class RunState {
     entry.timestamp = utcIsoNow();
     const runsDir = this.runsDir;
     mkdirSync(runsDir, { recursive: true });
+    if (this.checkpointFailed) throw new CheckpointError('A previous checkpoint failed; reload the run');
     this.logEntries.push(entry);
-    appendFileSync(join(runsDir, 'log.jsonl'), pyJsonDumps(entry) + '\n', 'utf8');
+    appendFileSync(join(runsDir, 'log.jsonl'), pyJsonDumps(entry, null, false) + '\n', 'utf8');
   }
 }
 
 // ============================================================================
 // Workflow Engine
 // ============================================================================
-
-/** Python ``a or b`` (``b`` evaluated lazily). */
-function pyOr(a: unknown, b: () => unknown): unknown {
-  return pyTruthy(a) ? a : b();
-}
-
-const HALTING: ReadonlySet<RunStatus> = new Set([RunStatus.PAUSED, RunStatus.FAILED, RunStatus.ABORTED]);
 
 /** Options for {@link WorkflowEngine.execute}. */
 export interface ExecuteOptions {
@@ -749,22 +790,17 @@ export interface ExecuteOptions {
   installedRegistryRoot?: string | null;
 }
 
-/** Python ``int(x)`` for ``max_concurrency`` coercion (``null`` on failure). */
-function pyIntCoerce(value: unknown): number | null {
-  if (typeof value === 'boolean') return value ? 1 : 0;
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return null;
-    return Math.trunc(value);
-  }
-  if (typeof value === 'string') return pyParseInt(value);
-  return null;
-}
-
 /** Orchestrator that loads, validates, and executes workflow definitions. */
 export class WorkflowEngine {
   projectRoot: string;
   /** Callback invoked when a step starts: ``(stepId, label)``. */
   onStepStart: ((stepId: string, label: string) => void) | null = null;
+  /**
+   * The run state of the current ``execute``/``resume`` once one exists
+   * (upstream ``_execution_state``), so the CLI can report a failure with the
+   * actual run's details.
+   */
+  executionState: RunState | null = null;
 
   constructor(projectRoot: string | null = null) {
     this.projectRoot = projectRoot || '.';
@@ -804,6 +840,7 @@ export class WorkflowEngine {
 
   /** Execute a workflow definition; returns the final ``RunState``. */
   async execute(definition: WorkflowDefinition, inputs: Dict | null = null, opts: ExecuteOptions = {}): Promise<RunState> {
+    this.executionState = null;
     const defaultErrors = dispatchDefaultErrors(definition);
     if (defaultErrors.length) throw new ValueError(defaultErrors.join(' '));
 
@@ -820,23 +857,19 @@ export class WorkflowEngine {
       installedWorkflowId: opts.installedWorkflowId ?? null,
       installedRegistryRoot: opts.installedRegistryRoot ?? null,
     });
+    this.executionState = state;
 
     const runDir = join(this.projectRoot, '.specify', 'workflows', 'runs', state.runId);
     mkdirSync(runDir, { recursive: true });
-    writeFileSync(join(runDir, 'workflow.yml'), dumpYaml(definition.data, { sortKeys: false }), 'utf8');
+    writeFileSync(
+      join(runDir, 'workflow.yml'),
+      dumpYaml(definition.data, { sortKeys: false, allowUnicode: true }),
+      'utf8',
+    );
 
     const resolvedInputs = this.resolveInputs(definition, inputs ?? {});
     state.inputs = resolvedInputs;
-    let workflowDir: string | null = null;
-    if (definition.sourcePath !== null) {
-      let resolved: string;
-      try {
-        resolved = realpathSync(definition.sourcePath);
-      } catch {
-        resolved = pathResolve(definition.sourcePath);
-      }
-      workflowDir = dirname(resolved);
-    }
+    const workflowDir = workflowDirFor(definition);
     state.workflowDir = workflowDir;
     state.status = RunStatus.RUNNING;
     state.save();
@@ -860,8 +893,10 @@ export class WorkflowEngine {
         state.save();
         return state;
       }
+      if (state.checkpointFailed) throw exc;
       state.status = RunStatus.FAILED;
       state.error = errorMessage(exc);
+      state.recordedException = exc;
       state.appendLog({ event: 'workflow_failed', error: errorMessage(exc) });
       state.save();
       throw exc;
@@ -878,10 +913,12 @@ export class WorkflowEngine {
    *
    * When ``inputs`` is provided, the values are merged over the run's
    * persisted inputs and re-resolved through the same typed validation path
-   * used by ``execute``.
+   * used by ``execute``; bound workflow calls re-bind their inputs too.
    */
   async resume(runId: string, inputs: Dict | null = null): Promise<RunState> {
+    this.executionState = null;
     const state = RunState.load(runId, this.projectRoot);
+    this.executionState = state;
     if (state.status !== RunStatus.PAUSED && state.status !== RunStatus.FAILED) {
       throw new ValueError(`Cannot resume run ${pyRepr(runId)} with status ${pyRepr(state.status)}.`);
     }
@@ -901,12 +938,16 @@ export class WorkflowEngine {
       );
     }
 
+    if (state.execution !== null) {
+      validateExecution(state.execution, { workflowSteps: steps, currentStepIndex: state.currentStepIndex });
+    }
+
     const defaultErrors = dispatchDefaultErrors(definition);
     if (defaultErrors.length) throw new ValueError(defaultErrors.join(' '));
 
+    const rebind = Boolean(inputs && Object.keys(inputs).length);
     if (inputs && Object.keys(inputs).length) {
-      const merged = { ...state.inputs, ...inputs };
-      state.inputs = this.resolveInputs(definition, merged);
+      state.inputs = this.mergeInputs(definition, state.inputs, inputs);
     }
 
     const context = new StepContext({
@@ -929,7 +970,7 @@ export class WorkflowEngine {
     const stepOffset = state.currentStepIndex;
 
     try {
-      await this.executeSteps(remainingSteps, context, state, STEP_REGISTRY, stepOffset);
+      await this.executeSteps(remainingSteps, context, state, STEP_REGISTRY, stepOffset, rebind);
     } catch (exc) {
       if (exc instanceof KeyboardInterrupt) {
         state.status = RunStatus.PAUSED;
@@ -937,8 +978,10 @@ export class WorkflowEngine {
         state.save();
         return state;
       }
+      if (state.checkpointFailed) throw exc;
       state.status = RunStatus.FAILED;
       state.error = errorMessage(exc);
+      state.recordedException = exc;
       state.appendLog({ event: 'resume_failed', error: errorMessage(exc) });
       state.save();
       throw exc;
@@ -950,263 +993,37 @@ export class WorkflowEngine {
     return state;
   }
 
-  /** Record a step result into both the live context and persistent state. */
-  private static recordResult(context: StepContext, state: RunState, stepId: string, data: Dict): void {
-    if (context.steps !== state.stepResults) context.steps[stepId] = data;
-    state.recordStepResult(stepId, data);
-  }
-
-  /** Execute a list of steps sequentially. */
+  /**
+   * Execute or resume the persisted execution tree. A run without a tree
+   * (a fresh run, or one persisted before the tree existed) adapts its
+   * remaining steps once; afterwards the tree is authoritative.
+   */
   async executeSteps(
     steps: Dict[],
     context: StepContext,
     state: RunState,
     registry: Map<string, StepBase>,
     stepOffset = 0,
+    rebind = false,
   ): Promise<void> {
-    for (let i = 0; i < steps.length; i++) {
-      const stepConfig = steps[i] as Dict;
-      const stepId = dget(stepConfig, 'id', `step-${i}`) as string;
-      const stepType = dget(stepConfig, 'type', 'command') as string;
-
-      state.currentStepId = stepId;
-      if (stepOffset >= 0) state.currentStepIndex = stepOffset + i;
+    if (state.execution === null) {
+      state.execution = newExecution(steps, stepOffset, context.steps);
       state.save();
-
-      state.appendLog({ event: 'step_started', step_id: stepId, type: stepType });
-
-      const command = dget(stepConfig, 'command', '');
-      const label = pyTruthy(command) ? pyStr(command) : stepType;
-      if (this.onStepStart !== null) this.onStepStart(stepId, label as string);
-
-      const stepImpl = registry.get(stepType);
-      if (!stepImpl) {
-        state.status = RunStatus.FAILED;
-        state.error = `Unknown step type: ${pyRepr(stepType)}`;
-        state.appendLog({ event: 'step_failed', step_id: stepId, error: `Unknown step type: ${pyRepr(stepType)}` });
-        state.save();
-        return;
-      }
-
-      const result: StepResult = await stepImpl.execute(stepConfig, context);
-
-      const out = result.output;
-      const pick = (outKey: string, cfgKey: string, fallback: unknown): unknown => {
-        const a = dget(out, outKey, null);
-        if (pyTruthy(a)) return a;
-        const b = dget(stepConfig, cfgKey, null);
-        if (pyTruthy(b)) return b;
-        return fallback;
-      };
-      const stepData: Dict = {
-        type: stepType,
-        integration: pick('integration', 'integration', context.defaultIntegration) ?? null,
-        model: pick('model', 'model', context.defaultModel) ?? null,
-        options: pyOr(dget(out, 'options', null), () => dget(stepConfig, 'options', {})),
-        input: pyOr(dget(out, 'input', null), () => dget(stepConfig, 'input', {})),
-        output: out,
-        status: result.status,
-        error: result.error,
-      };
-      if (stepType === 'command' && dhas(out, 'integration_args')) {
-        stepData.integration_args = out.integration_args;
-        stepData.integration_options = out.integration_options;
-      }
-      WorkflowEngine.recordResult(context, state, stepId, stepData);
-
-      state.appendLog({ event: 'step_completed', step_id: stepId, status: result.status });
-
-      if (result.status === StepStatus.PAUSED) {
-        state.status = RunStatus.PAUSED;
-        state.save();
-        return;
-      }
-
-      if (result.status === StepStatus.FAILED) {
-        if (pyTruthy(dget(out, 'aborted', null))) {
-          state.status = RunStatus.ABORTED;
-          state.error = result.error;
-          state.appendLog({ event: 'workflow_aborted', step_id: stepId });
-          state.save();
-          return;
-        }
-        if (dget(stepConfig, 'continue_on_error', null) === true) {
-          state.appendLog({ event: 'step_continue_on_error', step_id: stepId, error: result.error });
-          state.save();
-          continue;
-        }
-        state.status = RunStatus.FAILED;
-        state.error = result.error;
-        state.appendLog({ event: 'step_failed', step_id: stepId, error: result.error });
-        state.save();
-        return;
-      }
-
-      // Execute nested steps (from control flow). Nested steps run with
-      // stepOffset=-1 so they don't update currentStepIndex.
-      if (result.nextSteps.length) {
-        await this.executeSteps(result.nextSteps, context, state, registry, -1);
-        if (HALTING.has(state.status)) return;
-
-        if (stepType === 'while' || stepType === 'do-while') {
-          let maxIters = dget(stepConfig, 'max_iterations', null);
-          if (!isInt(maxIters) || maxIters < 1) maxIters = 10;
-          const condition = dget(stepConfig, 'condition', false);
-          for (let loopIter = 0; loopIter < (maxIters as number) - 1; loopIter++) {
-            if (!evaluateCondition(condition, context)) break;
-            for (let nsIdx = 0; nsIdx < result.nextSteps.length; nsIdx++) {
-              const nsCopy: Dict = { ...(result.nextSteps[nsIdx] as Dict) };
-              const orig = dget(nsCopy, 'id', null) as string | null;
-              const baseId = orig || `step-${nsIdx}`;
-              nsCopy.id = `${stepId}:${baseId}:${loopIter + 1}`;
-              await this.executeSteps([nsCopy], context, state, registry, -1);
-              if (HALTING.has(state.status)) return;
-              const nsId = nsCopy.id as string;
-              if (orig && Object.prototype.hasOwnProperty.call(context.steps, nsId)) {
-                WorkflowEngine.recordResult(context, state, orig, context.steps[nsId] as Dict);
-              }
-            }
-          }
-        }
-      }
-
-      if (stepType === 'fan-out') {
-        const items = dget(out, 'items', []);
-        const template = dget(out, 'step_template', {});
-        if (pyTruthy(template) && pyTruthy(items)) {
-          const fanOutResults = await this.runFanOut(
-            items as unknown[],
-            template as Dict,
-            stepId,
-            context,
-            state,
-            registry,
-            dget(out, 'max_concurrency', 1),
-          );
-          context.item = null;
-          const fanOutOutput: Dict = { ...out, results: fanOutResults };
-          state.setStepOutput(stepId, fanOutOutput);
-          if (HALTING.has(state.status)) return;
-        } else {
-          out.results = [];
-          state.setStepOutput(stepId, out);
-        }
-      }
     }
-  }
-
-  /**
-   * Run a fan-out template once per item; return per-item outputs in item
-   * order. ``maxConcurrency <= 1`` runs sequentially; ``> 1`` runs up to that
-   * many items concurrently with a sliding submission window.
-   */
-  async runFanOut(
-    items: unknown[],
-    template: Dict,
-    stepId: string,
-    context: StepContext,
-    state: RunState,
-    registry: Map<string, StepBase>,
-    maxConcurrency: unknown,
-  ): Promise<unknown[]> {
-    if (!items.length) return [];
-
-    const coerced = pyIntCoerce(maxConcurrency);
-    let workers = coerced === null ? 1 : Math.max(1, coerced);
-    workers = Math.min(workers, items.length);
-
-    const baseId = dget(template, 'id', 'item');
-    const itemId = (idx: number): string => `${stepId}:${pyStr(baseId)}:${idx}`;
-
-    const runItem = async (idx: number, itemCtx: StepContext): Promise<unknown> => {
-      const itemStep: Dict = { ...template, id: itemId(idx) };
-      await this.executeSteps([itemStep], itemCtx, state, registry, -1);
-      const rec = itemCtx.steps[itemStep.id as string];
-      return isDict(rec) ? dget(rec, 'output', {}) : {};
-    };
-
-    if (workers <= 1) {
-      const results: unknown[] = [];
-      const previousItem = context.item;
-      const previousInside = context.insideFanOut;
-      context.insideFanOut = true;
-      try {
-        for (let idx = 0; idx < items.length; idx++) {
-          context.item = items[idx];
-          results.push(await runItem(idx, context));
-          if (HALTING.has(state.status)) break;
-        }
-      } finally {
-        context.item = previousItem;
-        context.insideFanOut = previousInside;
-      }
-      return results;
+    const initial = dget(state.execution, 'initial', {});
+    context.steps = (isDict(initial) ? structuredClone(initial) : {}) as Record<string, Dict>;
+    const tree = state.execution.sequence as Dict;
+    const executor = new Execution(this, state, registry, { rebind });
+    let outcome: string;
+    let error: string | null;
+    try {
+      [outcome, error] = await executor.run(tree, context, [state.workflowId], { root: true });
+    } finally {
+      const active = activeStep(state.execution);
+      if (active !== null) state.currentStepId = active[2];
     }
-
-    // Concurrent path — bounded sliding window; results assembled in item order.
-    const n = items.length;
-    const slots: unknown[] = new Array(n).fill(null);
-
-    const runIsolated = (idx: number): Promise<unknown> =>
-      runItem(idx, context.replace({ item: items[idx], insideFanOut: true }));
-
-    const itemHaltStatus = (idx: number): RunStatus | null => {
-      const rec = context.steps[itemId(idx)];
-      if (rec === undefined) return HALTING.has(state.status) ? state.status : null;
-      const status = dget(rec, 'status', null);
-      if (status === StepStatus.PAUSED) return RunStatus.PAUSED;
-      if (status === StepStatus.FAILED) {
-        const o = dget(rec, 'output', null);
-        if (isDict(o) && pyTruthy(dget(o, 'aborted', null))) return RunStatus.ABORTED;
-        if (dget(template, 'continue_on_error', null) !== true) return RunStatus.FAILED;
-      }
-      return null;
-    };
-
-    let halt: [number, RunStatus] | null = null;
-    let collected = 0;
-    const inFlight = new Map<number, Promise<{ ok: true; value: unknown } | { ok: false; error: unknown }>>();
-    let nextSubmit = 0;
-    for (let idx = 0; idx < n; idx++) {
-      while (nextSubmit < n && inFlight.size < workers && !HALTING.has(state.status)) {
-        const i = nextSubmit;
-        inFlight.set(
-          i,
-          runIsolated(i).then(
-            (value) => ({ ok: true as const, value }),
-            (error: unknown) => ({ ok: false as const, error }),
-          ),
-        );
-        nextSubmit += 1;
-      }
-      const fut = inFlight.get(idx);
-      if (fut === undefined) break;
-      inFlight.delete(idx);
-      const settled = await fut;
-      if (!settled.ok) {
-        // Let already-running items finish before propagating (pool join).
-        await Promise.all(inFlight.values());
-        throw settled.error;
-      }
-      slots[idx] = settled.value;
-      collected = idx + 1;
-      const haltStatus = itemHaltStatus(idx);
-      if (haltStatus !== null) {
-        halt = [idx, haltStatus];
-        break;
-      }
-    }
-    // Join any still-running workers (their outputs are ignored).
-    await Promise.all(inFlight.values());
-
-    if (halt !== null) {
-      const [haltedAt, haltedStatus] = halt;
-      state.status = haltedStatus;
-      const haltRec = context.steps[itemId(haltedAt)];
-      if (isDict(haltRec)) state.error = (dget(haltRec, 'error', null) as string | null) ?? null;
-      return slots.slice(0, haltedAt + 1);
-    }
-    return slots.slice(0, collected);
+    state.status = runStatusFor(outcome);
+    state.error = error;
   }
 
   /** Resolve workflow inputs against definitions and provided values. */
@@ -1233,6 +1050,11 @@ export class WorkflowEngine {
       resolved[name] = WorkflowEngine.coerceInput(name, value, coerceInputDef);
     }
     return resolved;
+  }
+
+  /** Resolve *updates* over an existing input snapshot. */
+  mergeInputs(definition: WorkflowDefinition, previous: Dict, updates: Dict): Dict {
+    return this.resolveInputs(definition, { ...previous, ...updates });
   }
 
   /**
@@ -1269,7 +1091,10 @@ export class WorkflowEngine {
       }
       let num: number | null = null;
       if (typeof value === 'number') num = value;
-      else if (typeof value === 'string') num = pyParseFloat(value);
+      // Integers (including CLI strings) take the int path before float
+      // (upstream #5027). ADAPTATION: JS numbers are doubles, so integers
+      // beyond Number.MAX_SAFE_INTEGER still cannot be held exactly.
+      else if (typeof value === 'string') num = pyParseInt(value) ?? pyParseFloat(value);
       if (num === null || !Number.isFinite(num)) {
         throw new ValueError(`Input ${pyRepr(name)} expected a number, got ${pyRepr(value)}.`);
       }

@@ -114,7 +114,7 @@ describe('CommandStep', () => {
     const r = await new CommandStep().execute({ id: 'a', command: 'speckit.x' }, ctx());
     expect(r.status).toBe(StepStatus.FAILED);
     expect(r.error).toBe(
-      "Cannot dispatch command 'speckit.x': integration None CLI not found or not installed. Install the CLI tool or check 'specify integration list'.",
+      "Cannot dispatch command 'speckit.x': integration None CLI not found or not installed, or the integration does not support CLI dispatch. If the CLI is missing, install it or check 'specify integration list'; if the integration does not support CLI dispatch, set the step's 'integration' to one that does.",
     );
     expect(r.output.dispatched).toBe(false);
   });
@@ -155,7 +155,7 @@ describe('PromptStep', () => {
 
   test('undispatchable prompt fails', async () => {
     const r = await new PromptStep().execute({ id: 'p', prompt: 'x' }, ctx());
-    expect(r.error).toBe('Cannot dispatch prompt: integration None CLI not found or not installed.');
+    expect(r.error).toBe("Cannot dispatch prompt: integration None CLI not found or not installed, or the integration does not support CLI dispatch. If the CLI is missing, install it; if the integration does not support CLI dispatch, set the step's 'integration' to one that does.");
   });
 });
 

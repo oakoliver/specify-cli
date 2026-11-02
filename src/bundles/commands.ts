@@ -12,28 +12,39 @@
  * @module bundles/commands
  */
 
-import { statSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 
 import { console, errConsole, escapeMarkup, CliExit } from '../console.js';
 import { defineCommand, dispatchGroup, type GroupSpec, type ParsedArgs } from '../cli-args.js';
 import { BundlerError } from './index.js';
-import { activeIntegration, findProjectRoot, requireProjectRoot } from './project.js';
+import { activeIntegration, findProjectRoot, ProjectPolicyError, requireProjectRoot } from './project.js';
 import { loadRecords } from './records.js';
-import { detectConflicts } from './conflict.js';
+import { detectConflicts, effectiveSetting } from './conflict.js';
 import { CatalogStack, type ResolvedBundle } from './catalog-stack.js';
 import { Scope, loadSourceStack } from './catalogs.js';
 import { addSource, removeSource } from './catalog-config.js';
-import { BundleManifest } from './manifest.js';
+import { BundleManifest, type ComponentRef } from './manifest.js';
+import { availableVersions } from './catalog-versions.js';
+import {
+  ExpandedManifest,
+  discoveryOnlyMessages,
+  expandManifest,
+  requireInstallable,
+  type ComponentOverride,
+  type ResolvedReference,
+} from './expansion.js';
+import { sameVersion, stripVersionPrefix } from './versioning.js';
+import { ValidationReport } from './validator.js';
 import { resolveInstallPlan } from './resolver.js';
-import { installBundle, removeBundle, type PrimitiveInstaller } from './installer.js';
+import { installBundle, removeBundle, type InstallResult, type PrimitiveInstaller } from './installer.js';
 import { validateManifest } from './validator.js';
 import { makeReferenceChecker } from './references.js';
 import { buildBundle } from './packager.js';
 import { DefaultPrimitiveInstaller, makeCatalogFetcher } from './adapters.js';
-import { downloadManifest, localManifestSource, validateManifestStructure } from './sources.js';
-import { pyJsonDumps, pyRepr, resolvePath } from './pycompat.js';
+import { CatalogBundleLoader, downloadManifest, localManifestSource, validateManifestStructure } from './sources.js';
+import { expandUser, pyJsonDumps, pyRepr, resolvePath } from './pycompat.js';
 
 // ============================================================================
 // Injectable seams (tests replace entries)
@@ -71,16 +82,43 @@ export const commandDeps = {
 // ============================================================================
 
 /** Print an actionable error to stderr and exit non-zero. */
-function fail(message: string): never {
+function fail(message: string, opts: { asJson?: boolean } = {}): never {
+  if (opts.asJson) {
+    // json.dumps({"error": message}, ensure_ascii=False)
+    process.stderr.write(`{"error": ${JSON.stringify(message)}}\n`);
+    throw new CliExit(1);
+  }
   // stderr keeps --json stdout parseable; escape untrusted text so '[...]' is
   // never parsed as markup.
   errConsole.print(`[red]Error:[/red] ${escapeMarkup(message)}`);
   throw new CliExit(1);
 }
 
-function failFrom(exc: unknown): never {
-  if (exc instanceof BundlerError) fail(exc.message);
+/**
+ * Fail on a BundlerError. Under ``--json``, a project-policy failure (its
+ * cause is a ``ProjectPolicyError``) is reported as a JSON error envelope.
+ */
+function failFrom(exc: unknown, opts: { asJson?: boolean } = {}): never {
+  if (exc instanceof BundlerError) {
+    const cause = (exc as Error & { cause?: unknown }).cause;
+    fail(exc.message, { asJson: Boolean(opts.asJson) && cause instanceof ProjectPolicyError });
+  }
   throw exc;
+}
+
+/** Exit with the original error first, then any recovery notes. */
+function failWithNotes(exc: unknown): never {
+  if (exc instanceof BundlerError) {
+    const notes = ((exc as Error & { notes?: string[] }).notes ?? []).map(String);
+    fail(notes.length ? `${exc.message}\n${notes.join('\n')}` : exc.message);
+  }
+  throw exc;
+}
+
+function renderInstallWarnings(result: InstallResult): void {
+  for (const warning of result.warnings) {
+    errConsole.print(`[yellow]Warning:[/yellow] ${escapeMarkup(warning.message)}`);
+  }
 }
 
 function buildStack(projectRoot: string, opts: { offline: boolean }): CatalogStack {
@@ -137,12 +175,35 @@ async function resolveInitIntegration(override: string | null, manifest: BundleM
   return commandDeps.resolveDefaultInitIntegration();
 }
 
+/**
+ * Expand referenced bundles through the effective catalog stack. Flat
+ * manifests bypass stack construction so local bundles without references
+ * keep their offline, no-network behavior.
+ */
+async function expandBundleManifest(
+  projectRoot: string,
+  manifest: BundleManifest,
+  opts: { offline: boolean; stack?: CatalogStack | null },
+): Promise<ExpandedManifest> {
+  if (!manifest.bundles.length) return ExpandedManifest.flat(manifest);
+  const stack = opts.stack ?? buildStack(projectRoot, { offline: opts.offline });
+  const loader = new CatalogBundleLoader(stack, {
+    offline: opts.offline,
+    download: (resolved, o) => commandDeps.downloadManifest(resolved, o),
+  });
+  return expandManifest(manifest, loader);
+}
+
 /** Return informational overlaps between *manifest* and installed bundles. */
-function bundleOverlaps(projectRoot: string, manifest: BundleManifest | null): string[] {
+function bundleOverlaps(
+  projectRoot: string,
+  manifest: BundleManifest | null,
+  components: ComponentRef[] | null = null,
+): string[] {
   if (manifest === null) return [];
   try {
-    const report = detectConflicts(manifest, activeIntegration(projectRoot), loadRecords(projectRoot));
-    return [...report.overlaps];
+    const report = detectConflicts(manifest, activeIntegration(projectRoot), loadRecords(projectRoot), components);
+    return [...report.overlaps, ...report.version_clashes];
   } catch (exc) {
     if (exc instanceof BundlerError) return [];
     throw exc;
@@ -185,7 +246,7 @@ export async function bundleSearch(query: string, opts: { offline: boolean; asJs
     const stack = buildStack(projectRoot, { offline: opts.offline });
     results = await stack.search(query);
   } catch (exc) {
-    failFrom(exc);
+    failFrom(exc, { asJson: opts.asJson });
   }
 
   if (opts.asJson) {
@@ -229,23 +290,74 @@ export async function bundleSearch(query: string, opts: { offline: boolean; asJs
 // bundle info
 // ============================================================================
 
-interface ComponentView {
-  kind: string;
-  id: string;
+interface ProvenanceView {
   version: string | null;
+  origin: string[];
+  source?: string;
   priority?: number;
   strategy?: string;
 }
 
-/** Flatten a manifest's components to JSON-friendly dicts. */
-function manifestComponentView(manifest: BundleManifest | null): ComponentView[] {
-  if (manifest === null) return [];
-  return manifest.components.map((component) => {
+interface ComponentView {
+  kind: string;
+  id: string;
+  version: string | null;
+  source?: string;
+  priority?: number;
+  strategy?: string;
+  origin?: string[];
+  overrides?: ProvenanceView[];
+}
+
+/** Flatten an expanded manifest to JSON-friendly component dictionaries. */
+function manifestComponentView(expanded: ExpandedManifest | null): ComponentView[] {
+  if (expanded === null) return [];
+  return expanded.components.map((component) => {
     const item: ComponentView = { kind: component.kind, id: component.id, version: component.version };
+    if (expanded.hasReferences && component.source !== null) item.source = component.source;
     if (component.priority !== null) item.priority = component.priority;
     if (component.strategy !== null) item.strategy = component.strategy;
+    if (expanded.hasReferences) {
+      const origin = expanded.origins.get(`${component.kind}\u0000${component.id}`);
+      if (origin !== undefined && origin.origin.length) item.origin = [...origin.origin];
+      if (origin !== undefined && origin.overrides.length) {
+        item.overrides = origin.overrides.map((o: ComponentOverride) => componentProvenance(o.component, o.origin));
+      }
+    }
     return item;
   });
+}
+
+function componentProvenance(component: ComponentRef, origin: readonly string[]): ProvenanceView {
+  const item: ProvenanceView = { version: component.version, origin: [...origin] };
+  if (component.source !== null) item.source = component.source;
+  if (component.priority !== null) item.priority = component.priority;
+  if (component.strategy !== null) item.strategy = component.strategy;
+  return item;
+}
+
+function referenceView(expanded: ExpandedManifest): Array<Record<string, unknown>> {
+  return expanded.references.map((reference) => ({
+    id: reference.id,
+    version: reference.version,
+    source: reference.source_id,
+    install_policy: reference.install_allowed ? 'install-allowed' : 'discovery-only',
+    via: [...reference.via],
+    verified: reference.verified,
+    trust: trustLevel(reference.verified),
+  }));
+}
+
+function formatReference(reference: ResolvedReference): string {
+  // The label supplies its own "v", and an accepted pin may already carry one
+  // (``v1.0.1``); strip it so the text shows one prefix.
+  let label = `${reference.id} v${stripVersionPrefix(reference.version)}`;
+  label += ` (${reference.source_id}`;
+  label += `; ${trustLevel(reference.verified)}`;
+  if (reference.via.length) label += `; via ${reference.via.join(' → ')}`;
+  if (!reference.install_allowed) label += '; discovery-only, not installable';
+  label += ')';
+  return label;
 }
 
 function formatComponent(item: ComponentView): string {
@@ -253,31 +365,87 @@ function formatComponent(item: ComponentView): string {
   const extras: string[] = [];
   if (item.priority !== undefined && item.priority !== null) extras.push(`priority=${item.priority}`);
   if (item.strategy !== undefined && item.strategy !== null) extras.push(`strategy=${item.strategy}`);
+  if (item.origin && item.origin.length) extras.push(`from ${item.origin.join(' → ')}`);
+  for (const override of item.overrides ?? []) extras.push(formatOverride(item, override));
   if (extras.length) label += ` (${extras.join(', ')})`;
   return label;
 }
 
-export async function bundleInfo(bundleId: string, opts: { offline: boolean; asJson: boolean }): Promise<void> {
+/** Describe the settings replaced by an overriding component. */
+function formatOverride(item: ComponentView, override: ProvenanceView): string {
+  const changed: string[] = [];
+  const oldVersion = override.version ?? null;
+  const currentVersion = item.version ?? null;
+  const versionsDiffer = (oldVersion === null) !== (currentVersion === null);
+  if (versionsDiffer || (oldVersion !== null && currentVersion !== null && !sameVersion(currentVersion, oldVersion))) {
+    changed.push(oldVersion ? String(oldVersion) : 'unpinned');
+  }
+  const kind = item.kind;
+  for (const field of ['source', 'priority', 'strategy'] as const) {
+    const overrideValue = override[field] ?? null;
+    const itemValue = item[field] ?? null;
+    const differs =
+      kind === undefined || kind === null
+        ? overrideValue !== itemValue
+        : (effectiveSetting(kind, field, overrideValue) ?? null) !== (effectiveSetting(kind, field, itemValue) ?? null);
+    if (differs) changed.push(`${field}=${overrideValue !== null ? overrideValue : '<unset>'}`);
+  }
+  const origin = override.origin.join(' → ');
+  if (!changed.length) return `also declared by ${origin} (same as final)`;
+  return `overrides ${changed.join(', ')} from ${origin}`;
+}
+
+export async function bundleInfo(
+  bundleId: string,
+  opts: { offline: boolean; asJson: boolean; versions?: boolean },
+): Promise<void> {
   let projectRoot: string;
   let resolved: ResolvedBundle;
   let manifest: BundleManifest;
+  let expanded: ExpandedManifest;
   try {
     projectRoot = findProjectRoot() ?? process.cwd();
     const stack = buildStack(projectRoot, { offline: opts.offline });
     resolved = await stack.resolve(bundleId);
+    if (opts.versions === true) {
+      const available = availableVersions(resolved.entry);
+      if (opts.asJson) {
+        printJson({
+          id: resolved.entry.id,
+          versions: available,
+          current: resolved.entry.version,
+          source: resolved.source.id,
+          install_policy: resolved.source.install_policy,
+        });
+        return;
+      }
+      console.print(`Catalog versions for ${escapeMarkup(resolved.entry.id)}:`);
+      available.forEach((availableVersion, index) => {
+        const current = index === 0 ? ' (current)' : '';
+        console.print(`  ${escapeMarkup(availableVersion)}${current}`);
+      });
+      console.print(`  Source: ${escapeMarkup(resolved.source.id)} (${resolved.source.install_policy})`);
+      if (!resolved.installAllowed) {
+        console.print('[yellow]Discovery only; catalog installation is disabled.[/yellow]');
+      }
+      return;
+    }
     // `info` must show the fully expanded component set that `install` would
     // apply; if the manifest can't be resolved, fail loudly.
     manifest = await commandDeps.downloadManifest(resolved, { offline: opts.offline });
+    expanded = await expandBundleManifest(projectRoot, manifest, { offline: opts.offline, stack });
   } catch (exc) {
-    failFrom(exc);
+    failFrom(exc, { asJson: opts.asJson });
   }
 
-  const overlaps = bundleOverlaps(projectRoot, manifest);
-  const components = manifestComponentView(manifest);
+  const overlaps = expanded.hasReferences
+    ? bundleOverlaps(projectRoot, manifest, expanded.components)
+    : bundleOverlaps(projectRoot, manifest);
+  const components = manifestComponentView(expanded);
 
   const entry = resolved.entry;
   if (opts.asJson) {
-    printJson({
+    const payload: Record<string, unknown> = {
       id: entry.id,
       name: entry.name,
       version: entry.version,
@@ -294,7 +462,9 @@ export async function bundleInfo(bundleId: string, opts: { offline: boolean; asJ
       integration: manifest && manifest.integration ? manifest.integration.id : null,
       components,
       overlaps,
-    });
+    };
+    if (expanded.hasReferences) payload.references = referenceView(expanded);
+    printJson(payload);
     return;
   }
 
@@ -313,6 +483,11 @@ export async function bundleInfo(bundleId: string, opts: { offline: boolean; asJ
   }
   if (manifest && manifest.integration) {
     console.print(`  Integration: ${escapeMarkup(manifest.integration.id)}`);
+  }
+
+  if (expanded.hasReferences) {
+    console.print('\n  [bold]References:[/bold]');
+    for (const reference of expanded.references) console.print(`    - ${escapeMarkup(formatReference(reference))}`);
   }
 
   if (components.length) {
@@ -353,7 +528,7 @@ export async function bundleList(opts: { asJson: boolean }): Promise<void> {
     const projectRoot = requireProjectRoot();
     records = loadRecords(projectRoot);
   } catch (exc) {
-    failFrom(exc);
+    failFrom(exc, { asJson: opts.asJson });
   }
 
   if (opts.asJson) {
@@ -372,7 +547,7 @@ export async function bundleList(opts: { asJson: boolean }): Promise<void> {
     console.print(
       `  [bold]${escapeMarkup(record.bundle_id)}[/bold] ` +
         `v${escapeMarkup(record.version)} ` +
-        `[dim](${record.contributed_components.length} components, ` +
+        `[dim](${record.required_components.length} components, ` +
         `installed ${escapeMarkup(record.installed_at)})[/dim]`,
     );
   }
@@ -384,14 +559,23 @@ export async function bundleList(opts: { asJson: boolean }): Promise<void> {
 
 export async function bundleInstall(
   bundleId: string,
-  opts: { integration?: string | null; offline?: boolean; refresh?: boolean } = {},
+  opts: { integration?: string | null; offline?: boolean; refresh?: boolean; version?: string | null } = {},
 ): Promise<void> {
   const integration = opts.integration ?? null;
   const offline = opts.offline ?? false;
   const refresh = opts.refresh ?? false;
+  const version = typeof opts.version === 'string' ? opts.version : null;
   let result;
   try {
+    if (version !== null) {
+      if (!version.trim()) throw new BundlerError('--version must not be blank.');
+      if (existsSync(expandUser(bundleId, homedir()))) {
+        throw new BundlerError('--version requires a catalog bundle ID, not a local path.');
+      }
+      if (refresh) throw new BundlerError('--version cannot be used with --refresh.');
+    }
     let projectRoot = findProjectRoot();
+    let stack: CatalogStack | null = null;
 
     let manifest: BundleManifest;
     const localManifest = await localManifestSource(bundleId);
@@ -399,8 +583,8 @@ export async function bundleInstall(
       manifest = localManifest;
       validateManifestStructure(manifest, { source: `Local bundle source ${pyRepr(bundleId)}` });
     } else {
-      const stack = buildStack(projectRoot ?? process.cwd(), { offline });
-      const resolved = await stack.resolve(bundleId);
+      stack = buildStack(projectRoot ?? process.cwd(), { offline });
+      const resolved = await stack.resolve(bundleId, version);
       if (!resolved.installAllowed) {
         throw new BundlerError(
           `Bundle '${bundleId}' resolves only from a discovery-only source ` +
@@ -410,11 +594,15 @@ export async function bundleInstall(
       manifest = await commandDeps.downloadManifest(resolved, { offline });
     }
 
+    // A local parent's references resolve through the catalog stack.
+    const expanded = await expandBundleManifest(projectRoot ?? process.cwd(), manifest, { offline, stack });
+    requireInstallable(expanded);
+
     if (projectRoot === null) {
       const initIntegration = await resolveInitIntegration(integration, manifest);
       // Resolve all hard compatibility gates before `specify init` so an
       // incompatible bundle never leaves an initialized project behind.
-      resolveInstallPlan(manifest, {
+      resolveInstallPlan(expanded, {
         speckitVersion: await commandDeps.speckitVersion(),
         activeIntegration: initIntegration,
         integrationExplicit: true,
@@ -427,14 +615,14 @@ export async function bundleInstall(
       projectRoot = requireProjectRoot();
     }
 
-    for (const overlap of bundleOverlaps(projectRoot, manifest)) {
+    for (const overlap of bundleOverlaps(projectRoot, manifest, expanded.components)) {
       console.print(`[yellow]![/yellow] ${escapeMarkup(overlap)}`);
     }
 
     // The project's recorded active integration is authoritative; an explicit
     // --integration only confirms the target when it cannot be determined.
     const detected = activeIntegration(projectRoot);
-    const plan = resolveInstallPlan(manifest, {
+    const plan = resolveInstallPlan(expanded, {
       speckitVersion: await commandDeps.speckitVersion(),
       activeIntegration: detected !== null ? detected : integration,
       integrationExplicit: Boolean(integration) && detected === null,
@@ -449,9 +637,10 @@ export async function bundleInstall(
       refresh,
     );
   } catch (exc) {
-    failFrom(exc);
+    failWithNotes(exc);
   }
 
+  renderInstallWarnings(result);
   const refreshSummary = refresh
     ? `, ${result.refreshed.length} refreshed, ${result.uninstalled.length} removed`
     : '';
@@ -498,17 +687,23 @@ export async function bundleUpdate(
         );
       }
       const manifest = await commandDeps.downloadManifest(resolved, { offline });
+      const expanded = await expandBundleManifest(projectRoot, manifest, { offline, stack });
+      requireInstallable(expanded);
       const detected = activeIntegration(projectRoot);
-      const plan = resolveInstallPlan(manifest, {
+      const plan = resolveInstallPlan(expanded, {
         speckitVersion: await commandDeps.speckitVersion(),
         activeIntegration: detected !== null ? detected : integration,
         integrationExplicit: Boolean(integration) && detected === null,
       });
-      await installBundle(projectRoot, plan, installer, manifest, true);
+      if (expanded.hasReferences) {
+        for (const warning of plan.warnings) console.print(`[yellow]![/yellow] ${escapeMarkup(warning)}`);
+      }
+      const result = await installBundle(projectRoot, plan, installer, manifest, true);
+      renderInstallWarnings(result);
       console.print(`[green]✓[/green] Updated '${escapeMarkup(target)}' to v${escapeMarkup(plan.version)}.`);
     }
   } catch (exc) {
-    failFrom(exc);
+    failWithNotes(exc);
   }
 }
 
@@ -543,17 +738,68 @@ function resolveManifestPath(p: string | null): string {
   return target;
 }
 
+/** Run structural, expansion, and component checks in stable phases. */
+async function validateBundle(
+  manifest: BundleManifest,
+  manifestPath: string,
+  opts: { offline: boolean },
+): Promise<ValidationReport> {
+  const refRoot = findProjectRoot(path.dirname(manifestPath)) ?? process.cwd();
+  const refWarnings: string[] = [];
+  const checker = makeReferenceChecker(refRoot, { allowNetwork: !opts.offline, warnings: refWarnings });
+
+  // A flat manifest retains the historical single validation call and output.
+  if (!manifest.bundles.length) {
+    const report = await validateManifest(manifest, checker);
+    report.warnings.push(...refWarnings);
+    return report;
+  }
+
+  // Structural errors on a reference-bearing manifest must not resolve or
+  // download anything.
+  const structural = await validateManifest(manifest);
+  if (structural.errors.length) return structural;
+
+  if (opts.offline) {
+    const report = await validateManifest(manifest, checker);
+    report.warnings.push(...refWarnings);
+    report.warnings.push(
+      ...manifest.bundles.map(
+        (reference) =>
+          `Offline: bundle reference '${reference.id}@${reference.version}' ` +
+          `(${manifest.bundle.id} → ${reference.id}) was not expanded.`,
+      ),
+    );
+    return report;
+  }
+
+  let expanded: ExpandedManifest;
+  try {
+    expanded = await expandBundleManifest(refRoot, manifest, { offline: false });
+  } catch (exc) {
+    if (!(exc instanceof BundlerError)) throw exc;
+    // Structural checks already passed, so ``checked`` holds only the
+    // reference checker's own-component errors; the expansion error leads.
+    const checked = await validateManifest(manifest, checker);
+    checked.errors.unshift(exc.message);
+    checked.warnings.push(...refWarnings);
+    return checked;
+  }
+
+  const report = await validateManifest(manifest, checker, expanded.components, expanded.originChains());
+  report.errors.push(...discoveryOnlyMessages(expanded));
+  report.warnings.push(...refWarnings);
+  report.warnings.push(...expanded.warnings);
+  return report;
+}
+
 export async function bundleValidate(opts: { path?: string | null; offline?: boolean } = {}): Promise<void> {
   let report;
   let manifest: BundleManifest;
   try {
     const manifestPath = resolveManifestPath(opts.path ?? null);
     manifest = BundleManifest.fromFile(manifestPath);
-    const refRoot = findProjectRoot(path.dirname(manifestPath)) ?? process.cwd();
-    const refWarnings: string[] = [];
-    const checker = makeReferenceChecker(refRoot, { allowNetwork: !opts.offline, warnings: refWarnings });
-    report = await validateManifest(manifest, checker);
-    report.warnings.push(...refWarnings);
+    report = await validateBundle(manifest, manifestPath, { offline: Boolean(opts.offline) });
   } catch (exc) {
     failFrom(exc);
   }
@@ -613,7 +859,7 @@ export async function bundleInit(
   }
 
   console.print(`[green]✓[/green] Spec Kit project ready at ${escapeMarkup(projectRoot)}.`);
-  if (bundle) await bundleInstall(bundle, { integration, offline });
+  if (bundle) await bundleInstall(bundle, { integration, offline, refresh: false });
 }
 
 // ============================================================================
@@ -692,6 +938,11 @@ const BUNDLE_SOURCE_HELP =
 const OFFLINE_OPTION = { name: 'offline', flags: ['--offline'], type: 'boolean' as const, help: 'Do not access the network' };
 const JSON_OPTION = { name: 'json', flags: ['--json'], type: 'boolean' as const, help: 'Emit JSON to stdout' };
 const INTEGRATION_OVERRIDE = { name: 'integration', flags: ['--integration'], help: 'Override integration' };
+const VERSION_OPTION = {
+  name: 'version',
+  flags: ['--version'],
+  help: 'Install an exact bundle release from the catalog',
+};
 const REFRESH_OPTION = {
   name: 'refresh',
   flags: ['--refresh'],
@@ -763,9 +1014,18 @@ const bundleGroup: GroupSpec = {
         name: 'info',
         help: 'Show full metadata and the fully expanded component set (== what install adds).',
         arguments: [{ name: 'bundle_id', required: true, help: 'Bundle id to inspect' }],
-        options: [OFFLINE_OPTION, JSON_OPTION],
+        options: [
+          OFFLINE_OPTION,
+          JSON_OPTION,
+          { name: 'versions', flags: ['--versions'], type: 'boolean', help: 'List catalog versions' },
+        ],
       },
-      (p) => bundleInfo(String(p.args.bundle_id), { offline: Boolean(p.options.offline), asJson: Boolean(p.options.json) }),
+      (p) =>
+        bundleInfo(String(p.args.bundle_id), {
+          offline: Boolean(p.options.offline),
+          asJson: Boolean(p.options.json),
+          versions: Boolean(p.options.versions),
+        }),
     ),
     defineCommand(
       { name: 'list', help: 'List bundles currently installed in the project with versions.', options: [JSON_OPTION] },
@@ -778,17 +1038,20 @@ const bundleGroup: GroupSpec = {
           "Install a bundle's full component set through each primitive's machinery.\n\n" +
           '``bundle_id`` may be a catalog bundle id, or a local path to a built\n' +
           'artifact (``.zip``), a bundle directory, or a ``bundle.yml`` file. Local\n' +
-          'sources install directly without consulting the catalog stack. Use\n' +
+          'sources install directly without consulting the catalog stack, unless\n' +
+          "the manifest declares ``provides.bundles``: a local parent's references\n" +
+          'resolve through the catalog stack and need network access. Use\n' +
           '``--refresh`` to update owned components from a newer local source.',
         shortHelp: "Install a bundle's full component set through each primitive's machinery.",
         arguments: [{ name: 'bundle_id', required: true, help: BUNDLE_SOURCE_HELP }],
-        options: [INTEGRATION_OVERRIDE, OFFLINE_OPTION, REFRESH_OPTION],
+        options: [INTEGRATION_OVERRIDE, OFFLINE_OPTION, REFRESH_OPTION, VERSION_OPTION],
       },
       (p) =>
         bundleInstall(String(p.args.bundle_id), {
           integration: optStr(p, 'integration'),
           offline: Boolean(p.options.offline),
           refresh: Boolean(p.options.refresh),
+          version: optStr(p, 'version'),
         }),
     ),
     defineCommand(
@@ -796,13 +1059,14 @@ const bundleGroup: GroupSpec = {
         name: 'add',
         help: "Install a bundle's full component set (alias for install).",
         arguments: [{ name: 'bundle_id', required: true, help: BUNDLE_SOURCE_HELP }],
-        options: [INTEGRATION_OVERRIDE, OFFLINE_OPTION, REFRESH_OPTION],
+        options: [INTEGRATION_OVERRIDE, OFFLINE_OPTION, REFRESH_OPTION, VERSION_OPTION],
       },
       (p) =>
         bundleInstall(String(p.args.bundle_id), {
           integration: optStr(p, 'integration'),
           offline: Boolean(p.options.offline),
           refresh: Boolean(p.options.refresh),
+          version: optStr(p, 'version'),
         }),
     ),
     defineCommand(

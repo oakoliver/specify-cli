@@ -8,60 +8,132 @@
  * @module bundles/project
  */
 
-import { existsSync, lstatSync, statSync } from 'node:fs';
+import { existsSync, lstatSync } from 'node:fs';
 import * as path from 'node:path';
 
-import { resolveInitDirOverride } from '../project.js';
+import { errConsole, CliExit } from '../console.js';
+import { ProjectPolicyError, projectFiles } from '../file-policy.js';
+import { ProjectResolutionError, resolveInitDirOverrideUnrendered } from '../project.js';
+import { cleanIntegrationKey, dedupeIntegrationKeys } from '../integration-state.js';
 import { BundlerError } from './index.js';
 import { ensureWithin, loadJson } from './yamlio.js';
-import { dget, isMapping, pyTruthy, resolvePath } from './pycompat.js';
+import { isMapping, resolvePath } from './pycompat.js';
 
 export const DEFAULT_INTEGRATION = 'copilot';
 
-function isSymlink(p: string): boolean {
+
+// ``_file_policy.ProjectPolicyError`` / ``project_files`` (shared port in src/file-policy.ts).
+export { ProjectPolicyError };
+
+function lstatMode(p: string): 'missing' | 'link' | 'dir' | 'file' | 'other' {
+  let st;
   try {
-    return lstatSync(p).isSymbolicLink();
-  } catch {
-    return false;
+    st = lstatSync(p);
+  } catch (exc) {
+    if ((exc as NodeJS.ErrnoException).code === 'ENOENT') return 'missing';
+    throw exc;
+  }
+  if (st.isSymbolicLink()) return 'link';
+  if (st.isDirectory()) return 'dir';
+  if (st.isFile()) return 'file';
+  return 'other';
+}
+
+/**
+ * Injectable seam for ``specify_cli._file_policy.project_files``. The
+ * integrator can point ``projectFiles`` at the shared FileHelper port; it must
+ * throw {@link ProjectPolicyError} (or a subclass) on a policy failure.
+ */
+export const projectPolicyDeps = {
+  projectFiles(projectRoot: string): unknown {
+    return projectFiles(projectRoot);
+  },
+};
+
+/** ``_project.preflight_project_policy`` (errors carry the policy error as cause). */
+export function preflightProjectPolicy(projectRoot: string): void {
+  try {
+    projectPolicyDeps.projectFiles(projectRoot);
+  } catch (exc) {
+    if (!(exc instanceof ProjectPolicyError)) throw exc;
+    const marker = path.join(projectRoot, '.specify');
+    const mode = lstatMode(marker);
+    let message: string;
+    if (mode === 'link') {
+      message = `Refusing to use symlinked .specify path: ${marker}. ${exc.message}`;
+    } else if (mode !== 'missing' && mode !== 'dir') {
+      message = `Not a Spec Kit project: .specify path exists but is not a directory: ${marker}`;
+    } else {
+      message = exc.message;
+    }
+    const error = new ProjectResolutionError(message);
+    (error as Error & { cause?: unknown }).cause = exc;
+    throw error;
   }
 }
 
-function isDir(p: string): boolean {
+function preflightPolicy(root: string): void {
   try {
-    return statSync(p).isDirectory();
-  } catch {
-    return false;
+    projectPolicyDeps.projectFiles(root);
+  } catch (exc) {
+    if (exc instanceof ProjectPolicyError) throw new BundlerError(exc.message, { cause: exc });
+    throw exc;
   }
 }
 
 /**
- * Return the nearest ancestor (incl. *start*) containing a ``.specify/`` dir,
- * or null. A symlinked ``.specify`` is not accepted as a project root.
+ * Return the nearest ancestor (incl. *start*) containing a ``.specify/``
+ * entry, or null.
+ *
+ * A present ``.specify`` entry establishes the candidate boundary. Forbidden
+ * links, non-directory markers and corrupt policy fail there instead of
+ * silently selecting an ancestor. Only absent markers continue ancestor
+ * discovery.
  *
  * When *start* is omitted the ``SPECIFY_INIT_DIR`` override is honored first;
- * with an explicit override this may **throw** rather than return (a
- * set-but-invalid value throws ``CliExit`` and a symlinked ``.specify`` throws
- * {@link BundlerError}).
+ * with an explicit override this may **throw** rather than return (a policy
+ * failure throws {@link BundlerError}; any other invalid value prints the
+ * error and throws ``CliExit``).
  */
 export function findProjectRoot(start: string | null = null): string | null {
   if (start === null) {
-    const override = resolveInitDirOverride();
-    if (override !== null && override !== undefined) {
-      const overridePath = String(override);
-      if (isSymlink(path.join(overridePath, '.specify'))) {
-        throw new BundlerError(
-          'SPECIFY_INIT_DIR is not a safe Spec Kit project ' +
-            `(symlinked .specify/ directory is not allowed): ${overridePath}`,
-        );
-      }
-      return overridePath;
+    let override: string | null;
+    try {
+      override = resolveInitDirOverrideUnrendered();
+      // ADAPTATION: upstream's ``_resolve_init_dir_override_unrendered``
+      // preflights the policy itself; run it here so the bundler keeps the
+      // contract whether or not the shared resolver does.
+      if (override !== null) preflightProjectPolicy(override);
+    } catch (exc) {
+      if (!(exc instanceof ProjectResolutionError)) throw exc;
+      const cause = (exc as Error & { cause?: unknown }).cause;
+      if (cause instanceof ProjectPolicyError) throw new BundlerError(exc.message, { cause });
+      errConsole.print(`[red]Error:[/red] ${exc.message}`);
+      throw new CliExit(1);
     }
+    // An explicit override is strict: do not return null here, because bundle
+    // install treats null as "init the current directory".
+    if (override !== null && override !== undefined) return String(override);
   }
 
   let current = resolvePath(start || process.cwd());
   for (;;) {
     const marker = path.join(current, '.specify');
-    if (isDir(marker) && !isSymlink(marker)) return current;
+    let present = true;
+    try {
+      lstatSync(marker);
+    } catch (exc) {
+      if ((exc as NodeJS.ErrnoException).code === 'ENOENT') {
+        present = false;
+      } else {
+        const error = new ProjectPolicyError(`Cannot inspect project marker ${marker}: ${(exc as Error).message}`);
+        throw new BundlerError(error.message, { cause: error });
+      }
+    }
+    if (present) {
+      preflightPolicy(current);
+      return current;
+    }
     const parent = path.dirname(current);
     if (parent === current) return null;
     current = parent;
@@ -83,8 +155,13 @@ export function requireProjectRoot(start: string | null = null): string {
 /**
  * Return the project's active integration id, if recorded in
  * ``.specify/integration.json``. Returns null when it cannot be determined.
- * ``default_integration`` is authoritative (matching the canonical reader in
- * ``integration_state``); ``integration``/``id``/``active`` are fallbacks.
+ *
+ * Resolves the way the canonical reader does: ``default_integration`` is
+ * authoritative; ``integration`` (the legacy alias), then ``id``/``active``,
+ * are fallbacks, and each candidate is cleaned before selecting it (a
+ * whitespace-only default does not shadow a valid legacy key). Installed-only
+ * state promotes ``installed_integrations[0]`` like
+ * ``normalize_integration_state``.
  */
 export function activeIntegration(projectRoot: string): string | null {
   let marker = path.join(projectRoot, '.specify', 'integration.json');
@@ -103,15 +180,15 @@ export function activeIntegration(projectRoot: string): string | null {
     throw exc;
   }
   if (isMapping(data)) {
-    let value: unknown = null;
-    for (const key of ['default_integration', 'integration', 'id', 'active']) {
-      const candidate = dget(data, key);
-      if (pyTruthy(candidate)) {
-        value = candidate;
-        break;
-      }
+    for (const field of ['default_integration', 'integration', 'id', 'active']) {
+      const cleaned = cleanIntegrationKey(data[field]);
+      if (cleaned) return cleaned;
     }
-    if (typeof value === 'string' && value) return value;
+    const installed = data.installed_integrations;
+    if (Array.isArray(installed)) {
+      const installedKeys = dedupeIntegrationKeys(installed);
+      if (installedKeys.length) return installedKeys[0];
+    }
   }
   return null;
 }

@@ -10,6 +10,7 @@
  * @module agents
  */
 
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   lstatSync,
@@ -17,6 +18,7 @@ import {
   readdirSync,
   readFileSync,
   rmdirSync,
+  statSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
@@ -46,6 +48,8 @@ import {
 import { ValueError, homeDir, isValueError, isDir, isFile, isOSError, isRelativeTo, isSymlink, resolvePath } from './integrations/manifest.js';
 import { substituteCoreTemplate } from './presets/manager-commands.js';
 import { resolveActiveSkillsDir } from './shared-infra.js';
+import { ExtensionRegistry } from './extensions/registry.js';
+import { registrationDirectory } from './integrations/generic.js';
 
 // ============================================================================
 // Types
@@ -162,9 +166,12 @@ export class CommandRegistrar {
     CommandRegistrar._configsLoaded = true;
   }
 
+  /** Project-specific table (static table plus the project's ``generic`` output), or ``null``. */
+  private _projectConfigs: Record<string, AgentRegistrarConfig> | null = null;
+
   /** Instance view of the static table (Python ``self.AGENT_CONFIGS``). */
   get AGENT_CONFIGS(): Record<string, AgentRegistrarConfig> {
-    return CommandRegistrar.AGENT_CONFIGS;
+    return this._projectConfigs ?? CommandRegistrar.AGENT_CONFIGS;
   }
 
   /** Build ``AGENT_CONFIGS`` if not yet loaded. */
@@ -184,8 +191,42 @@ export class CommandRegistrar {
     CommandRegistrar._agentConfigs = {};
   }
 
-  constructor() {
+  /**
+   * With *projectRoot*, a project initialised with the ``generic``
+   * integration also gets a ``generic`` entry pointing at its persisted
+   * ``--commands-dir`` (throws ``ValueError`` when those settings are
+   * unreadable or invalid).
+   */
+  constructor(projectRoot: string | null = null, opts: { includeGeneric?: boolean } = {}) {
     CommandRegistrar.ensureConfigs();
+    if (projectRoot !== null && (opts.includeGeneric ?? true)) {
+      const opts = loadInitOptions(projectRoot);
+      if (isPlainObject(opts) && opts.ai === 'generic') {
+        this._projectConfigs = {
+          ...CommandRegistrar.AGENT_CONFIGS,
+          generic: {
+            dir: registrationDirectory(projectRoot),
+            format: 'markdown',
+            args: '$ARGUMENTS',
+            extension: '.md',
+            invoke_separator: '.',
+          } as AgentRegistrarConfig,
+        };
+      }
+    }
+  }
+
+  /** Only reuse a generated file if its installed extension still owns its bytes. */
+  static genericOwnedOutput(path: string, sourceId: string, projectRoot: string): boolean {
+    const metadata = new ExtensionRegistry(join(projectRoot, '.specify', 'extensions')).get(sourceId);
+    const hashes = metadata ? (metadata as Record<string, unknown>).generic_artifact_hashes ?? {} : {};
+    if (!isPlainObject(hashes) || !isFile(path)) return false;
+    if (statSync(path).nlink > 1) return false;
+    if (isSymlink(path) && !isRelativeTo(resolvePath(path), resolvePath(join(projectRoot, '.specify', 'extensions', sourceId)))) {
+      return false;
+    }
+    const rel = relative(resolvePath(projectRoot), path).split(sep).join('/');
+    return hashes[rel] === createHash('sha256').update(readFileSync(path)).digest('hex');
   }
 
   // -- Reference hyphenation --------------------------------------------
@@ -644,6 +685,9 @@ export class CommandRegistrar {
 
       const destFile = join(commandsDir, `${outputName}${agentConfig.extension}`);
       CommandRegistrar.ensureInside(destFile, commandsDir);
+      if (agentName === 'generic' && (existsSync(destFile) || isSymlink(destFile))) {
+        if (!CommandRegistrar.genericOwnedOutput(destFile, sourceId, projectRoot)) continue;
+      }
       mkdirSync(dirname(destFile), { recursive: true });
       CommandRegistrar.writeRegisteredOutput(
         destFile,
@@ -694,6 +738,9 @@ export class CommandRegistrar {
         }
         const aliasFile = join(commandsDir, `${aliasOutputName}${agentConfig.extension}`);
         CommandRegistrar.ensureInside(aliasFile, commandsDir);
+        if (agentName === 'generic' && (existsSync(aliasFile) || isSymlink(aliasFile))) {
+          if (!CommandRegistrar.genericOwnedOutput(aliasFile, sourceId, projectRoot)) continue;
+        }
         mkdirSync(dirname(aliasFile), { recursive: true });
         CommandRegistrar.writeRegisteredOutput(
           aliasFile,

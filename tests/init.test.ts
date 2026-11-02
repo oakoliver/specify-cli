@@ -414,6 +414,7 @@ describe('init end-to-end layouts', () => {
     expect(readJson(join(project, '.specify/init-options.json'))).toEqual({
       ai: 'claude',
       ai_skills: true,
+      allow_symlinks: false,
       feature_numbering: 'sequential',
       here: false,
       integration: 'claude',
@@ -666,7 +667,9 @@ describe('init failure handling', () => {
     writeFileSync(join(target, '.specify'), 'not a directory');
     const r = await runInit([target, '--force', '--integration', 'claude', '--script', 'sh', '--ignore-agent-tools']);
     expect(r.code).toBe(1);
-    expect(r.normalized).toContain('Please fix file permissions or delete .specify/integration.json and retry.');
+    // v1.2.5 (#4934): the persisted-policy read rejects the non-directory .specify first.
+    expect(r.normalized).toContain('Cannot read .specify/init-options.json:');
+    expect(r.normalized).toContain('Ensure the configuration hierarchy is non-symlinked and readable.');
   });
 });
 
@@ -888,4 +891,19 @@ describe('init() programmatic API', () => {
     }
     expect(code).toBe(1);
   });
+});
+
+// v1.2.5 (#4910): next-steps names come from the integration's invoke prefix/separator.
+describe('init next steps command names', () => {
+  for (const [key, expected] of [
+    ['junie', '/speckit-constitution'],
+    ['gemini', '/speckit.constitution'],
+    ['codex', '$speckit-constitution'],
+  ] as const) {
+    test(`${key} shows ${expected}`, async () => {
+      const r = await runInit([key, '--integration', key, '--script', 'sh', '--ignore-agent-tools', '--non-interactive']);
+      expect(r.code).toBe(0);
+      expect(r.output).toContain(`${expected} - Establish project principles`);
+    });
+  }
 });

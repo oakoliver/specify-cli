@@ -225,11 +225,18 @@ export class InitStep extends StepBase {
         // Best-effort cleanup.
       }
     }
+    // Record the exception only for an UNEXPECTED crash (a ``CliExit`` is how
+    // ``specify init`` reports every ordinary failure and is not an exception
+    // here). An ordinary failure with no real stderr carries init's own
+    // diagnostics -- printed to stdout -- across, so ``output.stderr`` still
+    // holds the reason (upstream #4530).
     if (exitCode !== 0 && exception !== null) {
       const name = exception instanceof Error ? exception.name : 'Exception';
       const msg = exception instanceof Error ? exception.message : String(exception);
       const detail = `${name}: ${msg}`;
       stderr = stderr ? `${stderr}\n${detail}`.trim() : detail;
+    } else if (exitCode !== 0 && !stderr.trim()) {
+      stderr = stdout.trim();
     }
     return [exitCode, stdout, stderr];
   };

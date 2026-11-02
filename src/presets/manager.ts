@@ -31,6 +31,9 @@ import {
   writeSharedText,
 } from '../shared-infra.js';
 import { versionSatisfies } from '../utils.js';
+import { loadInstallIgnore } from '../install-ignore.js';
+import { copytree } from '../extensions/fs-utils.js';
+import { InvalidVersion as PepInvalidVersion, Version as PepVersion } from '../bundles/versioning.js';
 import { registrarAgentConfigs, skillNamesForCommand, type AgentNameMap } from './manager-commands.js';
 import {
   PresetCompatibilityError,
@@ -199,6 +202,14 @@ export interface PresetInstallOptions {
   catalogName?: string | null;
 }
 
+/** Options for {@link PresetManager.installFromArchive}. */
+export interface PresetArchiveInstallOptions extends PresetInstallOptions {
+  /** Exact-version installs: the archive must declare this preset ID. */
+  expectedId?: string | null;
+  /** Exact-version installs: the archive must declare this (PEP 440-equal) version. */
+  expectedVersion?: string | null;
+}
+
 /** Hook for tests: the ``ExtensionRegistry`` class used by dependency checks. */
 export const presetManagerHooks: { ExtensionRegistry: typeof ExtensionRegistry } = { ExtensionRegistry };
 
@@ -339,18 +350,21 @@ export class PresetManager extends PresetSkillMethods {
     const manifest = new PresetManifest(nodePath.join(sourceDir, 'preset.yml'));
     this.checkCompatibility(manifest, speckitVersion);
 
-    if (this.registry.isInstalled(manifest.id)) {
-      if (!force) {
-        throw new PresetError(
-          `Preset '${manifest.id}' is already installed. Use 'specify preset remove ${manifest.id}' first.`,
-        );
-      }
-      this.remove(manifest.id);
+    const installed = this.registry.isInstalled(manifest.id);
+    if (installed && !force) {
+      throw new PresetError(
+        `Preset '${manifest.id}' is already installed. Use 'specify preset remove ${manifest.id}' first.`,
+      );
     }
+    // Validate .presetignore before remove() changes registry/agent artifacts
+    // or deleting an unregistered destination left by an earlier install.
+    const ignoreFn = loadInstallIgnore(sourceDir, '.presetignore', PresetValidationError);
+    if (installed) this.remove(manifest.id);
 
     const destDir = nodePath.join(this.presetsDir, manifest.id);
     if (pathExists(destDir)) rmSync(destDir, { recursive: true, force: true });
-    cpSync(sourceDir, destDir, { recursive: true, dereference: true });
+    if (ignoreFn !== null) copytree(sourceDir, destDir, { ignore: ignoreFn });
+    else cpSync(sourceDir, destDir, { recursive: true, dereference: true });
 
     const catalogName = opts.catalogName;
     const normalizedCatalogName = typeof catalogName === 'string' ? catalogName.trim() : '';
@@ -464,7 +478,7 @@ export class PresetManager extends PresetSkillMethods {
     archivePath: string,
     speckitVersion: string,
     priority = 10,
-    opts: PresetInstallOptions = {},
+    opts: PresetArchiveInstallOptions = {},
   ): PresetManifest {
     if (priority < 1) {
       throw new PresetValidationError('Priority must be a positive integer (1 or higher)');
@@ -487,7 +501,32 @@ export class PresetManager extends PresetSkillMethods {
       if (!pathExists(manifestPath)) {
         throw new PresetValidationError('No preset.yml found in archive');
       }
-      return this.installFromDirectory(packDir, speckitVersion, priority, opts);
+      const expectedId = opts.expectedId ?? null;
+      const expectedVersion = opts.expectedVersion ?? null;
+      if (expectedId !== null || expectedVersion !== null) {
+        const manifest = new PresetManifest(manifestPath);
+        if (expectedId !== null && manifest.id !== expectedId) {
+          throw new PresetValidationError(
+            `Preset archive ID '${manifest.id}' does not match catalog ID '${expectedId}'.`,
+          );
+        }
+        if (expectedVersion !== null) {
+          let matchesVersion: boolean;
+          try {
+            matchesVersion = new PepVersion(String(manifest.version)).equals(new PepVersion(expectedVersion));
+          } catch (e) {
+            if (!(e instanceof PepInvalidVersion)) throw e;
+            throw new PresetValidationError(`Invalid expected catalog version: ${pyRepr(expectedVersion)}`);
+          }
+          if (!matchesVersion) {
+            throw new PresetValidationError(
+              `Preset archive version '${manifest.version}' does not match catalog version '${expectedVersion}'.`,
+            );
+          }
+        }
+      }
+      const { expectedId: _id, expectedVersion: _version, ...installOpts } = opts;
+      return this.installFromDirectory(packDir, speckitVersion, priority, installOpts);
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -498,7 +537,7 @@ export class PresetManager extends PresetSkillMethods {
     zipPath: string,
     speckitVersion: string,
     priority = 10,
-    opts: PresetInstallOptions = {},
+    opts: PresetArchiveInstallOptions = {},
   ): PresetManifest {
     return this.installFromArchive(zipPath, speckitVersion, priority, opts);
   }

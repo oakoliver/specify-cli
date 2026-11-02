@@ -19,6 +19,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { runIntegrationCommand } from '../src/integrations/commands.js';
+import { main as cliMain } from '../src/cli.js';
 import { console as appConsole, errConsole } from '../src/console.js';
 import { scaffoldIntegration, scaffoldFs } from '../src/integrations/command-scaffold-generation.js';
 import {
@@ -41,6 +42,15 @@ interface RunResult {
 }
 
 async function run(args: string[], cwd = project): Promise<RunResult> {
+  return runWith(() => runIntegrationCommand(args), cwd);
+}
+
+/** Run any ``specify`` command (``extension add``, ``preset add``, ...). */
+async function runSpecify(args: string[], cwd = project): Promise<RunResult> {
+  return runWith(() => cliMain(args), cwd);
+}
+
+async function runWith(fn: () => Promise<number>, cwd: string): Promise<RunResult> {
   const prev = process.cwd();
   process.chdir(cwd);
   appConsole.beginCapture();
@@ -53,7 +63,7 @@ async function run(args: string[], cwd = project): Promise<RunResult> {
   };
   let code: number;
   try {
-    code = await runIntegrationCommand(args);
+    code = await fn();
   } finally {
     (process.stdout as unknown as { write: typeof origWrite }).write = origWrite;
     process.chdir(prev);
@@ -272,6 +282,94 @@ describe('integration use / uninstall', () => {
     expect(r.output).toContain("No manifest found for integration 'claude'. Nothing to uninstall.");
     expect(existsSync(join(project, '.specify', 'integration.json'))).toBe(false);
   });
+
+  // upstream #4911: extension/preset artifacts move with the integration
+  function addSamplePreset(): Promise<RunResult> {
+    const preset = join(tmp, 'sample-preset');
+    mkdirSync(join(preset, 'commands'), { recursive: true });
+    writeFileSync(
+      join(preset, 'commands', 'speckit.specify.md'),
+      '---\ndescription: Sample preset command\n---\nSample preset guidance\n',
+    );
+    writeFileSync(
+      join(preset, 'preset.yml'),
+      [
+        "schema_version: '1.0'",
+        'preset:',
+        '  id: sample-preset',
+        '  name: Sample Preset',
+        '  version: 1.0.0',
+        '  description: Sample guidance',
+        'requires:',
+        "  speckit_version: '>=0.1.0'",
+        'provides:',
+        '  templates:',
+        '  - type: command',
+        '    name: speckit.specify',
+        '    file: commands/speckit.specify.md',
+        '',
+      ].join('\n'),
+    );
+    return runSpecify(['preset', 'add', '--dev', preset]);
+  }
+
+  function registeredAgents(kind: 'extensions' | 'presets', id: string): string[] {
+    const registry = readJson(join(project, '.specify', kind, '.registry'));
+    return Object.keys(((registry[kind] as Record<string, Record<string, unknown>>)[id]['registered_commands'] ?? {}) as object);
+  }
+
+  test('uninstall unregisters extension and preset artifacts', async () => {
+    await run(['install', 'claude', '--script', 'sh']);
+    expect((await runSpecify(['extension', 'add', 'git'])).code).toBe(0);
+    expect((await addSamplePreset()).code).toBe(0);
+    const gitFeature = join(project, '.claude', 'skills', 'speckit-git-feature', 'SKILL.md');
+    const specify = join(project, '.claude', 'skills', 'speckit-specify', 'SKILL.md');
+    expect(existsSync(gitFeature)).toBe(true);
+    expect(readFileSync(specify, 'utf-8')).toContain('Sample preset guidance');
+
+    const r = await run(['uninstall', 'claude']);
+    expect(r.code).toBe(0);
+    expect(existsSync(gitFeature)).toBe(false);
+    expect(existsSync(specify)).toBe(false);
+    expect(registeredAgents('extensions', 'git')).not.toContain('claude');
+    expect(registeredAgents('presets', 'sample-preset')).not.toContain('claude');
+  });
+
+  for (const missingManifest of [false, true]) {
+    test(`uninstall default registers contributions for the fallback (missing manifest: ${missingManifest})`, async () => {
+      await run(['install', 'claude', '--script', 'sh']);
+      expect((await runSpecify(['extension', 'add', 'git'])).code).toBe(0);
+      expect((await addSamplePreset()).code).toBe(0);
+      expect((await run(['install', 'codex', '--script', 'sh'])).code).toBe(0);
+      const codexGit = join(project, '.agents', 'skills', 'speckit-git-feature', 'SKILL.md');
+      const codexSpecify = join(project, '.agents', 'skills', 'speckit-specify', 'SKILL.md');
+      expect(existsSync(codexGit)).toBe(false);
+      expect(readFileSync(codexSpecify, 'utf-8')).not.toContain('Sample preset guidance');
+      if (missingManifest) rmSync(join(project, '.specify', 'integrations', 'claude.manifest.json'));
+
+      const r = await run(['uninstall', 'claude']);
+      expect(r.code).toBe(0);
+      expect(state()['integration']).toBe('codex');
+      expect(existsSync(codexGit)).toBe(true);
+      expect(readFileSync(codexSpecify, 'utf-8')).toContain('Sample preset guidance');
+      expect(existsSync(join(project, '.claude', 'skills', 'speckit-git-feature', 'SKILL.md'))).toBe(false);
+      expect(existsSync(join(project, '.claude', 'skills', 'speckit-specify', 'SKILL.md'))).toBe(false);
+    });
+  }
+
+  test('uninstall of a non-default integration preserves the default contributions', async () => {
+    await run(['install', 'claude', '--script', 'sh']);
+    expect((await runSpecify(['extension', 'add', 'git'])).code).toBe(0);
+    expect((await addSamplePreset()).code).toBe(0);
+    expect((await run(['install', 'codex', '--script', 'sh'])).code).toBe(0);
+    expect((await run(['uninstall', 'codex'])).code).toBe(0);
+    expect(existsSync(join(project, '.claude', 'skills', 'speckit-git-feature', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(join(project, '.claude', 'skills', 'speckit-specify', 'SKILL.md'), 'utf-8')).toContain(
+      'Sample preset guidance',
+    );
+    expect(registeredAgents('extensions', 'git')).toContain('claude');
+    expect(registeredAgents('presets', 'sample-preset')).toContain('claude');
+  });
 });
 
 // ============================================================================
@@ -334,6 +432,37 @@ describe('integration switch', () => {
     const r = await run(['switch', 'claude', '--script', 'sh']);
     expect(r.code).toBe(0);
     expect(state()['default_integration']).toBe('claude');
+  });
+
+  // upstream #5008: required options are validated before Phase 1 uninstalls
+  for (const [label, options] of [['no options', null], ['options without --commands-dir', '--skills'], ['blank --commands-dir', '--commands-dir=']] as const) {
+    test(`switch rejects a missing required option before uninstalling (${label})`, async () => {
+      await run(['install', 'claude', '--script', 'sh']);
+      const skill = join(project, '.claude', 'skills', 'speckit-plan', 'SKILL.md');
+      const statePath = join(project, '.specify', 'integration.json');
+      const optionsPath = join(project, '.specify', 'init-options.json');
+      const beforeState = readFileSync(statePath, 'utf-8');
+      const beforeOptions = readFileSync(optionsPath, 'utf-8');
+      const args = ['switch', 'generic', '--script', 'sh'];
+      if (options !== null) args.push('--integration-options', options);
+      const r = await run(args);
+      expect(r.code).toBe(1);
+      expect(existsSync(skill)).toBe(true);
+      expect(readFileSync(statePath, 'utf-8')).toBe(beforeState);
+      expect(readFileSync(optionsPath, 'utf-8')).toBe(beforeOptions);
+      expect(r.output).toContain('requires --commands-dir');
+      expect(r.output).toContain('No files were changed.');
+    });
+  }
+
+  test('switch to generic with its required option', async () => {
+    await run(['install', 'claude', '--script', 'sh']);
+    const r = await run(['switch', 'generic', '--script', 'sh', '--integration-options', '--commands-dir .myagent/commands']);
+    expect(r.code).toBe(0);
+    expect(existsSync(join(project, '.myagent', 'commands', 'speckit.plan.md'))).toBe(true);
+    expect(existsSync(join(project, '.claude', 'skills', 'speckit-plan', 'SKILL.md'))).toBe(false);
+    expect(state()['default_integration']).toBe('generic');
+    expect(state()['installed_integrations']).toEqual(['generic']);
   });
 
   test('installed default without manifest refuses to switch', async () => {

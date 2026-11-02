@@ -1,0 +1,2622 @@
+[
+ {
+  "label": "init-2025-06-18",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 1,
+   "method": "initialize",
+   "params": {
+    "protocolVersion": "2025-06-18",
+    "capabilities": {},
+    "clientInfo": {
+     "name": "parity",
+     "version": "1"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 1,
+   "result": {
+    "capabilities": {
+     "prompts": {
+      "listChanged": false
+     },
+     "resources": {
+      "listChanged": false,
+      "subscribe": false
+     },
+     "tools": {
+      "listChanged": false
+     }
+    },
+    "protocolVersion": "2025-06-18",
+    "serverInfo": {
+     "description": "Experimental stdio-only MCP adapter for stable Specify CLI JSON commands.",
+     "name": "specify",
+     "title": "Spec Kit CLI",
+     "version": "experimental"
+    }
+   }
+  }
+ },
+ {
+  "label": "init-2024-11-05",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 2,
+   "method": "initialize",
+   "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": {
+     "name": "p",
+     "version": "1"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 2,
+   "result": {
+    "capabilities": {
+     "prompts": {
+      "listChanged": false
+     },
+     "resources": {
+      "listChanged": false,
+      "subscribe": false
+     },
+     "tools": {
+      "listChanged": false
+     }
+    },
+    "protocolVersion": "2024-11-05",
+    "serverInfo": {
+     "description": "Experimental stdio-only MCP adapter for stable Specify CLI JSON commands.",
+     "name": "specify",
+     "title": "Spec Kit CLI",
+     "version": "experimental"
+    }
+   }
+  }
+ },
+ {
+  "label": "init-unknown-version",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 3,
+   "method": "initialize",
+   "params": {
+    "protocolVersion": "1999-01-01",
+    "capabilities": {},
+    "clientInfo": {
+     "name": "p",
+     "version": "1"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 3,
+   "result": {
+    "capabilities": {
+     "prompts": {
+      "listChanged": false
+     },
+     "resources": {
+      "listChanged": false,
+      "subscribe": false
+     },
+     "tools": {
+      "listChanged": false
+     }
+    },
+    "protocolVersion": "2025-11-25",
+    "serverInfo": {
+     "description": "Experimental stdio-only MCP adapter for stable Specify CLI JSON commands.",
+     "name": "specify",
+     "title": "Spec Kit CLI",
+     "version": "experimental"
+    }
+   }
+  }
+ },
+ {
+  "label": "ping",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 4,
+   "method": "ping"
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 4,
+   "result": {}
+  }
+ },
+ {
+  "label": "tools-list",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 5,
+   "method": "tools/list"
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 5,
+   "result": {
+    "tools": [
+     {
+      "description": "List CLI commands supported by the Spec Kit MCP server.",
+      "inputSchema": {
+       "properties": {},
+       "type": "object",
+       "title": "specify_list_commandsArguments"
+      },
+      "name": "specify_list_commands",
+      "outputSchema": {
+       "properties": {
+        "commands": {
+         "items": {
+          "$ref": "#/$defs/CommandDescription"
+         },
+         "title": "Commands",
+         "type": "array"
+        }
+       },
+       "required": [
+        "commands"
+       ],
+       "type": "object",
+       "$defs": {
+        "CommandArgument": {
+         "additionalProperties": false,
+         "description": "One named argument accepted by an MCP-exposed CLI command.",
+         "properties": {
+          "name": {
+           "title": "Name",
+           "type": "string"
+          },
+          "type": {
+           "title": "Type",
+           "type": "string"
+          },
+          "required": {
+           "title": "Required",
+           "type": "boolean"
+          },
+          "description": {
+           "title": "Description",
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "type",
+          "required",
+          "description"
+         ],
+         "title": "CommandArgument",
+         "type": "object"
+        },
+        "CommandDescription": {
+         "additionalProperties": false,
+         "description": "Stable description of one MCP-exposed CLI command.",
+         "properties": {
+          "command": {
+           "const": "version",
+           "title": "Command",
+           "type": "string"
+          },
+          "description": {
+           "title": "Description",
+           "type": "string"
+          },
+          "arguments": {
+           "items": {
+            "$ref": "#/$defs/CommandArgument"
+           },
+           "title": "Arguments",
+           "type": "array"
+          },
+          "read_only": {
+           "const": true,
+           "title": "Read Only",
+           "type": "boolean"
+          },
+          "json_output": {
+           "const": true,
+           "title": "Json Output",
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "command",
+          "description",
+          "arguments",
+          "read_only",
+          "json_output"
+         ],
+         "title": "CommandDescription",
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "description": "List of commands currently exposed through MCP.",
+       "title": "CommandList"
+      }
+     },
+     {
+      "description": "Describe one CLI command supported by the Spec Kit MCP server.",
+      "inputSchema": {
+       "properties": {
+        "command": {
+         "title": "Command",
+         "type": "string"
+        }
+       },
+       "required": [
+        "command"
+       ],
+       "type": "object",
+       "title": "specify_describe_commandArguments"
+      },
+      "name": "specify_describe_command",
+      "outputSchema": {
+       "properties": {
+        "command": {
+         "const": "version",
+         "title": "Command",
+         "type": "string"
+        },
+        "description": {
+         "title": "Description",
+         "type": "string"
+        },
+        "arguments": {
+         "items": {
+          "$ref": "#/$defs/CommandArgument"
+         },
+         "title": "Arguments",
+         "type": "array"
+        },
+        "read_only": {
+         "const": true,
+         "title": "Read Only",
+         "type": "boolean"
+        },
+        "json_output": {
+         "const": true,
+         "title": "Json Output",
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "command",
+        "description",
+        "arguments",
+        "read_only",
+        "json_output"
+       ],
+       "type": "object",
+       "$defs": {
+        "CommandArgument": {
+         "additionalProperties": false,
+         "description": "One named argument accepted by an MCP-exposed CLI command.",
+         "properties": {
+          "name": {
+           "title": "Name",
+           "type": "string"
+          },
+          "type": {
+           "title": "Type",
+           "type": "string"
+          },
+          "required": {
+           "title": "Required",
+           "type": "boolean"
+          },
+          "description": {
+           "title": "Description",
+           "type": "string"
+          }
+         },
+         "required": [
+          "name",
+          "type",
+          "required",
+          "description"
+         ],
+         "title": "CommandArgument",
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "description": "Stable description of one MCP-exposed CLI command.",
+       "title": "CommandDescription"
+      }
+     },
+     {
+      "description": "Run one supported CLI command and return its direct stable JSON payload.",
+      "inputSchema": {
+       "properties": {
+        "command": {
+         "title": "Command",
+         "type": "string"
+        }
+       },
+       "required": [
+        "command"
+       ],
+       "type": "object",
+       "title": "specify_run_commandArguments"
+      },
+      "name": "specify_run_command",
+      "outputSchema": {
+       "properties": {
+        "cli_version": {
+         "title": "Cli Version",
+         "type": "string"
+        },
+        "runtime": {
+         "$ref": "#/$defs/RuntimeInfo"
+        },
+        "system": {
+         "$ref": "#/$defs/SystemInfo"
+        },
+        "features": {
+         "additionalProperties": {
+          "type": "boolean"
+         },
+         "title": "Features",
+         "type": "object"
+        }
+       },
+       "required": [
+        "cli_version",
+        "runtime",
+        "system",
+        "features"
+       ],
+       "type": "object",
+       "$defs": {
+        "RuntimeInfo": {
+         "additionalProperties": false,
+         "description": "Runtime portion of the stable version JSON result.",
+         "properties": {
+          "python": {
+           "title": "Python",
+           "type": "string"
+          },
+          "openssl": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Openssl"
+          }
+         },
+         "required": [
+          "python",
+          "openssl"
+         ],
+         "title": "RuntimeInfo",
+         "type": "object"
+        },
+        "SystemInfo": {
+         "additionalProperties": false,
+         "description": "System portion of the stable version JSON result.",
+         "properties": {
+          "platform": {
+           "title": "Platform",
+           "type": "string"
+          },
+          "architecture": {
+           "title": "Architecture",
+           "type": "string"
+          },
+          "os_version": {
+           "title": "Os Version",
+           "type": "string"
+          }
+         },
+         "required": [
+          "platform",
+          "architecture",
+          "os_version"
+         ],
+         "title": "SystemInfo",
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "description": "Direct success payload returned by ``specify version --json``.",
+       "title": "VersionResult"
+      }
+     },
+     {
+      "annotations": {
+       "idempotentHint": true,
+       "openWorldHint": false,
+       "readOnlyHint": true
+      },
+      "description": "Return the installed Spec Kit CLI version, runtime, system, and feature capabilities.",
+      "inputSchema": {
+       "properties": {},
+       "type": "object",
+       "additionalProperties": false,
+       "title": "specify_versionArguments"
+      },
+      "name": "specify_version",
+      "outputSchema": {
+       "properties": {
+        "cli_version": {
+         "title": "Cli Version",
+         "type": "string"
+        },
+        "runtime": {
+         "$ref": "#/$defs/VersionRuntimeResult"
+        },
+        "system": {
+         "$ref": "#/$defs/VersionSystemResult"
+        },
+        "features": {
+         "additionalProperties": {
+          "type": "boolean"
+         },
+         "title": "Features",
+         "type": "object"
+        }
+       },
+       "required": [
+        "cli_version",
+        "runtime",
+        "system",
+        "features"
+       ],
+       "type": "object",
+       "$defs": {
+        "VersionRuntimeResult": {
+         "additionalProperties": false,
+         "description": "Runtime portion of the MCP version result.",
+         "properties": {
+          "python": {
+           "title": "Python",
+           "type": "string"
+          },
+          "openssl": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Openssl"
+          }
+         },
+         "required": [
+          "python",
+          "openssl"
+         ],
+         "title": "VersionRuntimeResult",
+         "type": "object"
+        },
+        "VersionSystemResult": {
+         "additionalProperties": false,
+         "description": "System portion of the MCP version result.",
+         "properties": {
+          "platform": {
+           "title": "Platform",
+           "type": "string"
+          },
+          "architecture": {
+           "title": "Architecture",
+           "type": "string"
+          },
+          "os_version": {
+           "title": "Os Version",
+           "type": "string"
+          }
+         },
+         "required": [
+          "platform",
+          "architecture",
+          "os_version"
+         ],
+         "title": "VersionSystemResult",
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "description": "Typed structured result returned by ``specify_version``.",
+       "title": "VersionToolResult"
+      }
+     },
+     {
+      "annotations": {
+       "idempotentHint": true,
+       "openWorldHint": false,
+       "readOnlyHint": true
+      },
+      "description": "Return one paginated artifact inventory page for a project. While truncated is true, pass next_cursor as cursor to retrieve the next page.",
+      "inputSchema": {
+       "properties": {
+        "project_directory": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Project Directory"
+        },
+        "limit": {
+         "default": 100,
+         "maximum": 1000,
+         "minimum": 1,
+         "title": "Limit",
+         "type": "integer"
+        },
+        "cursor": {
+         "anyOf": [
+          {
+           "maxLength": 20,
+           "pattern": "^(0|[1-9][0-9]*)$",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Cursor"
+        }
+       },
+       "type": "object",
+       "additionalProperties": false,
+       "title": "specify_artifact_listArguments"
+      },
+      "name": "specify_artifact_list",
+      "outputSchema": {
+       "properties": {
+        "rows": {
+         "items": {
+          "discriminator": {
+           "mapping": {
+            "command": "#/$defs/ArtifactListRowResult",
+            "hook": "#/$defs/ArtifactListHookRowResult",
+            "script": "#/$defs/ArtifactListRowResult",
+            "template": "#/$defs/ArtifactListRowResult"
+           },
+           "propertyName": "kind"
+          },
+          "oneOf": [
+           {
+            "$ref": "#/$defs/ArtifactListRowResult"
+           },
+           {
+            "$ref": "#/$defs/ArtifactListHookRowResult"
+           }
+          ]
+         },
+         "title": "Rows",
+         "type": "array"
+        },
+        "next_cursor": {
+         "anyOf": [
+          {
+           "maxLength": 20,
+           "pattern": "^(0|[1-9][0-9]*)$",
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Next Cursor"
+        },
+        "truncated": {
+         "title": "Truncated",
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "rows",
+        "next_cursor",
+        "truncated"
+       ],
+       "type": "object",
+       "$defs": {
+        "ArtifactListHookRowResult": {
+         "additionalProperties": false,
+         "description": "One hook inventory row.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "name": {
+           "title": "Name",
+           "type": "string"
+          },
+          "kind": {
+           "const": "hook",
+           "title": "Kind",
+           "type": "string"
+          },
+          "description": {
+           "title": "Description",
+           "type": "string"
+          },
+          "eventName": {
+           "title": "Eventname",
+           "type": "string"
+          },
+          "targetCommand": {
+           "title": "Targetcommand",
+           "type": "string"
+          },
+          "registered": {
+           "title": "Registered",
+           "type": "boolean"
+          },
+          "stack": {
+           "items": {
+            "$ref": "#/$defs/ArtifactListHookStackEntryResult"
+           },
+           "title": "Stack",
+           "type": "array"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "kind",
+          "description",
+          "eventName",
+          "targetCommand",
+          "registered",
+          "stack"
+         ],
+         "title": "ArtifactListHookRowResult",
+         "type": "object"
+        },
+        "ArtifactListHookStackEntryResult": {
+         "additionalProperties": false,
+         "description": "Composition entry for a hook artifact.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "layer": {
+           "enum": [
+            "preset",
+            "extension"
+           ],
+           "title": "Layer",
+           "type": "string"
+          },
+          "sourceId": {
+           "title": "Sourceid",
+           "type": "string"
+          },
+          "presetId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetid"
+          },
+          "presetName": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetname"
+          },
+          "strategy": {
+           "const": "additive",
+           "title": "Strategy",
+           "type": "string"
+          },
+          "active": {
+           "title": "Active",
+           "type": "boolean"
+          },
+          "hidden": {
+           "title": "Hidden",
+           "type": "boolean"
+          },
+          "manifestPath": {
+           "title": "Manifestpath",
+           "type": "string"
+          },
+          "lookupId": {
+           "title": "Lookupid",
+           "type": "string"
+          },
+          "sourcePath": {
+           "title": "Sourcepath",
+           "type": "null"
+          },
+          "priority": {
+           "title": "Priority",
+           "type": "integer"
+          },
+          "optional": {
+           "title": "Optional",
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "id",
+          "layer",
+          "sourceId",
+          "presetId",
+          "presetName",
+          "strategy",
+          "active",
+          "hidden",
+          "manifestPath",
+          "lookupId",
+          "sourcePath",
+          "priority",
+          "optional"
+         ],
+         "title": "ArtifactListHookStackEntryResult",
+         "type": "object"
+        },
+        "ArtifactListRowResult": {
+         "additionalProperties": false,
+         "description": "One named artifact inventory row.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "name": {
+           "title": "Name",
+           "type": "string"
+          },
+          "kind": {
+           "enum": [
+            "command",
+            "template",
+            "script"
+           ],
+           "title": "Kind",
+           "type": "string"
+          },
+          "description": {
+           "title": "Description",
+           "type": "string"
+          },
+          "stack": {
+           "items": {
+            "$ref": "#/$defs/ArtifactListStackEntryResult"
+           },
+           "title": "Stack",
+           "type": "array"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "kind",
+          "description",
+          "stack"
+         ],
+         "title": "ArtifactListRowResult",
+         "type": "object"
+        },
+        "ArtifactListStackEntryResult": {
+         "additionalProperties": false,
+         "description": "Composition entry for a named artifact.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "layer": {
+           "anyOf": [
+            {
+             "enum": [
+              "project",
+              "preset",
+              "extension"
+             ],
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Layer"
+          },
+          "sourceId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Sourceid"
+          },
+          "presetId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetid"
+          },
+          "presetName": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetname"
+          },
+          "strategy": {
+           "enum": [
+            "replace",
+            "wrap",
+            "prepend",
+            "append"
+           ],
+           "title": "Strategy",
+           "type": "string"
+          },
+          "active": {
+           "title": "Active",
+           "type": "boolean"
+          },
+          "hidden": {
+           "title": "Hidden",
+           "type": "boolean"
+          },
+          "manifestPath": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Manifestpath"
+          },
+          "lookupId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Lookupid"
+          },
+          "sourcePath": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Sourcepath"
+          }
+         },
+         "required": [
+          "id",
+          "layer",
+          "sourceId",
+          "presetId",
+          "presetName",
+          "strategy",
+          "active",
+          "hidden",
+          "manifestPath",
+          "lookupId",
+          "sourcePath"
+         ],
+         "title": "ArtifactListStackEntryResult",
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "description": "Typed structured result returned by ``specify_artifact_list``.",
+       "title": "ArtifactListToolResult"
+      }
+     },
+     {
+      "annotations": {
+       "idempotentHint": true,
+       "openWorldHint": false,
+       "readOnlyHint": true
+      },
+      "description": "Return one artifact and its complete composition stack for a project. Accepts bare or kind:name identifiers; responses are bounded by the MCP response-size limit.",
+      "inputSchema": {
+       "properties": {
+        "identifier": {
+         "title": "Identifier",
+         "type": "string"
+        },
+        "kind": {
+         "anyOf": [
+          {
+           "enum": [
+            "command",
+            "template",
+            "script",
+            "hook"
+           ],
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Kind"
+        },
+        "project_directory": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Project Directory"
+        }
+       },
+       "required": [
+        "identifier"
+       ],
+       "type": "object",
+       "additionalProperties": false,
+       "title": "specify_artifact_infoArguments"
+      },
+      "name": "specify_artifact_info",
+      "outputSchema": {
+       "type": "object",
+       "$defs": {
+        "ArtifactInfoHookResult": {
+         "additionalProperties": false,
+         "description": "One hook artifact and its additive declaration stack.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "name": {
+           "title": "Name",
+           "type": "string"
+          },
+          "kind": {
+           "const": "hook",
+           "title": "Kind",
+           "type": "string"
+          },
+          "description": {
+           "title": "Description",
+           "type": "string"
+          },
+          "eventName": {
+           "title": "Eventname",
+           "type": "string"
+          },
+          "targetCommand": {
+           "title": "Targetcommand",
+           "type": "string"
+          },
+          "registered": {
+           "title": "Registered",
+           "type": "boolean"
+          },
+          "stack": {
+           "items": {
+            "$ref": "#/$defs/ArtifactInfoHookStackEntryResult"
+           },
+           "minItems": 1,
+           "title": "Stack",
+           "type": "array"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "kind",
+          "description",
+          "eventName",
+          "targetCommand",
+          "registered",
+          "stack"
+         ],
+         "title": "ArtifactInfoHookResult",
+         "type": "object"
+        },
+        "ArtifactInfoHookStackEntryResult": {
+         "additionalProperties": false,
+         "description": "Composition entry for a hook artifact.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "layer": {
+           "enum": [
+            "preset",
+            "extension"
+           ],
+           "title": "Layer",
+           "type": "string"
+          },
+          "sourceId": {
+           "title": "Sourceid",
+           "type": "string"
+          },
+          "presetId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetid"
+          },
+          "presetName": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetname"
+          },
+          "strategy": {
+           "const": "additive",
+           "title": "Strategy",
+           "type": "string"
+          },
+          "active": {
+           "title": "Active",
+           "type": "boolean"
+          },
+          "hidden": {
+           "title": "Hidden",
+           "type": "boolean"
+          },
+          "manifestPath": {
+           "title": "Manifestpath",
+           "type": "string"
+          },
+          "lookupId": {
+           "title": "Lookupid",
+           "type": "string"
+          },
+          "sourcePath": {
+           "title": "Sourcepath",
+           "type": "null"
+          },
+          "priority": {
+           "title": "Priority",
+           "type": "integer"
+          },
+          "optional": {
+           "title": "Optional",
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "id",
+          "layer",
+          "sourceId",
+          "presetId",
+          "presetName",
+          "strategy",
+          "active",
+          "hidden",
+          "manifestPath",
+          "lookupId",
+          "sourcePath",
+          "priority",
+          "optional"
+         ],
+         "title": "ArtifactInfoHookStackEntryResult",
+         "type": "object"
+        },
+        "ArtifactInfoNamedResult": {
+         "additionalProperties": false,
+         "description": "One named artifact and its complete ordered composition stack.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "name": {
+           "title": "Name",
+           "type": "string"
+          },
+          "kind": {
+           "enum": [
+            "command",
+            "template",
+            "script"
+           ],
+           "title": "Kind",
+           "type": "string"
+          },
+          "description": {
+           "title": "Description",
+           "type": "string"
+          },
+          "stack": {
+           "items": {
+            "$ref": "#/$defs/ArtifactInfoStackEntryResult"
+           },
+           "minItems": 1,
+           "title": "Stack",
+           "type": "array"
+          }
+         },
+         "required": [
+          "id",
+          "name",
+          "kind",
+          "description",
+          "stack"
+         ],
+         "title": "ArtifactInfoNamedResult",
+         "type": "object"
+        },
+        "ArtifactInfoStackEntryResult": {
+         "additionalProperties": false,
+         "description": "Composition entry for a named artifact.",
+         "properties": {
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "layer": {
+           "anyOf": [
+            {
+             "enum": [
+              "project",
+              "preset",
+              "extension"
+             ],
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Layer"
+          },
+          "sourceId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Sourceid"
+          },
+          "presetId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetid"
+          },
+          "presetName": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Presetname"
+          },
+          "strategy": {
+           "enum": [
+            "replace",
+            "wrap",
+            "prepend",
+            "append"
+           ],
+           "title": "Strategy",
+           "type": "string"
+          },
+          "active": {
+           "title": "Active",
+           "type": "boolean"
+          },
+          "hidden": {
+           "title": "Hidden",
+           "type": "boolean"
+          },
+          "manifestPath": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Manifestpath"
+          },
+          "lookupId": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Lookupid"
+          },
+          "sourcePath": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Sourcepath"
+          }
+         },
+         "required": [
+          "id",
+          "layer",
+          "sourceId",
+          "presetId",
+          "presetName",
+          "strategy",
+          "active",
+          "hidden",
+          "manifestPath",
+          "lookupId",
+          "sourcePath"
+         ],
+         "title": "ArtifactInfoStackEntryResult",
+         "type": "object"
+        }
+       },
+       "description": "Typed structured result returned by ``specify_artifact_info``.",
+       "discriminator": {
+        "mapping": {
+         "command": "#/$defs/ArtifactInfoNamedResult",
+         "hook": "#/$defs/ArtifactInfoHookResult",
+         "script": "#/$defs/ArtifactInfoNamedResult",
+         "template": "#/$defs/ArtifactInfoNamedResult"
+        },
+        "propertyName": "kind"
+       },
+       "oneOf": [
+        {
+         "$ref": "#/$defs/ArtifactInfoNamedResult"
+        },
+        {
+         "$ref": "#/$defs/ArtifactInfoHookResult"
+        }
+       ],
+       "title": "ArtifactInfoToolResult"
+      }
+     },
+     {
+      "annotations": {
+       "idempotentHint": true,
+       "openWorldHint": false,
+       "readOnlyHint": true
+      },
+      "description": "List installed workflows and warnings without execution or network access. limit bounds registry entries, including warnings; truncated reports omitted entries.",
+      "inputSchema": {
+       "properties": {
+        "project_directory": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "default": null,
+         "title": "Project Directory"
+        },
+        "limit": {
+         "default": 100,
+         "maximum": 1000,
+         "minimum": 1,
+         "title": "Limit",
+         "type": "integer"
+        }
+       },
+       "type": "object",
+       "additionalProperties": false,
+       "title": "specify_workflow_listArguments"
+      },
+      "name": "specify_workflow_list",
+      "outputSchema": {
+       "properties": {
+        "items": {
+         "items": {
+          "discriminator": {
+           "mapping": {
+            "warning": "#/$defs/WorkflowWarningResult",
+            "workflow": "#/$defs/WorkflowEntryResult"
+           },
+           "propertyName": "kind"
+          },
+          "oneOf": [
+           {
+            "$ref": "#/$defs/WorkflowEntryResult"
+           },
+           {
+            "$ref": "#/$defs/WorkflowWarningResult"
+           }
+          ]
+         },
+         "maxItems": 1000,
+         "title": "Items",
+         "type": "array"
+        },
+        "truncated": {
+         "title": "Truncated",
+         "type": "boolean"
+        }
+       },
+       "required": [
+        "items",
+        "truncated"
+       ],
+       "type": "object",
+       "$defs": {
+        "WorkflowEntryResult": {
+         "additionalProperties": false,
+         "properties": {
+          "kind": {
+           "const": "workflow",
+           "title": "Kind",
+           "type": "string"
+          },
+          "id": {
+           "title": "Id",
+           "type": "string"
+          },
+          "name": {
+           "title": "Name",
+           "type": "string"
+          },
+          "version": {
+           "title": "Version",
+           "type": "string"
+          },
+          "description": {
+           "anyOf": [
+            {
+             "type": "string"
+            },
+            {
+             "type": "null"
+            }
+           ],
+           "title": "Description"
+          },
+          "enabled": {
+           "title": "Enabled",
+           "type": "boolean"
+          }
+         },
+         "required": [
+          "kind",
+          "id",
+          "name",
+          "version",
+          "description",
+          "enabled"
+         ],
+         "title": "WorkflowEntryResult",
+         "type": "object"
+        },
+        "WorkflowWarningResult": {
+         "additionalProperties": false,
+         "properties": {
+          "kind": {
+           "const": "warning",
+           "title": "Kind",
+           "type": "string"
+          },
+          "code": {
+           "const": "invalid_registry_entry",
+           "title": "Code",
+           "type": "string"
+          },
+          "workflow_id": {
+           "title": "Workflow Id",
+           "type": "string"
+          },
+          "message": {
+           "title": "Message",
+           "type": "string"
+          }
+         },
+         "required": [
+          "kind",
+          "code",
+          "workflow_id",
+          "message"
+         ],
+         "title": "WorkflowWarningResult",
+         "type": "object"
+        }
+       },
+       "additionalProperties": false,
+       "title": "WorkflowListToolResult"
+      }
+     }
+    ]
+   }
+  }
+ },
+ {
+  "label": "unknown-method",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 6,
+   "method": "resources/unknown"
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 6,
+   "error": {
+    "code": -32601,
+    "message": "Method not found",
+    "data": "resources/unknown"
+   }
+  }
+ },
+ {
+  "label": "list-commands",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 7,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_list_commands",
+    "arguments": {}
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 7,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"commands\": [\n    {\n      \"command\": \"version\",\n      \"description\": \"Return the installed Spec Kit CLI version, runtime, system, and feature capabilities.\",\n      \"arguments\": [],\n      \"read_only\": true,\n      \"json_output\": true\n    }\n  ]\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "commands": [
+      {
+       "command": "version",
+       "description": "Return the installed Spec Kit CLI version, runtime, system, and feature capabilities.",
+       "arguments": [],
+       "read_only": true,
+       "json_output": true
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "label": "list-commands-extra",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 8,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_list_commands",
+    "arguments": {
+     "x": 1
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 8,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"commands\": [\n    {\n      \"command\": \"version\",\n      \"description\": \"Return the installed Spec Kit CLI version, runtime, system, and feature capabilities.\",\n      \"arguments\": [],\n      \"read_only\": true,\n      \"json_output\": true\n    }\n  ]\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "commands": [
+      {
+       "command": "version",
+       "description": "Return the installed Spec Kit CLI version, runtime, system, and feature capabilities.",
+       "arguments": [],
+       "read_only": true,
+       "json_output": true
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "label": "describe-version",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 9,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_describe_command",
+    "arguments": {
+     "command": "version"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 9,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"command\": \"version\",\n  \"description\": \"Return the installed Spec Kit CLI version, runtime, system, and feature capabilities.\",\n  \"arguments\": [],\n  \"read_only\": true,\n  \"json_output\": true\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "command": "version",
+     "description": "Return the installed Spec Kit CLI version, runtime, system, and feature capabilities.",
+     "arguments": [],
+     "read_only": true,
+     "json_output": true
+    }
+   }
+  }
+ },
+ {
+  "label": "describe-unknown",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 10,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_describe_command",
+    "arguments": {
+     "command": "init"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 10,
+   "result": {
+    "content": [
+     {
+      "text": "unavailable_command: Command 'init' is not available through the experimental Spec Kit MCP server.",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "unavailable_command",
+      "message": "Command 'init' is not available through the experimental Spec Kit MCP server.",
+      "details": {
+       "command": "init",
+       "available_commands": [
+        "version"
+       ]
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "describe-missing-arg",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 11,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_describe_command",
+    "arguments": {}
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 11,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_describe_command: 1 validation error for specify_describe_commandArguments\ncommand\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "run-unknown",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 12,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_run_command",
+    "arguments": {
+     "command": "init"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 12,
+   "result": {
+    "content": [
+     {
+      "text": "unavailable_command: Command 'init' is not available through the experimental Spec Kit MCP server.",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "unavailable_command",
+      "message": "Command 'init' is not available through the experimental Spec Kit MCP server.",
+      "details": {
+       "command": "init",
+       "available_commands": [
+        "version"
+       ]
+      }
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "version-extra",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 13,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_version",
+    "arguments": {
+     "x": 1
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 13,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_version: 1 validation error for specify_versionArguments\nx\n  Extra inputs are not permitted [type=extra_forbidden, input_value=1, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "unknown-tool",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 14,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_nope",
+    "arguments": {}
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 14,
+   "result": {
+    "content": [
+     {
+      "text": "Unknown tool: specify_nope",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "artifact-list-page",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 15,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "limit": 2
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 15,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"rows\": [\n    {\n      \"id\": \"command:speckit.analyze\",\n      \"name\": \"speckit.analyze\",\n      \"kind\": \"command\",\n      \"description\": \"Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.\",\n      \"stack\": [\n        {\n          \"id\": \"command:speckit.analyze\",\n          \"layer\": null,\n          \"sourceId\": null,\n          \"presetId\": null,\n          \"presetName\": null,\n          \"strategy\": \"replace\",\n          \"active\": true,\n          \"hidden\": false,\n          \"manifestPath\": null,\n          \"lookupId\": null,\n          \"sourcePath\": null\n        }\n      ]\n    },\n    {\n      \"id\": \"command:speckit.checklist\",\n      \"name\": \"speckit.checklist\",\n      \"kind\": \"command\",\n      \"description\": \"Generate a custom checklist for the current feature based on user requirements.\",\n      \"stack\": [\n        {\n          \"id\": \"command:speckit.checklist\",\n          \"layer\": null,\n          \"sourceId\": null,\n          \"presetId\": null,\n          \"presetName\": null,\n          \"strategy\": \"replace\",\n          \"active\": true,\n          \"hidden\": false,\n          \"manifestPath\": null,\n          \"lookupId\": null,\n          \"sourcePath\": null\n        }\n      ]\n    }\n  ],\n  \"next_cursor\": \"2\",\n  \"truncated\": true\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "rows": [
+      {
+       "id": "command:speckit.analyze",
+       "name": "speckit.analyze",
+       "kind": "command",
+       "description": "Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.",
+       "stack": [
+        {
+         "id": "command:speckit.analyze",
+         "layer": null,
+         "sourceId": null,
+         "presetId": null,
+         "presetName": null,
+         "strategy": "replace",
+         "active": true,
+         "hidden": false,
+         "manifestPath": null,
+         "lookupId": null,
+         "sourcePath": null
+        }
+       ]
+      },
+      {
+       "id": "command:speckit.checklist",
+       "name": "speckit.checklist",
+       "kind": "command",
+       "description": "Generate a custom checklist for the current feature based on user requirements.",
+       "stack": [
+        {
+         "id": "command:speckit.checklist",
+         "layer": null,
+         "sourceId": null,
+         "presetId": null,
+         "presetName": null,
+         "strategy": "replace",
+         "active": true,
+         "hidden": false,
+         "manifestPath": null,
+         "lookupId": null,
+         "sourcePath": null
+        }
+       ]
+      }
+     ],
+     "next_cursor": "2",
+     "truncated": true
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-list-cursor",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 16,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "limit": 2,
+     "cursor": "2"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 16,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"rows\": [\n    {\n      \"id\": \"command:speckit.clarify\",\n      \"name\": \"speckit.clarify\",\n      \"kind\": \"command\",\n      \"description\": \"Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.\",\n      \"stack\": [\n        {\n          \"id\": \"command:speckit.clarify\",\n          \"layer\": null,\n          \"sourceId\": null,\n          \"presetId\": null,\n          \"presetName\": null,\n          \"strategy\": \"replace\",\n          \"active\": true,\n          \"hidden\": false,\n          \"manifestPath\": null,\n          \"lookupId\": null,\n          \"sourcePath\": null\n        }\n      ]\n    },\n    {\n      \"id\": \"command:speckit.constitution\",\n      \"name\": \"speckit.constitution\",\n      \"kind\": \"command\",\n      \"description\": \"Create or update the project constitution from interactive or provided principle inputs.\",\n      \"stack\": [\n        {\n          \"id\": \"command:speckit.constitution\",\n          \"layer\": null,\n          \"sourceId\": null,\n          \"presetId\": null,\n          \"presetName\": null,\n          \"strategy\": \"replace\",\n          \"active\": true,\n          \"hidden\": false,\n          \"manifestPath\": null,\n          \"lookupId\": null,\n          \"sourcePath\": null\n        }\n      ]\n    }\n  ],\n  \"next_cursor\": \"4\",\n  \"truncated\": true\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "rows": [
+      {
+       "id": "command:speckit.clarify",
+       "name": "speckit.clarify",
+       "kind": "command",
+       "description": "Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.",
+       "stack": [
+        {
+         "id": "command:speckit.clarify",
+         "layer": null,
+         "sourceId": null,
+         "presetId": null,
+         "presetName": null,
+         "strategy": "replace",
+         "active": true,
+         "hidden": false,
+         "manifestPath": null,
+         "lookupId": null,
+         "sourcePath": null
+        }
+       ]
+      },
+      {
+       "id": "command:speckit.constitution",
+       "name": "speckit.constitution",
+       "kind": "command",
+       "description": "Create or update the project constitution from interactive or provided principle inputs.",
+       "stack": [
+        {
+         "id": "command:speckit.constitution",
+         "layer": null,
+         "sourceId": null,
+         "presetId": null,
+         "presetName": null,
+         "strategy": "replace",
+         "active": true,
+         "hidden": false,
+         "manifestPath": null,
+         "lookupId": null,
+         "sourcePath": null
+        }
+       ]
+      }
+     ],
+     "next_cursor": "4",
+     "truncated": true
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-list-last",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 17,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "limit": 1000,
+     "cursor": "30"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 17,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"rows\": [],\n  \"next_cursor\": null,\n  \"truncated\": false\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "rows": [],
+     "next_cursor": null,
+     "truncated": false
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-list-bad-limit",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 18,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "limit": 0
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 18,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_artifact_list: 1 validation error for specify_artifact_listArguments\nlimit\n  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.14/v/greater_than_equal",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "artifact-list-bad-limit-type",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 19,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "limit": "5"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 19,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_artifact_list: 1 validation error for specify_artifact_listArguments\nlimit\n  Input should be a valid integer [type=int_type, input_value='5', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/int_type",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "artifact-list-bad-cursor",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 20,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "cursor": "01"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 20,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_artifact_list: 1 validation error for specify_artifact_listArguments\ncursor\n  String should match pattern '^(0|[1-9][0-9]*)$' [type=string_pattern_mismatch, input_value='01', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/string_pattern_mismatch",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "artifact-list-relative",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 21,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "project_directory": "relative/dir"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 21,
+   "result": {
+    "content": [
+     {
+      "text": "invalid_project_directory: project_directory must be an absolute path",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "invalid_project_directory",
+      "message": "project_directory must be an absolute path",
+      "details": {
+       "project_directory": "relative/dir"
+      },
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-list-not-project",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 22,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "project_directory": "/"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 22,
+   "result": {
+    "content": [
+     {
+      "text": "not_a_spec_kit_project: not a Spec Kit project: no .specify/ directory found",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "not_a_spec_kit_project",
+      "message": "not a Spec Kit project: no .specify/ directory found",
+      "details": {
+       "project_directory": "/"
+      },
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-list-extra",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 23,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_list",
+    "arguments": {
+     "bogus": true
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 23,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_artifact_list: 1 validation error for specify_artifact_listArguments\nbogus\n  Extra inputs are not permitted [type=extra_forbidden, input_value=True, input_type=bool]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "artifact-info-plan",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 24,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {
+     "identifier": "command:plan"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 24,
+   "result": {
+    "content": [
+     {
+      "text": "unknown_artifact: unknown artifact command:plan",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "unknown_artifact",
+      "message": "unknown artifact command:plan",
+      "details": {
+       "identifier": "command:plan"
+      },
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-info-template",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 25,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {
+     "identifier": "spec-template",
+     "kind": "template"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 25,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"id\": \"template:spec-template\",\n  \"name\": \"spec-template\",\n  \"kind\": \"template\",\n  \"description\": \"\",\n  \"stack\": [\n    {\n      \"id\": \"template:spec-template\",\n      \"layer\": null,\n      \"sourceId\": null,\n      \"presetId\": null,\n      \"presetName\": null,\n      \"strategy\": \"replace\",\n      \"active\": true,\n      \"hidden\": false,\n      \"manifestPath\": null,\n      \"lookupId\": null,\n      \"sourcePath\": null\n    }\n  ]\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "id": "template:spec-template",
+     "name": "spec-template",
+     "kind": "template",
+     "description": "",
+     "stack": [
+      {
+       "id": "template:spec-template",
+       "layer": null,
+       "sourceId": null,
+       "presetId": null,
+       "presetName": null,
+       "strategy": "replace",
+       "active": true,
+       "hidden": false,
+       "manifestPath": null,
+       "lookupId": null,
+       "sourcePath": null
+      }
+     ]
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-info-unknown",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 26,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {
+     "identifier": "command:nope"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 26,
+   "result": {
+    "content": [
+     {
+      "text": "unknown_artifact: unknown artifact command:nope",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "unknown_artifact",
+      "message": "unknown artifact command:nope",
+      "details": {
+       "identifier": "command:nope"
+      },
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-info-bad-id",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 27,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {
+     "identifier": "weird:thing"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 27,
+   "result": {
+    "content": [
+     {
+      "text": "invalid_artifact_identifier: unknown artifact weird:thing",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "invalid_artifact_identifier",
+      "message": "unknown artifact weird:thing",
+      "details": {
+       "identifier": "weird:thing"
+      },
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-info-hook-unknown",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 28,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {
+     "identifier": "hook:before_plan/speckit.x"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 28,
+   "result": {
+    "content": [
+     {
+      "text": "invalid_artifact_identifier: unknown artifact hook:before_plan/speckit.x",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "invalid_artifact_identifier",
+      "message": "unknown artifact hook:before_plan/speckit.x",
+      "details": {
+       "identifier": "hook:before_plan/speckit.x"
+      },
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "artifact-info-bad-kind",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 29,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {
+     "identifier": "plan",
+     "kind": "bogus"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 29,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_artifact_info: 1 validation error for specify_artifact_infoArguments\nkind\n  Input should be 'command', 'template', 'script' or 'hook' [type=literal_error, input_value='bogus', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/literal_error",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "artifact-info-missing",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 30,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {}
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 30,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_artifact_info: 1 validation error for specify_artifact_infoArguments\nidentifier\n  Field required [type=missing, input_value={}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "artifact-info-relative",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 31,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_artifact_info",
+    "arguments": {
+     "identifier": "plan",
+     "project_directory": "x"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 31,
+   "result": {
+    "content": [
+     {
+      "text": "invalid_project_directory: project_directory must be an absolute path",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "invalid_project_directory",
+      "message": "project_directory must be an absolute path",
+      "details": {
+       "project_directory": "x"
+      },
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "workflow-list",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 32,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_workflow_list",
+    "arguments": {}
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 32,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"items\": [\n    {\n      \"kind\": \"workflow\",\n      \"id\": \"speckit\",\n      \"name\": \"Full SDD Cycle\",\n      \"version\": \"1.0.1\",\n      \"description\": \"Runs specify → plan → tasks → implement with review gates\",\n      \"enabled\": true\n    }\n  ],\n  \"truncated\": false\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "items": [
+      {
+       "kind": "workflow",
+       "id": "speckit",
+       "name": "Full SDD Cycle",
+       "version": "1.0.1",
+       "description": "Runs specify → plan → tasks → implement with review gates",
+       "enabled": true
+      }
+     ],
+     "truncated": false
+    }
+   }
+  }
+ },
+ {
+  "label": "workflow-list-limit",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 33,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_workflow_list",
+    "arguments": {
+     "limit": 1
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 33,
+   "result": {
+    "content": [
+     {
+      "text": "{\n  \"items\": [\n    {\n      \"kind\": \"workflow\",\n      \"id\": \"speckit\",\n      \"name\": \"Full SDD Cycle\",\n      \"version\": \"1.0.1\",\n      \"description\": \"Runs specify → plan → tasks → implement with review gates\",\n      \"enabled\": true\n    }\n  ],\n  \"truncated\": false\n}",
+      "type": "text"
+     }
+    ],
+    "isError": false,
+    "structuredContent": {
+     "items": [
+      {
+       "kind": "workflow",
+       "id": "speckit",
+       "name": "Full SDD Cycle",
+       "version": "1.0.1",
+       "description": "Runs specify → plan → tasks → implement with review gates",
+       "enabled": true
+      }
+     ],
+     "truncated": false
+    }
+   }
+  }
+ },
+ {
+  "label": "workflow-list-bad-limit",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 34,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_workflow_list",
+    "arguments": {
+     "limit": 1001
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 34,
+   "result": {
+    "content": [
+     {
+      "text": "Error executing tool specify_workflow_list: 1 validation error for specify_workflow_listArguments\nlimit\n  Input should be less than or equal to 1000 [type=less_than_equal, input_value=1001, input_type=int]\n    For further information visit https://errors.pydantic.dev/2.14/v/less_than_equal",
+      "type": "text"
+     }
+    ],
+    "isError": true
+   }
+  }
+ },
+ {
+  "label": "workflow-list-not-project",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 35,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_workflow_list",
+    "arguments": {
+     "project_directory": "/"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 35,
+   "result": {
+    "content": [
+     {
+      "text": "not_a_spec_kit_project: The selected directory is not a Spec Kit project.",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "not_a_spec_kit_project",
+      "message": "The selected directory is not a Spec Kit project.",
+      "details": {},
+      "retryable": false
+     }
+    }
+   }
+  }
+ },
+ {
+  "label": "workflow-list-relative",
+  "request": {
+   "jsonrpc": "2.0",
+   "id": 36,
+   "method": "tools/call",
+   "params": {
+    "name": "specify_workflow_list",
+    "arguments": {
+     "project_directory": "rel"
+    }
+   }
+  },
+  "response": {
+   "jsonrpc": "2.0",
+   "id": 36,
+   "result": {
+    "content": [
+     {
+      "text": "invalid_project_directory: project_directory must be an absolute path.",
+      "type": "text"
+     }
+    ],
+    "isError": true,
+    "structuredContent": {
+     "error": {
+      "code": "invalid_project_directory",
+      "message": "project_directory must be an absolute path.",
+      "details": {},
+      "retryable": false
+     }
+    }
+   }
+  }
+ }
+]

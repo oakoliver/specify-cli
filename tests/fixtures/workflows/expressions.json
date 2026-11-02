@@ -1,0 +1,2239 @@
+{
+ "conds": [
+  {
+   "c": "inputs.count > 100",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.count > 100 }}\".",
+   "format_condition_correction": "\"{{ inputs.count > 100 }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.count > 100' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.count > 100' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.count > 100' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.count > 100",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.count > 100 }}\".",
+   "format_condition_correction": "\"{{ inputs.count > 100 }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ inputs.count > 100' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ inputs.count > 100' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ inputs.count > 100' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ]
+   }
+  },
+  {
+   "c": "}} inputs.count > 100 {{",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.count > 100 }}\".",
+   "format_condition_correction": "\"{{ inputs.count > 100 }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '}} inputs.count > 100 {{' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' '}} inputs.count > 100 {{' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '}} inputs.count > 100 {{' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.count > 100 }}\"."
+    ]
+   }
+  },
+  {
+   "c": "{{ true }} and {{ inputs.ready",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ true and inputs.ready }}\".",
+   "format_condition_correction": "\"{{ true and inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ true }} and {{ inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ true and inputs.ready }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ true }} and {{ inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ true and inputs.ready }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ true }} and {{ inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ true and inputs.ready }}\"."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.x == '}}'",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": true,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.x == '}}' }}\".",
+   "format_condition_correction": "\"{{ inputs.x == '}}' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"{{ inputs.x == '}}'\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "While": [
+     "While step 's': 'condition' \"{{ inputs.x == '}}'\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"{{ inputs.x == '}}'\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.missing | default('oops }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": true,
+   "format_condition_remediation": "No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.missing | default('oops }} }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"{{ inputs.missing | default('oops }}\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "While": [
+     "While step 's': 'condition' \"{{ inputs.missing | default('oops }}\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"{{ inputs.missing | default('oops }}\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.name }} {{ inputs.missing | default('oops }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": true,
+   "format_condition_remediation": "No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.name inputs.missing | default('oops }} }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"{{ inputs.name }} {{ inputs.missing | default('oops }}\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "While": [
+     "While step 's': 'condition' \"{{ inputs.name }} {{ inputs.missing | default('oops }}\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"{{ inputs.name }} {{ inputs.missing | default('oops }}\" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.ready }} and {{ inputs.count > 100 }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": true,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready and inputs.count > 100 }}\".",
+   "format_condition_correction": "\"{{ inputs.ready and inputs.count > 100 }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ inputs.ready }} and {{ inputs.count > 100 }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ inputs.ready }} and {{ inputs.count > 100 }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ inputs.ready }} and {{ inputs.count > 100 }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.ready }} or {{ inputs.ready }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": true,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready or inputs.ready }}\".",
+   "format_condition_correction": "\"{{ inputs.ready or inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ inputs.ready }} or {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ inputs.ready }} or {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ inputs.ready }} or {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ]
+   }
+  },
+  {
+   "c": "not {{ inputs.ready }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": true,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ not inputs.ready }}\".",
+   "format_condition_correction": "\"{{ not inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'not {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "While": [
+     "While step 's': 'condition' 'not {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'not {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.count }} > 100",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": true,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.count > 100 }}\".",
+   "format_condition_correction": "\"{{ inputs.count > 100 }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ inputs.count }} > 100' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ inputs.count }} > 100' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ inputs.count }} > 100' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ]
+   }
+  },
+  {
+   "c": "ready: {{ inputs.ready }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": true,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'ready: inputs.ready' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ ready: inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'ready: {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "While": [
+     "While step 's': 'condition' 'ready: {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'ready: {{ inputs.ready }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.ready }}x",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": true,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'ready x' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.ready x }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ inputs.ready }}x' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ inputs.ready }}x' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ inputs.ready }}x' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.ready }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready }}\".",
+   "format_condition_correction": "\"{{ inputs.ready }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.ready and inputs.count > 100 }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready and inputs.count > 100 }}\".",
+   "format_condition_correction": "\"{{ inputs.ready and inputs.count > 100 }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ not inputs.ready }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ not inputs.ready }}\".",
+   "format_condition_correction": "\"{{ not inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.tags | join(', ') == 'a, b' }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (filter 'join' used in an unsupported form (got '| join(', ') == 'a, b'')): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.tags | join(', ') == 'a, b' }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.text | contains('}}') }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.text | contains('}}') }}\".",
+   "format_condition_correction": "\"{{ inputs.text | contains('}}') }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "  {{ inputs.ready }}  ",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready }}\".",
+   "format_condition_correction": "\"{{ inputs.ready }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "inputs.name == \"zzz\"",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\".",
+   "format_condition_correction": "\"{{ inputs.name == \\\"zzz\\\" }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.name == \"zzz\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.name == \"zzz\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.name == \"zzz\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.name == 'zzz'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.name == 'zzz' }}\".",
+   "format_condition_correction": "\"{{ inputs.name == 'zzz' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.name == 'zzz'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == 'zzz' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.name == 'zzz'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == 'zzz' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.name == 'zzz'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == 'zzz' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a == \"x\" and inputs.b == 'y'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.a == \\\"x\\\" and inputs.b == 'y' }}\".",
+   "format_condition_correction": "\"{{ inputs.a == \\\"x\\\" and inputs.b == 'y' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.a == \"x\" and inputs.b == \\'y\\'' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == \\\"x\\\" and inputs.b == 'y' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.a == \"x\" and inputs.b == \\'y\\'' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == \\\"x\\\" and inputs.b == 'y' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.a == \"x\" and inputs.b == \\'y\\'' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == \\\"x\\\" and inputs.b == 'y' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.path == 'C:\\tmp'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.path == 'C:\\\\tmp' }}\".",
+   "format_condition_correction": "\"{{ inputs.path == 'C:\\\\tmp' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.path == 'C:\\\\tmp'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.path == 'C:\\\\tmp' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.path == 'C:\\\\tmp'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.path == 'C:\\\\tmp' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.path == 'C:\\\\tmp'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.path == 'C:\\\\tmp' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.path == \"C:\\tmp\"",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.path == \\\"C:\\\\tmp\\\" }}\".",
+   "format_condition_correction": "\"{{ inputs.path == \\\"C:\\\\tmp\\\" }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.path == \"C:\\\\tmp\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.path == \\\"C:\\\\tmp\\\" }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.path == \"C:\\\\tmp\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.path == \\\"C:\\\\tmp\\\" }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.path == \"C:\\\\tmp\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.path == \\\"C:\\\\tmp\\\" }}\"."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.name == \"zzz\"",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\".",
+   "format_condition_correction": "\"{{ inputs.name == \\\"zzz\\\" }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ inputs.name == \"zzz\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ inputs.name == \"zzz\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ inputs.name == \"zzz\"' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name == \\\"zzz\\\" }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.x == 1\nand inputs.name == 'abc'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.x == 1\\nand inputs.name == 'abc' }}\".",
+   "format_condition_correction": "\"{{ inputs.x == 1\\nand inputs.name == 'abc' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.x == 1\\nand inputs.name == 'abc'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.x == 1\\nand inputs.name == 'abc' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.x == 1\\nand inputs.name == 'abc'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.x == 1\\nand inputs.name == 'abc' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.x == 1\\nand inputs.name == 'abc'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.x == 1\\nand inputs.name == 'abc' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "he said \"hi\"\nthen left",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ he said \\\"hi\\\"\\nthen left }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'he said \"hi\"\\nthen left' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'he said \"hi\"\\nthen left' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'he said \"hi\"\\nthen left' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a == 'x\ty'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.a == 'x\\ty' }}\".",
+   "format_condition_correction": "\"{{ inputs.a == 'x\\ty' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.a == 'x\\ty'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == 'x\\ty' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.a == 'x\\ty'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == 'x\\ty' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.a == 'x\\ty'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == 'x\\ty' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a == 'x\ry'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.a == 'x\\ry' }}\".",
+   "format_condition_correction": "\"{{ inputs.a == 'x\\ry' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.a == 'x\\ry'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == 'x\\ry' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.a == 'x\\ry'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == 'x\\ry' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.a == 'x\\ry'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a == 'x\\ry' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.ten == 'mười'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ten == 'mười' }}\".",
+   "format_condition_correction": "\"{{ inputs.ten == 'mười' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.ten == 'mười'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.ten == 'mười' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.ten == 'mười'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.ten == 'mười' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.ten == 'mười'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.ten == 'mười' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a and inputs.b",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.a and inputs.b }}\".",
+   "format_condition_correction": "\"{{ inputs.a and inputs.b }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.a and inputs.b' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a and inputs.b }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.a and inputs.b' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a and inputs.b }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.a and inputs.b' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.a and inputs.b }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.name",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.name }}\".",
+   "format_condition_correction": "\"{{ inputs.name }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.name' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.name' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.name' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.name }}\"."
+    ]
+   }
+  },
+  {
+   "c": "not inputs.ready",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ not inputs.ready }}\".",
+   "format_condition_correction": "\"{{ not inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'not inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ not inputs.ready }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'not inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ not inputs.ready }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'not inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ not inputs.ready }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.tags | join(',')",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.tags | join(',') }}\".",
+   "format_condition_correction": "\"{{ inputs.tags | join(',') }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.tags | join(',')\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.tags | join(',') }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.tags | join(',')\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.tags | join(',') }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.tags | join(',')\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.tags | join(',') }}\"."
+    ]
+   }
+  },
+  {
+   "c": "   ",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because there is no expression here to wrap: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '   ' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because there is no expression here to wrap: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' '   ' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because there is no expression here to wrap: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '   ' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because there is no expression here to wrap: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.name == 'abc",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.name == 'abc }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"{{ inputs.name == 'abc\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' \"{{ inputs.name == 'abc\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"{{ inputs.name == 'abc\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "'unterminated",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ 'unterminated }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"'unterminated\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' \"'unterminated\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"'unterminated\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the quote opened in it is never closed: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.name ==",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.name == }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.name ==' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.name ==' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.name ==' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.count >",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.count > }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.count >' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.count >' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.count >' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.ready and",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.ready and }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.ready and' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.ready and' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.ready and' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.x | ",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.x | }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.x | ' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.x | ' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.x | ' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.f(",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.f( }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.f(' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.f(' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.f(' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a == inputs.b ==",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.a == inputs.b == }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.a == inputs.b ==' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.a == inputs.b ==' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.a == inputs.b ==' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "and inputs.ready",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ and inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'and inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'and inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'and inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a not in",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.a not in }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.a not in' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.a not in' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.a not in' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "in inputs.tags",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ in inputs.tags }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'in inputs.tags' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'in inputs.tags' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'in inputs.tags' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.f(]",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.f(] }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.f(]' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.f(]' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.f(]' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because its brackets do not balance: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.items | length",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.items | length }}\".",
+   "format_condition_correction": "\"{{ inputs.items | length }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.items | length' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.items | length }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.items | length' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.items | length }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.items | length' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.items | length }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.tags | join",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (filter 'join' used in an unsupported form (got '| join')): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.tags | join }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.tags | join' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (filter 'join' used in an unsupported form (got '| join')): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.tags | join' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (filter 'join' used in an unsupported form (got '| join')): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.tags | join' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (filter 'join' used in an unsupported form (got '| join')): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "he said \"hi\" then left",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ he said \\\"hi\\\" then left }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'he said \"hi\" then left' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'he said \"hi\" then left' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'he said \"hi\" then left' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'he said \"hi\" then left' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.count+1",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.count+1 }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.count+1' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.count+1' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.count+1' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a === inputs.b",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because '= inputs.b' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.a === inputs.b }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.a === inputs.b' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because '= inputs.b' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.a === inputs.b' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because '= inputs.b' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.a === inputs.b' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because '= inputs.b' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "bogus == 'x'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ bogus == 'x' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"bogus == 'x'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' \"bogus == 'x'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"bogus == 'x'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.payload | from_json()",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (from_json): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.payload | from_json() }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.payload | from_json()' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (from_json): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.payload | from_json()' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (from_json): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.payload | from_json()' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (from_json): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because there is no expression here to wrap: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "true",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ true }}\".",
+   "format_condition_correction": "\"{{ true }}\"",
+   "eval": true,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.a }} and {{ inputs.b }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": true,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.a and inputs.b }}\".",
+   "format_condition_correction": "\"{{ inputs.a and inputs.b }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '{{ inputs.a }} and {{ inputs.b }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "While": [
+     "While step 's': 'condition' '{{ inputs.a }} and {{ inputs.b }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '{{ inputs.a }} and {{ inputs.b }}' holds more than one '{{ }}' block, or text around one, so it is substituted into a string and coerced by bool() instead of being evaluated. Put the whole expression inside a single '{{ }}' block."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.x == '}}' ",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": true,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.x == '}}' }}\".",
+   "format_condition_correction": "\"{{ inputs.x == '}}' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"{{ inputs.x == '}}' \" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "While": [
+     "While step 's': 'condition' \"{{ inputs.x == '}}' \" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"{{ inputs.x == '}}' \" opens a '{{' the interpolator cannot close, so it falls back to the first raw '}}' and evaluates a truncated expression instead of the one written. Balance the delimiters and quotes."
+    ]
+   }
+  },
+  {
+   "c": "prefix {{ inputs.ready",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'prefix inputs.ready' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ prefix inputs.ready }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'prefix {{ inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'prefix inputs.ready' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'prefix {{ inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'prefix inputs.ready' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'prefix {{ inputs.ready' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'prefix inputs.ready' is not a name the evaluator can resolve: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.tags | join(bogus)",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.tags | join(bogus) }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.tags | join(bogus)' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.tags | join(bogus)' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.tags | join(bogus)' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.x | lenght",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (unknown filter 'lenght'): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.x | lenght }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.x | lenght' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (unknown filter 'lenght'): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.x | lenght' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (unknown filter 'lenght'): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.x | lenght' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because the evaluator rejects it (unknown filter 'lenght'): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "steps.emit.output.stdout | from_json",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ steps.emit.output.stdout | from_json }}\".",
+   "format_condition_correction": "\"{{ steps.emit.output.stdout | from_json }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'steps.emit.output.stdout | from_json' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ steps.emit.output.stdout | from_json }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'steps.emit.output.stdout | from_json' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ steps.emit.output.stdout | from_json }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'steps.emit.output.stdout | from_json' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ steps.emit.output.stdout | from_json }}\"."
+    ]
+   }
+  },
+  {
+   "c": "item[0] == 'x'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ item[0] == 'x' }}\".",
+   "format_condition_correction": "\"{{ item[0] == 'x' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"item[0] == 'x'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ item[0] == 'x' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"item[0] == 'x'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ item[0] == 'x' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"item[0] == 'x'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ item[0] == 'x' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "not inputs.x",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ not inputs.x }}\".",
+   "format_condition_correction": "\"{{ not inputs.x }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'not inputs.x' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ not inputs.x }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' 'not inputs.x' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ not inputs.x }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'not inputs.x' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ not inputs.x }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.x not in",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.x not in }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.x not in' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.x not in' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.x not in' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "and inputs.x",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ and inputs.x }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'and inputs.x' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'and inputs.x' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'and inputs.x' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because an operator in it is missing an operand: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.count+1 > 2",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.count+1 > 2 }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.count+1 > 2' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.count+1 > 2' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.count+1 > 2' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'count+1' is not a valid path segment: wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.x == 'a\nb'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.x == 'a\\nb' }}\".",
+   "format_condition_correction": "\"{{ inputs.x == 'a\\nb' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.x == 'a\\nb'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.x == 'a\\nb' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.x == 'a\\nb'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.x == 'a\\nb' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.x == 'a\\nb'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.x == 'a\\nb' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "inputs.tags | map('x') | contains(bogus)",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.tags | map('x') | contains(bogus) }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.tags | map('x') | contains(bogus)\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.tags | map('x') | contains(bogus)\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.tags | map('x') | contains(bogus)\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "[inputs.a, bogus]",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ [inputs.a, bogus] }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' '[inputs.a, bogus]' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' '[inputs.a, bogus]' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' '[inputs.a, bogus]' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "inputs.a | default(bogus)",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.a | default(bogus) }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' 'inputs.a | default(bogus)' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "While": [
+     "While step 's': 'condition' 'inputs.a | default(bogus)' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' 'inputs.a | default(bogus)' is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. No correction is offered because 'bogus' is not one of the namespace roots (inputs, steps, item, fan_in, context): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.tags[-1] == 'a' }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.tags[-1] == 'a' }}\".",
+   "format_condition_correction": "\"{{ inputs.tags[-1] == 'a' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ (inputs.ready or inputs.count) and inputs.name }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ (inputs.ready or inputs.count) and inputs.name }}\".",
+   "format_condition_correction": "\"{{ (inputs.ready or inputs.count) and inputs.name }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.ready or\n inputs.name }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready or\\n inputs.name }}\".",
+   "format_condition_correction": "\"{{ inputs.ready or\\n inputs.name }}\"",
+   "eval": true,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.name | upper == 'ABC' }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (upper): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.name | upper == 'ABC' }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.tags | length > 0 }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (length): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.tags | length > 0 }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.name | length }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.name | length }}\".",
+   "format_condition_correction": "\"{{ inputs.name | length }}\"",
+   "eval": true,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.ready or (inputs.count | upper) }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready or (inputs.count | upper) }}\".",
+   "format_condition_correction": "\"{{ inputs.ready or (inputs.count | upper) }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.name | upper }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.name | upper }}\".",
+   "format_condition_correction": "\"{{ inputs.name | upper }}\"",
+   "eval": true,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.name | split(',') }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.name | split(',') }}\".",
+   "format_condition_correction": "\"{{ inputs.name | split(',') }}\"",
+   "eval": true,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.name | split }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (filter 'split' used in an unsupported form (got '| split')): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.name | split }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ inputs.name | upper('x') }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "No correction is offered because the evaluator rejects it (upper): wrapping it as written would produce a different expression from the one intended, and its result can silently invert the condition rather than repair it. Complete the expression, or use the literal true or false.",
+   "format_condition_correction": "\"{{ inputs.name | upper('x') }}\"",
+   "eval": "ERR ValueError",
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "inputs.tags[-1] == 'a'",
+   "condition_is_never_evaluated": true,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.tags[-1] == 'a' }}\".",
+   "format_condition_correction": "\"{{ inputs.tags[-1] == 'a' }}\"",
+   "eval": true,
+   "validate": {
+    "If": [
+     "If step 's': 'condition' \"inputs.tags[-1] == 'a'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.tags[-1] == 'a' }}\"."
+    ],
+    "While": [
+     "While step 's': 'condition' \"inputs.tags[-1] == 'a'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.tags[-1] == 'a' }}\"."
+    ],
+    "Do-while": [
+     "Do-while step 's': 'condition' \"inputs.tags[-1] == 'a'\" is not a single complete '{{ }}' block, so it is never evaluated as an expression and is always true. Wrap the expression: \"{{ inputs.tags[-1] == 'a' }}\"."
+    ]
+   }
+  },
+  {
+   "c": "{{ inputs.ready and (inputs.bogus | upper) }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ inputs.ready and (inputs.bogus | upper) }}\".",
+   "format_condition_correction": "\"{{ inputs.ready and (inputs.bogus | upper) }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  },
+  {
+   "c": "{{ (inputs.ready) or (inputs.count > 1) }}",
+   "condition_is_never_evaluated": false,
+   "condition_is_interpolated_to_text": false,
+   "condition_has_malformed_expression_block": false,
+   "format_condition_remediation": "Wrap the expression: \"{{ (inputs.ready) or (inputs.count > 1) }}\".",
+   "format_condition_correction": "\"{{ (inputs.ready) or (inputs.count > 1) }}\"",
+   "eval": false,
+   "validate": {
+    "If": [],
+    "While": [],
+    "Do-while": []
+   }
+  }
+ ],
+ "templates": [
+  {
+   "t": "{{ inputs.name }}",
+   "v": "Bob",
+   "s": null
+  },
+  {
+   "t": "Hi {{ inputs.name }}!",
+   "v": "Hi Bob!",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.missing | default('x') }}",
+   "v": "x",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.count > 5 }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.count >= '10' }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.v > '9' }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.d < '2026-02-01' }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.count > 'abc' }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ inputs.rows | map('r.s') }}",
+   "v": [
+    1,
+    null
+   ],
+   "s": "[1, None]"
+  },
+  {
+   "t": "{{ inputs.rows | map('name') | join('-') }}",
+   "v": "a-b",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.blob | from_json }}",
+   "v": {
+    "a": [
+     1,
+     2
+    ]
+   },
+   "s": "{'a': [1, 2]}"
+  },
+  {
+   "t": "{{ 'a' in inputs.tags }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ 'z' not in inputs.tags }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.name in inputs.count }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ 1 in inputs.nums }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.flag == 1 }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.zero == false }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.ratio }}",
+   "v": 1.5,
+   "s": "1.5"
+  },
+  {
+   "t": "{{ 1.5 }}",
+   "v": 1.5,
+   "s": "1.5"
+  },
+  {
+   "t": "{{ 007 }}",
+   "v": 7,
+   "s": "7"
+  },
+  {
+   "t": "{{ 1_000 }}",
+   "v": 1000,
+   "s": "1000"
+  },
+  {
+   "t": "{{ -3 }}",
+   "v": -3,
+   "s": "-3"
+  },
+  {
+   "t": "{{ [1, 2,] }}",
+   "v": [
+    1,
+    2
+   ],
+   "s": "[1, 2]"
+  },
+  {
+   "t": "{{ [1,, 2] }}",
+   "v": [
+    1,
+    2
+   ],
+   "s": "[1, 2]"
+  },
+  {
+   "t": "{{ ['', 'a'] }}",
+   "v": [
+    "",
+    "a"
+   ],
+   "s": "['', 'a']"
+  },
+  {
+   "t": "{{ [1,2][0] }}",
+   "v": null,
+   "s": "None"
+  },
+  {
+   "t": "{{ None }}",
+   "v": null,
+   "s": "None"
+  },
+  {
+   "t": "{{ inputs.missing }}",
+   "v": null,
+   "s": "None"
+  },
+  {
+   "t": "{{ inputs.tags }} and {{ inputs.flag }}",
+   "v": "['a', 'b'] and True",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.rows }}",
+   "v": [
+    {
+     "name": "a",
+     "r": {
+      "s": 1
+     }
+    },
+    {
+     "name": "b"
+    }
+   ],
+   "s": "[{'name': 'a', 'r': {'s': 1}}, {'name': 'b'}]"
+  },
+  {
+   "t": "x {{ inputs.ratio }} {{ inputs.missing }} {{ inputs.flag }}",
+   "v": "x 1.5  True",
+   "s": null
+  },
+  {
+   "t": "{{ steps.emit.output.list[0].file }}",
+   "v": "a.md",
+   "s": null
+  },
+  {
+   "t": "{{ steps.emit.output.list[3].file }}",
+   "v": null,
+   "s": "None"
+  },
+  {
+   "t": "{{ inputs.count | default(1, 2) }}",
+   "err": "ValueError: filter 'default' used in an unsupported form (got '| default(1, 2)'): expected one of default or default('x'), join('sep'), map('attr'), contains('s'), split('sep'), from_json, upper, lower, length, or to_json"
+  },
+  {
+   "t": "{{ inputs.missing | default('7') > '5' }}",
+   "err": "ValueError: filter 'default' used in an unsupported form (got '| default('7') > '5''): expected one of default or default('x'), join('sep'), map('attr'), contains('s'), split('sep'), from_json, upper, lower, length, or to_json"
+  },
+  {
+   "t": "{{ not inputs.missing | default(1) }}",
+   "err": "ValueError: ambiguous filter precedence in 'not inputs.missing | default(1)': '| default(1)' would apply to the result of 'not inputs.missing', not to an operand of 'not'. Filter the operand in its own expression instead."
+  },
+  {
+   "t": "{{ inputs.tags | join }}",
+   "err": "ValueError: filter 'join' used in an unsupported form (got '| join'): expected one of default or default('x'), join('sep'), map('attr'), contains('s'), split('sep'), from_json, upper, lower, length, or to_json"
+  },
+  {
+   "t": "{{ inputs.tags | length }}",
+   "v": 2,
+   "s": "2"
+  },
+  {
+   "t": "{{ inputs.name | contains(5) }}",
+   "err": "ValueError: contains: expected a string argument when the value is a string, got int"
+  },
+  {
+   "t": "{{ inputs.nums | contains(5) }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ not inputs.zero }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.a or inputs.flag and inputs.zero }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ inputs.mode == 'read and write' }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ 'done' == 'failed' }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ inputs.name }} {{ inputs.missing | default('oops }}",
+   "err": "ValueError: filter 'default' used in an unsupported form (got '| default('oops'): expected one of default or default('x'), join('sep'), map('attr'), contains('s'), split('sep'), from_json, upper, lower, length, or to_json"
+  },
+  {
+   "t": "{{ unterminated",
+   "v": "{{ unterminated",
+   "s": null
+  },
+  {
+   "t": "{{ }}",
+   "v": "",
+   "s": null
+  },
+  {
+   "t": "{{  }} x",
+   "v": " x",
+   "s": null
+  },
+  {
+   "t": "plain",
+   "v": "plain",
+   "s": null
+  },
+  {
+   "t": "",
+   "v": "",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.tags == ['a', 'b'] }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.rows | map(5) }}",
+   "err": "ValueError: map: expected a string attribute name, got int"
+  },
+  {
+   "t": "{{ inputs.tags | join(5) }}",
+   "err": "ValueError: join: expected a string separator, got int"
+  },
+  {
+   "t": "{{ inputs.count | from_json }}",
+   "err": "ValueError: from_json: expected a JSON string, got int"
+  },
+  {
+   "t": "{{ inputs.s | from_json() }}",
+   "err": "ValueError: from_json: expected '| from_json' with no arguments or trailing tokens, got '| from_json()'"
+  },
+  {
+   "t": "{{ context.run_id }}",
+   "v": "r1",
+   "s": null
+  },
+  {
+   "t": "{{ context.workflow_dir }}",
+   "v": "",
+   "s": null
+  },
+  {
+   "t": "{{ fan_in }}",
+   "v": {},
+   "s": "{}"
+  },
+  {
+   "t": "{{ item }}",
+   "v": null,
+   "s": "None"
+  },
+  {
+   "t": "{{ True }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.ratio > 1 }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.tags < ['a', 'c'] }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ 3 > 2 > 1 }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.count != '10' }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.tags[-1] }}",
+   "v": "b",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.tags[-2] }}",
+   "v": "a",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.tags[-3] }}",
+   "v": null,
+   "s": "None"
+  },
+  {
+   "t": "{{ inputs.rows[-1].name }}",
+   "v": "b",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.nums[-1] > 4 }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ (inputs.flag or inputs.zero) and inputs.count }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ (inputs.zero or inputs.missing) and inputs.flag }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ not (inputs.zero or inputs.flag) }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ ('(' == inputs.name) or inputs.flag }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ (inputs.name) }}",
+   "v": "Bob",
+   "s": null
+  },
+  {
+   "t": "{{ ((inputs.count > 5)) }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ (inputs.count | default(1)) > 5 }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.flag or\n   inputs.zero }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.zero\tor inputs.flag }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.mode == 'read  and\twrite' }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ not\ninputs.flag }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ inputs.name\n== 'Bob' }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.tags\n  not in inputs.nums }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.name | upper }}",
+   "v": "BOB",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.name | lower }}",
+   "v": "bob",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.count | upper }}",
+   "err": "ValueError: upper: expected a string value, got int"
+  },
+  {
+   "t": "{{ inputs.missing | lower }}",
+   "err": "ValueError: lower: expected a string value, got NoneType"
+  },
+  {
+   "t": "{{ inputs.name | upper() }}",
+   "err": "ValueError: upper: expected '| upper' with no arguments or trailing tokens, got '| upper()'"
+  },
+  {
+   "t": "{{ inputs.name | upper extra }}",
+   "err": "ValueError: upper: expected '| upper' with no arguments or trailing tokens, got '| upper extra'"
+  },
+  {
+   "t": "{{ inputs.name | lower('x') }}",
+   "err": "ValueError: lower: expected '| lower' with no arguments or trailing tokens, got '| lower('x')'"
+  },
+  {
+   "t": "{{ inputs.mode | split(' ') }}",
+   "v": [
+    "read",
+    "and",
+    "write"
+   ],
+   "s": "['read', 'and', 'write']"
+  },
+  {
+   "t": "{{ inputs.d | split('-') }}",
+   "v": [
+    "2026",
+    "01",
+    "01"
+   ],
+   "s": "['2026', '01', '01']"
+  },
+  {
+   "t": "{{ inputs.d | split('-') | length }}",
+   "v": 3,
+   "s": "3"
+  },
+  {
+   "t": "{{ inputs.mode | split('') }}",
+   "err": "ValueError: split: separator must not be empty"
+  },
+  {
+   "t": "{{ inputs.mode | split(1) }}",
+   "err": "ValueError: split: expected a string separator, got int"
+  },
+  {
+   "t": "{{ inputs.count | split(',') }}",
+   "err": "ValueError: split: expected a string value, got int"
+  },
+  {
+   "t": "{{ inputs.mode | split }}",
+   "err": "ValueError: filter 'split' used in an unsupported form (got '| split'): expected one of default or default('x'), join('sep'), map('attr'), contains('s'), split('sep'), from_json, upper, lower, length, or to_json"
+  },
+  {
+   "t": "{{ inputs.mode | split(' ') | join('_') }}",
+   "v": "read_and_write",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.tags | length }}",
+   "v": 2,
+   "s": "2"
+  },
+  {
+   "t": "{{ inputs.name | length }}",
+   "v": 3,
+   "s": "3"
+  },
+  {
+   "t": "{{ inputs.rows | length }}",
+   "v": 2,
+   "s": "2"
+  },
+  {
+   "t": "{{ inputs.rows[0] | length }}",
+   "err": "ValueError: length: expected a list or string, got dict (mappings are not supported)"
+  },
+  {
+   "t": "{{ inputs.flag | length }}",
+   "err": "ValueError: length: expected a list or string, got bool (mappings are not supported)"
+  },
+  {
+   "t": "{{ inputs.missing | length }}",
+   "err": "ValueError: length: expected a list or string, got NoneType (mappings are not supported)"
+  },
+  {
+   "t": "{{ inputs.count | length }}",
+   "err": "ValueError: length: expected a list or string, got int (mappings are not supported)"
+  },
+  {
+   "t": "{{ inputs.tags | length() }}",
+   "err": "ValueError: length: expected '| length' with no arguments or trailing tokens, got '| length()'"
+  },
+  {
+   "t": "{{ inputs.rows | to_json }}",
+   "v": "[{\"name\": \"a\", \"r\": {\"s\": 1}}, {\"name\": \"b\"}]",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.tags | to_json }}",
+   "v": "[\"a\", \"b\"]",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.name | to_json }}",
+   "v": "\"Bob\"",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.ratio | to_json }}",
+   "v": "1.5",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.missing | to_json }}",
+   "v": "null",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.flag | to_json }}",
+   "v": "true",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.blob | from_json | to_json }}",
+   "v": "{\"a\": [1, 2]}",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.rows | to_json | from_json | map('name') | join(',') }}",
+   "v": "a,b",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.rows | to_json(1) }}",
+   "err": "ValueError: to_json: expected '| to_json' with no arguments or trailing tokens, got '| to_json(1)'"
+  },
+  {
+   "t": "Tags: {{ inputs.tags | to_json }} and {{ inputs.name | upper }}",
+   "v": "Tags: [\"a\", \"b\"] and BOB",
+   "s": null
+  },
+  {
+   "t": "{{ inputs.flag or (inputs.count | upper) }}",
+   "v": true,
+   "s": "True"
+  },
+  {
+   "t": "{{ inputs.zero and (inputs.count | upper) }}",
+   "v": false,
+   "s": "False"
+  },
+  {
+   "t": "{{ inputs.zero or (inputs.count | upper) }}",
+   "err": "ValueError: upper: expected a string value, got int"
+  },
+  {
+   "t": "{{ inputs.flag and (inputs.count | upper) }}",
+   "err": "ValueError: upper: expected a string value, got int"
+  },
+  {
+   "t": "{{ inputs.name | bogus }}",
+   "err": "ValueError: unknown filter 'bogus': expected one of default or default('x'), join('sep'), map('attr'), contains('s'), split('sep'), from_json, upper, lower, length, or to_json (got '| bogus')"
+  },
+  {
+   "t": "{{ inputs.name | trim }}",
+   "err": "ValueError: unknown filter 'trim': expected one of default or default('x'), join('sep'), map('attr'), contains('s'), split('sep'), from_json, upper, lower, length, or to_json (got '| trim')"
+  }
+ ],
+ "ctx": {
+  "inputs": {
+   "name": "Bob",
+   "missing": null,
+   "rows": [
+    {
+     "name": "a",
+     "r": {
+      "s": 1
+     }
+    },
+    {
+     "name": "b"
+    }
+   ],
+   "count": 10,
+   "tags": [
+    "a",
+    "b"
+   ],
+   "s": "xabz",
+   "flag": true,
+   "zero": 0,
+   "ratio": 1.5,
+   "blob": "{\"a\": [1,2]}",
+   "v": "10",
+   "d": "2026-01-01",
+   "mode": "read and write",
+   "nums": [
+    1,
+    2,
+    5
+   ]
+  },
+  "steps": {
+   "emit": {
+    "output": {
+     "stdout": "false\n",
+     "code": 1,
+     "list": [
+      {
+       "file": "a.md"
+      }
+     ]
+    }
+   }
+  }
+ }
+}

@@ -9,7 +9,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { isPlainObject, pyJsonDumps } from './utils.js';
+import { saveProjectOptions } from './file-policy.js';
+import { isPlainObject } from './utils.js';
 
 export const INIT_OPTIONS_FILE = '.specify/init-options.json';
 
@@ -19,9 +20,8 @@ export type MissingInitOptionsFile = typeof MISSING_INIT_OPTIONS_FILE;
 
 /** Persist the CLI options used during `specify init` (indent 2, sorted keys, UTF-8). */
 export function saveInitOptions(projectPath: string, options: Record<string, unknown>): void {
-  const dest = path.join(projectPath, INIT_OPTIONS_FILE);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.writeFileSync(dest, pyJsonDumps(options, { indent: 2, sortKeys: true, ensureAscii: false }) + '\n', 'utf8');
+  // #4934: deny-mode configuration bootstrap through the project FileHelper policy.
+  saveProjectOptions(projectPath, options);
 }
 
 /** Load persisted init options, returning `{}` when unavailable or invalid. */

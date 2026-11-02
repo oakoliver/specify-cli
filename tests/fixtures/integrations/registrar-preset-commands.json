@@ -216,6 +216,14 @@
    ".lingma/skills/speckit-plan/SKILL.md": "---\nname: speckit-plan\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: my-preset:x.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: lingma\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file"
   }
  },
+ "mcode": {
+  "registered": [
+   "speckit.plan"
+  ],
+  "files": {
+   ".minimax/skills/speckit-plan/SKILL.md": "---\nname: speckit-plan\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: my-preset:x.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: mcode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file"
+  }
+ },
  "muse": {
   "registered": [
    "speckit.plan"

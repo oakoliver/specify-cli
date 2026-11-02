@@ -37,6 +37,7 @@ import { randomBytes } from 'node:crypto';
 import { homedir as osHomedir } from 'node:os';
 
 import { ValueError } from '../download-security.js';
+import { afterFileChange, beforeFileChange } from './file-changes.js';
 import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path';
 
 // ============================================================================
@@ -267,6 +268,55 @@ function hasDotDot(rel: string): boolean {
   return pathParts(rel).includes('..');
 }
 
+/** Ownership modes a manifest can record for a tracked file. */
+export const OWNERSHIP_MODES: ReadonlySet<string> = new Set(['whole', 'partial', 'shared']);
+
+function validateOwnershipMode(mode: unknown): void {
+  if (typeof mode !== 'string' || !OWNERSHIP_MODES.has(mode)) {
+    throw new ValueError(`Invalid manifest ownership mode: ${pyReprStr(mode)}`);
+  }
+}
+
+function pyReprStr(value: unknown): string {
+  if (typeof value === 'string') return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  if (value === null || value === undefined) return 'None';
+  return String(value);
+}
+
+/** Reject noncanonical and symlinked lexical paths before resolution (``_validate_record_path``). */
+function validateRecordPath(relPath: string, root: string): string {
+  if (isAbsolute(relPath) || hasDotDot(relPath)) {
+    validateRelPath(relPath, root);
+    throw new ValueError(`Manifest paths must be canonical; '..' segments are not allowed (got ${relPath})`);
+  }
+  let current = root;
+  for (const part of pathParts(relPath)) {
+    current = join(current, part);
+    if (isSymlink(current)) {
+      throw new ValueError(
+        `Refusing to record symlinked manifest path: ${pathParts(relPath).join('/')} ` +
+          `(symlinked at ${relativeTo(current, root)})`,
+      );
+    }
+  }
+  return validateRelPath(relPath, root);
+}
+
+/** Check lexical containment and ancestors without following a leaf link. */
+function ensureSafeManifestRemoval(root: string, path: string): void {
+  const rel = relative(root, path);
+  if (rel === '' || isAbsolute(rel) || rel.split(sep)[0] === '..') {
+    if (rel !== '') throw new ValueError(`Integration manifest removal escapes project root: ${path}`);
+  }
+  const parts = pathParts(rel);
+  if (parts.includes('..')) throw new ValueError(`Noncanonical integration manifest removal path: ${parts.join('/')}`);
+  let current = root;
+  for (const part of parts.slice(0, -1)) {
+    current = join(current, part);
+    if (isSymlink(current)) throw new ValueError(`Refusing deletion through symlinked manifest directory: ${current}`);
+  }
+}
+
 // ============================================================================
 // IntegrationManifest
 // ============================================================================
@@ -285,6 +335,7 @@ export class IntegrationManifest {
   version: string;
   /** rel_path → sha256 hex */
   private _files: Record<string, string> = {};
+  private _ownershipModes: Record<string, string> = {};
   private _recoveredFiles = new Set<string>();
   private _installedAt = '';
 
@@ -312,14 +363,20 @@ export class IntegrationManifest {
    * Write *content* to *relPath* (relative to project root) and record its hash.
    * Returns the absolute path of the written file.
    */
-  recordFile(relPath: string, content: string | Uint8Array): string {
-    const absPath = validateRelPath(relPath, this.projectRoot);
+  recordFile(relPath: string, content: string | Uint8Array, opts: { ownership?: string } = {}): string {
+    const ownership = opts.ownership ?? 'whole';
+    validateOwnershipMode(ownership);
+    const absPath = validateRecordPath(relPath, this.projectRoot);
+    beforeFileChange(absPath);
     mkdirSync(dirname(absPath), { recursive: true });
+    ensureSafeManifestDestination(this.projectRoot, absPath);
     const bytes = typeof content === 'string' ? Buffer.from(content, 'utf-8') : Buffer.from(content);
     writeFileSync(absPath, bytes);
     const normalized = relativeTo(absPath, this.projectRoot);
     this._files[normalized] = createHash('sha256').update(bytes).digest('hex');
+    this._ownershipModes[normalized] = ownership;
     this._recoveredFiles.delete(normalized);
+    afterFileChange(absPath);
     return absPath;
   }
 
@@ -327,34 +384,22 @@ export class IntegrationManifest {
    * Record the hash of an already-existing regular file at *relPath*.
    * With ``recovered: true`` the path is also marked in ``recovered_files``.
    */
-  recordExisting(relPath: string, opts: { recovered?: boolean } = {}): void {
-    if (isAbsolute(relPath) || hasDotDot(relPath)) {
-      validateRelPath(relPath, this.projectRoot);
-      throw new ValueError(
-        `Manifest paths must be canonical; '..' segments are not allowed (got ${relPath})`,
-      );
-    }
-    let walk = this.projectRoot;
-    for (const part of pathParts(relPath)) {
-      walk = join(walk, part);
-      if (isSymlink(walk)) {
-        throw new ValueError(
-          `Refusing to record symlinked manifest path: ${pathParts(relPath).join('/')} ` +
-            `(symlinked at ${relativeTo(walk, this.projectRoot)})`,
-        );
-      }
-    }
-    const absPath = validateRelPath(relPath, this.projectRoot);
+  recordExisting(relPath: string, opts: { recovered?: boolean; ownership?: string | null } = {}): void {
+    const ownership = opts.ownership ?? null;
+    if (ownership !== null) validateOwnershipMode(ownership);
+    const absPath = validateRecordPath(relPath, this.projectRoot);
     if (!isFile(absPath)) {
       throw new ValueError(`Manifest path is not a regular file: ${pathParts(relPath).join('/')}`);
     }
     const normalized = relativeTo(absPath, this.projectRoot);
     this._files[normalized] = sha256File(absPath);
+    if (ownership !== null) this._ownershipModes[normalized] = ownership;
     if (opts.recovered) {
       this._recoveredFiles.add(normalized);
     } else {
       this._recoveredFiles.delete(normalized);
     }
+    if (!opts.recovered) afterFileChange(absPath);
   }
 
   /** Drop *relPath* from the tracked set (does not touch disk). */
@@ -368,6 +413,7 @@ export class IntegrationManifest {
       return false;
     }
     this._recoveredFiles.delete(normalized);
+    delete this._ownershipModes[normalized];
     if (normalized in this._files) {
       delete this._files[normalized];
       return true;
@@ -380,6 +426,24 @@ export class IntegrationManifest {
   /** Copy of the ``{rel_path: sha256}`` mapping. */
   get files(): Record<string, string> {
     return { ...this._files };
+  }
+
+  /** ``{rel_path: mode}`` for every tracked file (default ``whole``). */
+  get ownershipModes(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const path of Object.keys(this._files)) out[path] = this._ownershipModes[path] ?? 'whole';
+    return out;
+  }
+
+  /** Python-compatible alias. */
+  get ownership_modes(): Record<string, string> {
+    return this.ownershipModes;
+  }
+
+  setOwnership(relPath: string, mode: string): void {
+    validateOwnershipMode(mode);
+    const rel = pathParts(relPath).join('/');
+    if (rel in this._files) this._ownershipModes[rel] = mode;
   }
 
   /** Copy of the set of paths recorded with ``recovered: true``. */
@@ -446,10 +510,20 @@ export class IntegrationManifest {
     const skipped: string[] = [];
 
     for (const [rel, expected] of Object.entries(this._files)) {
+      // Use the non-resolved path so symlinks themselves are removed.
       const path = join(root, rel);
-      const normed = normalize(isAbsolute(rel) ? rel : path);
-      if (isAbsolute(rel) || !isRelativeTo(normed, root)) continue;
+      if (isAbsolute(rel)) continue;
+      try {
+        ensureSafeManifestRemoval(root, path);
+      } catch {
+        skipped.push(path);
+        continue;
+      }
       if (!existsSync(path) && !isSymlink(path)) continue;
+      if ((this._ownershipModes[rel] ?? 'whole') !== 'whole') {
+        skipped.push(path);
+        continue;
+      }
       if (!isFile(path) && !isSymlink(path)) {
         skipped.push(path);
         continue;
@@ -473,15 +547,19 @@ export class IntegrationManifest {
         }
       }
       try {
+        beforeFileChange(path, { removal: true });
+        ensureSafeManifestRemoval(root, path);
         unlinkSync(path);
       } catch {
         skipped.push(path);
         continue;
       }
       removed.push(path);
+      afterFileChange(path);
       let parent = dirname(path);
       while (parent !== root && isRelativeTo(parent, root)) {
         try {
+          ensureSafeManifestRemoval(root, parent);
           rmdirSync(parent);
         } catch {
           break;
@@ -491,15 +569,26 @@ export class IntegrationManifest {
     }
 
     const manifest = join(root, '.specify', 'integrations', `${this.key}.manifest.json`);
-    if (removeManifest && existsSync(manifest)) {
+    if (removeManifest) {
+      let manifestPresent = false;
       try {
-        unlinkSync(manifest);
+        ensureSafeManifestRemoval(root, manifest);
+        manifestPresent = existsSync(manifest) || isSymlink(manifest);
+        if (manifestPresent) {
+          beforeFileChange(manifest, { removal: true });
+          ensureSafeManifestRemoval(root, manifest);
+          unlinkSync(manifest);
+          afterFileChange(manifest);
+        }
       } catch {
+        // An undeletable manifest must not abort the uninstall after the
+        // tracked files were already removed.
         skipped.push(manifest);
       }
       let parent = dirname(manifest);
-      while (parent !== root && isRelativeTo(parent, root)) {
+      while (manifestPresent && parent !== root && isRelativeTo(parent, root)) {
         try {
+          ensureSafeManifestRemoval(root, parent);
           rmdirSync(parent);
         } catch {
           break;
@@ -522,11 +611,15 @@ export class IntegrationManifest {
       installed_at: this._installedAt,
       files: this._files,
     };
+    if (Object.keys(this._ownershipModes).length > 0) {
+      data.ownership_modes = this._ownershipModes;
+    }
     if (this._recoveredFiles.size > 0) {
       data.recovered_files = [...this._recoveredFiles].sort();
     }
     const path = this.manifestPath;
     const content = pyJsonDumps(data, 2) + '\n';
+    beforeFileChange(path);
     ensureSafeManifestDestination(this.projectRoot, path);
     const tempPath = join(dirname(path), `.${basename(path)}.${randomBytes(6).toString('hex')}`);
     try {
@@ -539,6 +632,7 @@ export class IntegrationManifest {
       chmodSync(tempPath, 0o644);
       ensureSafeManifestDestination(this.projectRoot, path);
       renameSync(tempPath, path);
+      afterFileChange(path);
     } finally {
       try {
         unlinkSync(tempPath);
@@ -590,6 +684,17 @@ export class IntegrationManifest {
     inst.version = (obj.version as string) ?? '';
     inst._installedAt = (obj.installed_at as string) ?? '';
     inst._files = { ...(files as Record<string, string>) };
+    const ownership = 'ownership_modes' in obj ? obj.ownership_modes : {};
+    if (
+      typeof ownership !== 'object' ||
+      ownership === null ||
+      Array.isArray(ownership) ||
+      !Object.keys(ownership).every((p) => p in inst._files) ||
+      Object.values(ownership).some((mode) => typeof mode !== 'string' || !OWNERSHIP_MODES.has(mode))
+    ) {
+      throw new ValueError(`Invalid integration manifest ownership modes at ${path}`);
+    }
+    inst._ownershipModes = { ...(ownership as Record<string, string>) };
 
     const recovered = 'recovered_files' in obj ? obj.recovered_files : [];
     if (!Array.isArray(recovered) || !recovered.every((p) => typeof p === 'string')) {

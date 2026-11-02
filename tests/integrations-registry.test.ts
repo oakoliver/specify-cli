@@ -24,6 +24,7 @@ import {
   register,
 } from '../src/integrations/index.js';
 import { CommandRegistrar } from '../src/agents.js';
+import { IntegrationManifest } from '../src/integrations/manifest.js';
 
 let tmp: string;
 let home: string;
@@ -52,12 +53,12 @@ afterEach(() => {
 const ALL_KEYS = [
   'agy', 'alquimia', 'amp', 'auggie', 'bob', 'claude', 'cline', 'codebuddy', 'codex', 'command-code',
   'copilot', 'cursor-agent', 'devin', 'docker-agent', 'droid', 'dsh', 'firebender', 'forge', 'gemini',
-  'generic', 'goose', 'grok', 'hermes', 'junie', 'kilocode', 'kimi', 'kiro-cli', 'lingma', 'muse', 'omp',
+  'generic', 'goose', 'grok', 'hermes', 'junie', 'kilocode', 'kimi', 'kiro-cli', 'lingma', 'mcode', 'muse', 'none', 'omp',
   'opencode', 'pi', 'qodercli', 'qwen', 'rovodev', 'shai', 'tabnine', 'trae', 'vibe', 'zcode', 'zed',
 ];
 
 describe('INTEGRATION_REGISTRY', () => {
-  test('all 41 upstream integrations registered in order', () => {
+  test('all 43 upstream integrations registered in order', () => {
     expect(Object.keys(INTEGRATION_REGISTRY)).toEqual(ALL_KEYS);
   });
 
@@ -83,25 +84,49 @@ describe('INTEGRATION_REGISTRY', () => {
     expect(() => register(new Dup())).toThrow("Integration with key 'claude' is already registered.");
   });
 
-  test('every non-generic integration is in the registrar', () => {
-    for (const key of ALL_KEYS.filter((k) => k !== 'generic')) {
+  test('every rendering integration is in the registrar (generic and none excluded)', () => {
+    for (const key of ALL_KEYS.filter((k) => k !== 'generic' && k !== 'none')) {
       expect(key in CommandRegistrar.AGENT_CONFIGS).toBe(true);
     }
   });
 
   test('registrar_config dir matches config folder + commands_subdir', () => {
     for (const [key, integ] of Object.entries(INTEGRATION_REGISTRY)) {
-      if (key === 'generic' || key === 'hermes' || key === 'bob' || key === 'copilot') continue;
+      if (key === 'generic' || key === 'none' || key === 'hermes' || key === 'bob' || key === 'copilot') continue;
       const folder = integ.config!.folder!.replace(/\/+$/, '');
       expect({ key, dir: integ.registrarConfig!.dir }).toEqual({ key, dir: `${folder}/${integ.config!.commands_subdir}` });
+    }
+  });
+
+  test('a "-" command-mode separator means hyphenated registration', () => {
+    for (const key of Object.keys(INTEGRATION_REGISTRY).filter((k) => k !== 'generic' && k !== 'none').sort()) {
+      const registered = CommandRegistrar.computeOutputName(key, 'speckit.ext.cmd', CommandRegistrar.AGENT_CONFIGS[key]);
+      const hyphenated = INTEGRATION_REGISTRY[key].invokeSeparatorForMode(false) === '-';
+      expect({ key, registered }).toEqual({ key, registered: hyphenated ? 'speckit-ext-cmd' : 'speckit.ext.cmd' });
     }
   });
 });
 
 describe('multi_install_safe invariants', () => {
-  const safe = Object.entries(INTEGRATION_REGISTRY).filter(([, i]) => i.multiInstallSafe);
+  const all = Object.entries(INTEGRATION_REGISTRY).filter(([, i]) => i.multiInstallSafe);
+  const safe = all.filter(([, i]) => i.registrarConfig !== null);
   const rootOf = (k: string) => INTEGRATION_REGISTRY[k].config!.folder!.replace(/\/+$/, '');
   const cmdDirOf = (k: string) => INTEGRATION_REGISTRY[k].registrarConfig!.dir.replace(/\/+$/, '');
+
+  test('safe integrations without output emit no files', () => {
+    for (const [key, integ] of all.filter(([, i]) => i.registrarConfig === null)) {
+      const root = mkdtempSync(join(tmpdir(), 'speckit-noout-'));
+      try {
+        const manifest = new IntegrationManifest(key, root);
+        expect(integ.config?.folder ?? null).toBeNull();
+        expect(integ.setup(root, manifest)).toEqual([]);
+        expect(manifest.files).toEqual({});
+        expect(readdirSync(root)).toEqual([]);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  });
 
   test('safe integrations have static isolated paths', () => {
     expect(safe.length).toBeGreaterThan(20);
@@ -229,8 +254,8 @@ describe('IntegrationCatalog', () => {
     );
     const merged = await cat.getMergedIntegrations();
     expect(merged).toEqual([
-      { name: 'Foo Agent', tags: ['cli'], author: 'Acme', id: 'foo', _catalog_name: 'one', _install_allowed: true },
-      { name: 'Bar', description: 'IDE thing', id: 'bar', _catalog_name: 'two', _install_allowed: false },
+      { name: 'Foo Agent', tags: ['cli'], author: 'Acme', id: 'foo', _declared_id: 'foo', _catalog_name: 'one', _install_allowed: true },
+      { name: 'Bar', description: 'IDE thing', id: 'bar', _declared_id: 'bar', _catalog_name: 'two', _install_allowed: false },
     ]);
     expect(calls.length).toBe(2);
     await cat.getMergedIntegrations();
@@ -341,12 +366,20 @@ describe('IntegrationDescriptor', () => {
     ['tools not list', VALID.replace('  tools:\n    - name: my-agent\n', '  tools: x\n'), 'requires.tools must be a list'],
     ['traversal cmd', VALID.replace('file: commands/run.md', 'file: ../run.md'), "Command entry 'file' must be a relative path without '..': ../run.md"],
     ['abs script', VALID.replace('- scripts/setup.sh', '- /etc/x.sh'), "Script entry must be a relative path without '..': /etc/x.sh"],
-    [
-      'nothing provided',
-      VALID.replace(/provides:[\s\S]*$/, 'provides:\n  commands: []\n'),
-      'Integration must provide at least one command or script',
-    ],
+    // spec-kit 1.2.5 (#4862): requires metadata is validated more strictly.
+    ['bad speckit specifier', VALID.replace('">=0.6.0"', '"not a spec"'), 'Invalid requires.speckit_version'],
+    ['tool required not bool', VALID.replace('    - name: my-agent\n', '    - name: my-agent\n      required: "yes"\n'), "requires.tools entry 'required' must be a boolean"],
+    ['tool version not string', VALID.replace('    - name: my-agent\n', '    - name: my-agent\n      version: 2\n'), "requires.tools entry 'version' must be a string"],
+    ['tool version invalid', VALID.replace('    - name: my-agent\n', '    - name: my-agent\n      version: "~~1"\n'), 'Invalid requires.tools version'],
+    ['blank author', VALID.replace('name: My Agent', 'name: My Agent\n  author: "  "'), 'integration.author must be a non-empty string'],
   ];
+
+  // spec-kit 1.2.5 (#4862): ``provides`` is optional legacy metadata.
+  test('accepts a descriptor that provides nothing', () => {
+    const noProvides = new IntegrationDescriptor(write(VALID.replace(/provides:[\s\S]*$/, '')));
+    expect(noProvides.commands).toEqual([]);
+    expect(new IntegrationDescriptor(write(VALID.replace(/provides:[\s\S]*$/, 'provides:\n  commands: []\n'))).scripts).toEqual([]);
+  });
   for (const [name, text, err] of cases) {
     test(`rejects: ${name}`, () => {
       const p = name === 'missing file' ? join(tmp, 'missing.yml') : write(text);

@@ -6,7 +6,7 @@
  * @module integrations/shai
  */
 
-import { MarkdownIntegration, type IntegrationConfig, type RegistrarConfig } from './base.js';
+import { MarkdownIntegration, type ExecArgsOptions, type IntegrationConfig, type RegistrarConfig } from './base.js';
 
 export class ShaiIntegration extends MarkdownIntegration {
   key = 'shai';
@@ -24,4 +24,15 @@ export class ShaiIntegration extends MarkdownIntegration {
     extension: '.md',
   };
   multiInstallSafe = true;
+
+  /**
+   * SHAI's headless routes all go to its auto-fix agent and never load
+   * ``.shai/commands``, so ``shai -p <prompt>`` reported success without
+   * running the Spec Kit command (upstream #4791). Opt out of CLI dispatch so
+   * workflow steps fail instead.
+   */
+  buildExecArgs(_prompt: string, opts: ExecArgsOptions = {}): string[] | null {
+    this.validateRuntimeConfig(opts.integrationArgs, opts.integrationOptions);
+    return null;
+  }
 }

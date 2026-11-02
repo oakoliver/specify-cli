@@ -12,6 +12,8 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, parse as parsePath } from 'node:path';
 
+import { INTEGRATION_STATE_SCHEMA, integrationSetting, tryReadIntegrationJson } from '../integration-state.js';
+
 import {
   IntegrationOption,
   MarkdownIntegration,
@@ -29,7 +31,33 @@ import {
   type RegistrarConfig,
   type SetupOptions,
 } from './base.js';
-import type { IntegrationManifest } from './manifest.js';
+import { isRelativeTo, resolvePath, type IntegrationManifest } from './manifest.js';
+
+/**
+ * Resolve the installed generic output root (never the class-level
+ * placeholder) from ``.specify/integration.json`` (``registration_directory``).
+ */
+export function registrationDirectory(projectRoot: string): string {
+  const [state, error] = tryReadIntegrationJson(projectRoot);
+  if (error !== null && error !== undefined) {
+    const detail =
+      error.kind === 'schema_too_new'
+        ? `integration state schema ${error.schema} is newer than supported schema ${INTEGRATION_STATE_SCHEMA}; upgrade Spec Kit`
+        : error.detail;
+    throw new ValueError(`Cannot read generic integration settings: ${detail}`);
+  }
+  const settings = integrationSetting(state ?? {}, 'generic') as Record<string, unknown>;
+  const commandsDir = GenericIntegration.resolveCommandsDir(settings.parsed_options as ParsedOptions | null, {
+    rawOptions: (settings.raw_options as string | null | undefined) ?? null,
+  });
+  if (typeof commandsDir !== 'string') throw new ValueError('Invalid --commands-dir in generic integration settings');
+  const root = resolvePath(projectRoot);
+  const destination = resolvePath(isAbsolute(commandsDir) ? commandsDir : join(projectRoot, commandsDir));
+  if (!isRelativeTo(destination, root)) {
+    throw new ValueError(`Generic command directory ${destination} escapes project root ${root}`);
+  }
+  return destination;
+}
 
 /**
  * Internal helper supplying skills-mode post-processing for
@@ -54,6 +82,11 @@ export class GenericIntegration extends MarkdownIntegration {
     args: '$ARGUMENTS',
     extension: '.md',
   };
+
+  /** Skills-mode post-processing (hook invocation note) for extension skills. */
+  postProcessSkillContent(content: string): string {
+    return new GenericSkillsHelper().postProcessSkillContent(content);
+  }
 
   /** ``"-"`` for the ``--skills`` layout, ``"."`` for flat commands. */
   effectiveInvokeSeparator(parsedOptions?: ParsedOptions | null, projectRoot?: string | null): string {

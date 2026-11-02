@@ -6,7 +6,7 @@
  * @module integrations/kimi
  */
 
-import { SkillsIntegration, IntegrationOption, type IntegrationConfig, type RegistrarConfig, type ParsedOptions, type SetupOptions, ValueError, splitlines, pyRstrip } from './base.js';
+import { SkillsIntegration, IntegrationOption, type IntegrationConfig, type RegistrarConfig, type ParsedOptions, type SetupOptions, type ExecArgsOptions, ValueError, splitlines, pyRstrip } from './base.js';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, cpSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { parseYaml } from '../yaml.js';
@@ -28,6 +28,17 @@ export class KimiIntegration extends SkillsIntegration {
     extension: '/SKILL.md',
   };
   multiInstallSafe = false;
+
+  /** ``kimi -p <prompt>``; structured output is ``--output-format stream-json`` (``json`` is rejected). */
+  buildExecArgs(prompt: string, opts: ExecArgsOptions = {}): string[] | null {
+    this.validateRuntimeConfig(opts.integrationArgs, opts.integrationOptions);
+    if (!this.config || !this.config.requires_cli) return null;
+    const args: string[] = [this.resolveExecutable(), '-p', prompt];
+    this.applyExtraArgsEnvVar(args);
+    if (opts.model) args.push('--model', opts.model);
+    if (opts.outputJson ?? true) args.push('--output-format', 'stream-json');
+    return args;
+  }
 
   options(): IntegrationOption[] {
     const opts: IntegrationOption[] = [];

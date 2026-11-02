@@ -179,11 +179,14 @@ describe('json-nested (Claude)', () => {
   });
 
   test('empty events strip prior hooks (#3) and delete Spec-Kit-only config (#14)', () => {
-    installIntegrationEvents(new ClaudeIntegration(), tmp, fakeManifest(), {
+    // The dispatcher is removed only when this integration's manifest owns it (#5055).
+    const owned = new IntegrationManifest('claude', tmp);
+    installIntegrationEvents(new ClaudeIntegration(), tmp, owned, {
       pre_tool_use: [{ command: 'speckit.tdd.validate' }],
     });
+    owned.save();
     expect(existsSync(path.join(tmp, '.claude/settings.json'))).toBe(true);
-    installIntegrationEvents(new ClaudeIntegration(), tmp, fakeManifest(), {});
+    installIntegrationEvents(new ClaudeIntegration(), tmp, new IntegrationManifest('claude', tmp), {});
     expect(existsSync(path.join(tmp, '.claude/settings.json'))).toBe(false);
     // No other integration references the dispatcher → removed too (S3).
     expect(existsSync(path.join(tmp, EVENTS_DISPATCHER_REL))).toBe(false);
@@ -490,7 +493,7 @@ describe('shared dispatcher refcount (#10)', () => {
   });
 
   test('dispatcher deleted for the last integration', () => {
-    const manifest = fakeManifest();
+    const manifest = new IntegrationManifest('claude', tmp);
     installIntegrationEvents(new ClaudeIntegration(), tmp, manifest, {
       pre_tool_use: [{ command: 'speckit.tdd.validate' }],
     });
@@ -539,5 +542,142 @@ describe('unsupported events', () => {
     });
     const err = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
     expect(err).toContain("\u26a0\ufe0f  vibe does not support 'session_end' events; skipping\n");
+  });
+});
+
+// ============================================================================
+// Dispatcher cleanup ownership (upstream #5055, TestDispatcherCleanupOwnership)
+// ============================================================================
+
+describe('dispatcher cleanup ownership (#5055)', () => {
+  const dispatcherPath = (): string => path.join(tmp, EVENTS_DISPATCHER_REL);
+
+  for (const ownership of ['unowned', 'recovered', 'partial'] as const) {
+    for (const newline of ['\n', '\r\n']) {
+      test(`generated template does not establish ownership (${ownership}, ${JSON.stringify(newline)})`, () => {
+        const integration = new CopilotIntegration();
+        const manifest = new IntegrationManifest(integration.key, tmp);
+        const content = Buffer.from(EVENTS_DISPATCHER_TEMPLATE.replace(/\n/g, newline), 'utf-8');
+        write(EVENTS_DISPATCHER_REL, content);
+        if (ownership !== 'unowned') {
+          manifest.recordExisting(EVENTS_DISPATCHER_REL, {
+            recovered: ownership === 'recovered',
+            ownership: ownership === 'partial' ? 'partial' : 'shared',
+          });
+        }
+        manifest.save();
+        integration.teardown(tmp, manifest);
+        expect(readFileSync(dispatcherPath()).equals(content)).toBe(true);
+      });
+    }
+  }
+
+  for (const operation of ['install', 'remove', 'teardown'] as const) {
+    for (const savedManifest of [false, true]) {
+      test(`unowned dispatcher is preserved (${operation}, saved manifest: ${savedManifest})`, () => {
+        const integration = new CopilotIntegration();
+        const manifest = new IntegrationManifest(integration.key, tmp);
+        if (savedManifest) manifest.save();
+        write(EVENTS_DISPATCHER_REL, '# User-owned dispatcher\n');
+        if (operation === 'install') installIntegrationEvents(integration, tmp, manifest, {});
+        else if (operation === 'remove') removeIntegrationEvents(integration, tmp, manifest);
+        else integration.teardown(tmp, manifest, { force: true });
+        expect(readFileSync(dispatcherPath(), 'utf8')).toBe('# User-owned dispatcher\n');
+        expect(EVENTS_DISPATCHER_REL in manifest.files).toBe(false);
+      });
+    }
+  }
+
+  for (const fresh of [false, true]) {
+    test(`empty map preserves a modified dispatcher (fresh manifest: ${fresh})`, () => {
+      const warn = spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        const integration = new ClaudeIntegration();
+        let manifest = new IntegrationManifest(integration.key, tmp);
+        installIntegrationEvents(integration, tmp, manifest, { pre_tool_use: [{ command: 'speckit.x' }] });
+        manifest.save();
+        writeFileSync(dispatcherPath(), '# User-modified dispatcher\n');
+        if (fresh) manifest = new IntegrationManifest(integration.key, tmp);
+        installIntegrationEvents(integration, tmp, manifest, {});
+        expect(readFileSync(dispatcherPath(), 'utf8')).toBe('# User-modified dispatcher\n');
+        expect(EVENTS_DISPATCHER_REL in manifest.files).toBe(false);
+        expect(warn.mock.calls.map((c) => String(c[0])).join('')).toContain('modified dispatcher');
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  }
+
+  for (const force of [false, true]) {
+    test(`teardown of a modified dispatcher honours force (${force})`, () => {
+      const warn = spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        const integration = new ClaudeIntegration();
+        const manifest = new IntegrationManifest(integration.key, tmp);
+        installIntegrationEvents(integration, tmp, manifest, { pre_tool_use: [{ command: 'speckit.x' }] });
+        writeFileSync(dispatcherPath(), '# User-modified dispatcher\n');
+        integration.teardown(tmp, manifest, { force });
+        expect(existsSync(dispatcherPath())).toBe(!force);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  }
+
+  for (const [recovered, ownership] of [[true, 'shared'], [true, 'whole'], [false, 'partial']] as const) {
+    test(`observed dispatcher is not cleanup authority (recovered: ${recovered}, ${ownership})`, () => {
+      const integration = new CopilotIntegration();
+      const manifest = new IntegrationManifest(integration.key, tmp);
+      write(EVENTS_DISPATCHER_REL, '# User-owned dispatcher\n');
+      manifest.recordExisting(EVENTS_DISPATCHER_REL, { recovered, ownership });
+      manifest.save();
+      integration.teardown(tmp, manifest, { force: true });
+      expect(readFileSync(dispatcherPath(), 'utf8')).toBe('# User-owned dispatcher\n');
+    });
+  }
+
+  for (const content of [Buffer.from('{invalid'), Buffer.from([0xff]), Buffer.from('[]')]) {
+    test(`unreadable prior manifest does not authorise cleanup (${JSON.stringify(content.toString('latin1'))})`, () => {
+      const warn = spyOn(process.stderr, 'write').mockImplementation(() => true);
+      try {
+        const integration = new CopilotIntegration();
+        const manifest = new IntegrationManifest(integration.key, tmp);
+        manifest.save();
+        writeFileSync(manifest.manifestPath, content);
+        write(EVENTS_DISPATCHER_REL, '# User-owned dispatcher\n');
+        installIntegrationEvents(integration, tmp, manifest, {});
+        expect(readFileSync(dispatcherPath(), 'utf8')).toBe('# User-owned dispatcher\n');
+        const out = warn.mock.calls.map((c) => String(c[0])).join('');
+        expect(out).toContain('prior dispatcher manifest');
+        expect(out).toContain(integration.key);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  }
+
+  test('manifest uninstall skips non-whole ownership', () => {
+    const manifest = new IntegrationManifest('claude', tmp);
+    write('shared.txt', 'x');
+    manifest.recordExisting('shared.txt', { ownership: 'shared' });
+    manifest.recordFile('whole.txt', 'y');
+    manifest.save();
+    const loaded = IntegrationManifest.load('claude', tmp);
+    expect(loaded.ownershipModes).toEqual({ 'shared.txt': 'shared', 'whole.txt': 'whole' });
+    const [removed, skipped] = loaded.uninstall(tmp, { force: true });
+    expect(removed).toEqual([path.join(tmp, 'whole.txt')]);
+    expect(skipped).toEqual([path.join(tmp, 'shared.txt')]);
+    expect(existsSync(path.join(tmp, 'shared.txt'))).toBe(true);
+  });
+
+  test('invalid ownership modes are rejected on record and load', () => {
+    const manifest = new IntegrationManifest('claude', tmp);
+    expect(() => manifest.recordFile('a.txt', 'x', { ownership: 'mine' })).toThrow("Invalid manifest ownership mode: 'mine'");
+    manifest.recordFile('a.txt', 'x');
+    manifest.save();
+    const raw = JSON.parse(readFileSync(manifest.manifestPath, 'utf8'));
+    raw.ownership_modes = { 'missing.txt': 'whole' };
+    writeFileSync(manifest.manifestPath, JSON.stringify(raw));
+    expect(() => IntegrationManifest.load('claude', tmp)).toThrow('Invalid integration manifest ownership modes');
   });
 });

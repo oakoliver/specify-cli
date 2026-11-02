@@ -13,6 +13,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from
 import { basename, join, parse as parsePath } from 'node:path';
 
 import { CliExit, console as cliConsole } from '../console.js';
+import { which } from '../utils.js';
 import { PresetResolver } from '../presets/resolver.js';
 import {
   IntegrationBase,
@@ -23,6 +24,7 @@ import {
   runSubprocess,
   scriptTypeOf,
   warn,
+  type CaptureDispatchOptions,
   type DispatchOptions,
   type DispatchResult,
   type ExecArgsOptions,
@@ -32,6 +34,7 @@ import {
   type SetupOptions,
 } from './base.js';
 import { IntegrationManifest, isFile, isRelativeTo, resolvePath } from './manifest.js';
+import { runCaptured, type CapturedProcess } from './capture.js';
 
 const COPILOT_CORE_COMMANDS = new Set([
   'analyze',
@@ -46,10 +49,23 @@ const COPILOT_CORE_COMMANDS = new Set([
   'taskstoissues',
 ]);
 
-/** Executable name for Copilot CLI on this platform. */
+/**
+ * Executable name for Copilot CLI on this platform.
+ *
+ * On Windows the CLI may be installed as ``copilot.exe`` (standalone
+ * installer, winget, scoop) or as a ``copilot.cmd`` npm shim: probe ``PATH``
+ * for whichever is present, falling back to the historical ``copilot.cmd``.
+ */
 export function copilotExecutable(): string {
-  return process.platform === 'win32' ? 'copilot.cmd' : 'copilot';
+  if (process.platform !== 'win32') return 'copilot';
+  for (const candidate of ['copilot.exe', 'copilot.cmd']) {
+    if (copilotDeps.which(candidate)) return candidate;
+  }
+  return 'copilot.cmd';
 }
+
+/** Mockable seams (tests override ``which``). */
+export const copilotDeps: { which: (cmd: string) => string | null } = { which: (cmd) => which(cmd) };
 
 /**
  * True if the Copilot CLI should run with full permissions
@@ -223,10 +239,19 @@ export class CopilotIntegration extends IntegrationBase {
   }
 
   /** Dispatch via ``--agent speckit.<stem>`` (commands mode) or ``/speckit-<stem>`` (skills). */
-  dispatchCommand(commandName: string, argsOrOpts: string | DispatchOptions = '', maybeOpts: DispatchOptions = {}): DispatchResult {
+  override dispatchCommand(commandName: string, opts: CaptureDispatchOptions): Promise<CapturedProcess>;
+  override dispatchCommand(commandName: string, argsOrOpts?: string | DispatchOptions, maybeOpts?: DispatchOptions): DispatchResult;
+  override dispatchCommand(
+    commandName: string,
+    argsOrOpts: string | DispatchOptions = '',
+    maybeOpts: DispatchOptions = {},
+  ): DispatchResult | Promise<CapturedProcess> {
     const [args, opts] = normalizeDispatchArgs(argsOrOpts, maybeOpts);
     this.validateRuntimeConfig(opts.integrationArgs, opts.integrationOptions);
     const stream = opts.stream ?? true;
+    const captureMaxBytes = opts.captureMaxBytes ?? null;
+    if (stream && captureMaxBytes !== null) throw new ValueError('capture_max_bytes requires stream=False.');
+    const outputJson = opts.outputJson ?? !stream;
     let stem = commandName;
     if (stem.startsWith('speckit.')) stem = stem.slice('speckit.'.length);
     const projectRoot = opts.projectRoot ?? null;
@@ -245,7 +270,10 @@ export class CopilotIntegration extends IntegrationBase {
     if (!skillsMode) cliArgs.push('--agent', agentName);
     if (allowAll()) cliArgs.push('--yolo');
     if (opts.model) cliArgs.push('--model', opts.model);
-    if (!stream) cliArgs.push('--output-format', 'json');
+    if (outputJson) cliArgs.push('--output-format', 'json');
+    if (captureMaxBytes !== null) {
+      return runCaptured(cliArgs, { cwd: projectRoot, timeout: opts.timeout ?? 600, maxBytes: captureMaxBytes });
+    }
     return runSubprocess(cliArgs, projectRoot, stream, opts.timeout ?? 600);
   }
 
@@ -271,7 +299,7 @@ export class CopilotIntegration extends IntegrationBase {
     const created = this.skillsModeActive
       ? this.setupSkills(projectRoot, manifest, parsed, opts)
       : this.setupCommands(projectRoot, manifest, parsed, opts);
-    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsed));
+    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsed, { force: Boolean(opts.force) }));
     return created;
   }
 
@@ -390,11 +418,8 @@ export class CopilotIntegration extends IntegrationBase {
       }
     }
     if (!changed) return;
-    writeFileSync(dst, pyJsonIndent4(existing) + '\n', 'utf-8');
+    // A lone surrogate is written back as its JSON escape (JSON.stringify does this).
+    writeFileSync(dst, JSON.stringify(existing, null, 4) + '\n', 'utf-8');
   }
 }
 
-/** Python ``json.dumps(obj, indent=4)`` (ensure_ascii=True). */
-function pyJsonIndent4(obj: unknown): string {
-  return JSON.stringify(obj, null, 4).replace(/[\u0080-\uffff]/g, (ch) => '\\u' + ch.charCodeAt(0).toString(16).padStart(4, '0'));
-}

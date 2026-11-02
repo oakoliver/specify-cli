@@ -29,6 +29,24 @@ import { InstallPlan } from '../src/bundles/resolver.js';
 import { makeReferenceChecker } from '../src/bundles/references.js';
 import { StepRegistry } from '../src/workflows/step/catalog/domain.js';
 import { makeProject, validManifestDict } from './bundles-helpers.js';
+import type { ComponentCatalogLike } from '../src/bundles/component-catalog.js';
+
+/** A component catalog fake with one source holding *entries* for *kind*. */
+function fakeCatalog(
+  kind: string,
+  entries: Record<string, unknown> | unknown[],
+  opts: { name?: string; installAllowed?: boolean; fail?: unknown } = {},
+): ComponentCatalogLike {
+  return {
+    getActiveCatalogs: () => [
+      { name: opts.name ?? 'trusted', url: 'https://example.com/catalog.json', install_allowed: opts.installAllowed ?? true },
+    ],
+    fetchSingleCatalog: () => {
+      if (opts.fail !== undefined) throw opts.fail;
+      return { schema_version: '1.0', [kind]: entries };
+    },
+  };
+}
 
 let tmp: string;
 const saved = { ...primitiveDeps };
@@ -39,6 +57,8 @@ beforeEach(() => {
   primitiveDeps.locateBundledPreset = async () => null;
   primitiveDeps.locateBundledExtension = async () => null;
   primitiveDeps.locateBundledWorkflow = async () => null;
+  primitiveDeps.workflowCatalog = async () => fakeCatalog('workflows', {});
+  primitiveDeps.stepCatalog = async () => fakeCatalog('steps', {});
 });
 afterEach(() => {
   Object.assign(primitiveDeps, saved);
@@ -114,12 +134,16 @@ describe('pinned versions', () => {
   });
 
   test('catalog workflow version mismatch refuses', async () => {
-    primitiveDeps.workflowCatalogInfo = async () => ({ version: '9.9.9' });
+    primitiveDeps.workflowCatalog = async () =>
+      fakeCatalog('workflows', { 'wf-a': { version: '9.9.9', url: 'https://example.com/workflow.yml' } });
     let added = false;
-    primitiveDeps.workflowAdd = async () => {
+    primitiveDeps.installPreselectedWorkflow = async () => {
       added = true;
     };
-    await rejects(primitiveManager('workflows', tmp).install(comp('workflows', 'wf-a', { version: '0.3.0' })), 'pinned to version 0.3.0');
+    await rejects(
+      primitiveManager('workflows', tmp).install(comp('workflows', 'wf-a', { version: '0.3.0' })),
+      "Workflow 'wf-a' has no catalog release for pinned version 0.3.0 in the highest-priority source.",
+    );
     expect(added).toBe(false);
   });
 
@@ -285,14 +309,16 @@ describe('workflow/step delegation', () => {
   });
 
   test('delegated non-zero exit becomes BundlerError', async () => {
-    primitiveDeps.workflowCatalogInfo = async () => null;
-    primitiveDeps.workflowAdd = async () => {
+    primitiveDeps.workflowCatalog = async () =>
+      fakeCatalog('workflows', { wf: { version: '1.0.0', url: 'https://example.com/workflow.yml' } });
+    primitiveDeps.installPreselectedWorkflow = async () => {
       throw new CliExit(1);
     };
     await rejects(primitiveManager('workflows', tmp).install(comp('workflows', 'wf', { version: '1.0.0' })), "Failed to install workflow 'wf'.");
     primitiveDeps.workflowRemove = async () => 2;
     await rejects(primitiveManager('workflows', tmp).remove(comp('workflows', 'wf')), "Failed to remove workflow 'wf'.");
-    primitiveDeps.workflowStepAdd = async () => {
+    primitiveDeps.stepCatalog = async () => fakeCatalog('steps', [{ id: 's', version: '1.0.0' }]);
+    primitiveDeps.installPreselectedStep = async () => {
       throw new CliExit(0);
     };
     await primitiveManager('steps', tmp).install(comp('steps', 's'));
@@ -325,7 +351,8 @@ describe('workflow/step delegation', () => {
       reg.remove(id);
       rmSync(path.join(stepsDir, id), { recursive: true, force: true });
     };
-    primitiveDeps.workflowStepAdd = async (id) => {
+    primitiveDeps.stepCatalog = async () => fakeCatalog('steps', [{ id: 'my-step', version: '1.0.0' }]);
+    primitiveDeps.installPreselectedStep = async (id) => {
       throw new BundlerError(`Failed to install step '${id}'.`);
     };
 
@@ -382,7 +409,7 @@ test('bundle update refresh passes force=true to installFromDirectory', async ()
 // ============================================================================
 
 describe('reference checker', () => {
-  const ref = (kind: string, id: string) => new ComponentRef({ kind, id, version: '1.0.0' });
+  const ref = (kind: string, id: string, version: string | null = '1.0.0') => new ComponentRef({ kind, id, version });
 
   beforeEach(() => {
     primitiveDeps.presetManager = async () => ({
@@ -391,25 +418,27 @@ describe('reference checker', () => {
       installFromZip: () => undefined,
       remove: () => true,
     });
-    primitiveDeps.presetCatalog = async () => ({ getPackInfo: () => null, downloadPack: () => '' });
-    primitiveDeps.stepCatalogInfo = async () => null;
+    primitiveDeps.presetCatalog = async () =>
+      ({ getPackInfo: () => null, downloadPack: () => '', ...fakeCatalog('presets', {}) }) as never;
   });
 
   test('bundled extension resolves without warnings', async () => {
-    primitiveDeps.locateBundledExtension = async (id) => (id === 'agent-context' ? '/bundled/agent-context' : null);
+    const bundled = writeAssetManifest(path.join(tmp, 'agent-context'), 'extension', '1.0.0');
+    primitiveDeps.locateBundledExtension = async (id) => (id === 'agent-context' ? bundled : null);
     const warnings: string[] = [];
     const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: true, warnings });
     expect(await check(ref('extensions', 'agent-context'))).toBeNull();
     expect(warnings).toEqual([]);
   });
 
-  test('built-in step types resolve; community/unknown do not', async () => {
+  test('built-in step types resolve unpinned; community/unknown do not', async () => {
     primitiveDeps.builtinStepTypes = async () => new Set(['shell', 'gate', 'command', 'if', 'slot']);
+    primitiveDeps.stepCatalog = async () => fakeCatalog('steps', [{ id: 'other-step', version: '1.0.0' }]);
     const warnings: string[] = [];
     const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: true, warnings });
-    for (const id of ['shell', 'gate', 'command', 'if', 'slot']) expect(await check(ref('steps', id))).toBeNull();
+    for (const id of ['shell', 'gate', 'command', 'if', 'slot']) expect(await check(ref('steps', id, null))).toBeNull();
     expect(await check(ref('steps', 'no-such-step-type'))).toBe(
-      "step 'no-such-step-type' is not bundled, installed, or present in any active catalog.",
+      "step 'no-such-step-type' at 1.0.0 is not available locally or from the selected install-allowed catalog.",
     );
     expect(warnings).toEqual([]);
   });
@@ -422,11 +451,145 @@ describe('reference checker', () => {
     expect(warnings).toEqual([
       "Could not verify preset 'does-not-exist' offline (not bundled or installed); re-run validate online to check catalogs.",
     ]);
-    primitiveDeps.presetCatalog = async () => {
-      throw new Error('unreachable');
-    };
+    const outage = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    primitiveDeps.presetCatalog = async () => fakeCatalog('presets', {}, { fail: outage }) as never;
     warnings.length = 0;
     expect(await makeReferenceChecker(root, { allowNetwork: true, warnings })(ref('presets', 'p'))).toBeNull();
     expect(warnings).toEqual(["Could not verify preset 'p' (catalog unreachable); reference left unchecked."]);
+  });
+
+  test('wrong bundled extension pin is definitive; a catalog source pin is checked online', async () => {
+    const bundled = writeAssetManifest(path.join(tmp, 'agent-context'), 'extension', '1.0.0');
+    primitiveDeps.locateBundledExtension = async (id) => (id === 'agent-context' ? bundled : null);
+    primitiveDeps.extensionCatalog = async () =>
+      ({
+        getExtensionInfo: () => null,
+        downloadExtension: () => '',
+        ...fakeCatalog('extensions', {
+          'agent-context': { version: '999.0.0', download_url: 'https://example.com/release.zip' },
+        }),
+      }) as never;
+    for (const allowNetwork of [false, true]) {
+      const warnings: string[] = [];
+      const check = makeReferenceChecker(makeProject(tmp), { allowNetwork, warnings });
+      expect(await check(ref('extensions', 'agent-context', '999.0.0'))).toContain('resolved version is');
+      expect(warnings).toEqual([]);
+      if (allowNetwork) {
+        expect(
+          await check(new ComponentRef({ kind: 'extensions', id: 'agent-context', version: '999.0.0', source: 'trusted' })),
+        ).toBeNull();
+      }
+      expect(await check(ref('extensions', 'agent-context', '1.0.0'))).toBeNull();
+    }
+  });
+
+  test('newer packaged patch is accepted with a warning', async () => {
+    const bundled = writeAssetManifest(path.join(tmp, 'git'), 'extension', '1.0.2');
+    primitiveDeps.locateBundledExtension = async () => bundled;
+    const warnings: string[] = [];
+    const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: false, warnings });
+    expect(await check(ref('extensions', 'git', '1.0.0'))).toBeNull();
+    expect(warnings).toEqual([
+      "Extension 'git' is pinned to version 1.0.0, but Spec Kit ships 1.0.2; using the newer packaged patch. " +
+        'Bundle installation records the actual installed version alongside the requested pin.',
+    ]);
+  });
+
+  test('online validation checks the winning exact release, its source and its metadata', async () => {
+    const release = (url: string, sha = 'a'.repeat(64)) => ({ download_url: url, sha256: sha });
+    primitiveDeps.extensionCatalog = async () =>
+      ({
+        getExtensionInfo: () => null,
+        downloadExtension: () => '',
+        ...fakeCatalog('extensions', {
+          ext: {
+            version: '2.0.0',
+            download_url: 'https://example.com/2.zip',
+            releases: {
+              '1.0.0': release('https://example.com/1.zip'),
+              '1.1.0': release('http://example.com/insecure.zip'),
+            },
+          },
+        }),
+      }) as never;
+    const warnings: string[] = [];
+    const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: true, warnings });
+    expect(await check(ref('extensions', 'ext', '1.0.0'))).toBeNull();
+    expect(await check(ref('extensions', 'ext', '1.1.0'))).toBe(
+      "Catalog lookup failed: extension 'ext' has an invalid download URL for pinned version 1.1.0.",
+    );
+    expect(await check(ref('extensions', 'ext', '3.0.0'))).toBe(
+      "extension 'ext' at 3.0.0 is not available locally or from the selected install-allowed catalog.",
+    );
+    expect(await check(new ComponentRef({ kind: 'extensions', id: 'ext', version: '1.0.0', source: 'other' }))).toBe(
+      "extension 'ext' at 1.0.0 is not available locally or from the selected install-allowed catalog.",
+    );
+    expect(warnings).toEqual([]);
+  });
+
+  test('a malformed release digest fails the whole entry through the extension release selector', async () => {
+    primitiveDeps.extensionCatalog = async () =>
+      ({
+        getExtensionInfo: () => null,
+        downloadExtension: () => '',
+        ...fakeCatalog('extensions', {
+          ext: {
+            version: '2.0.0',
+            download_url: 'https://example.com/2.zip',
+            releases: {
+              '1.0.0': { download_url: 'https://example.com/1.zip', sha256: 'a'.repeat(64) },
+              '1.2.0': { download_url: 'https://example.com/1.2.zip', sha256: 'nope' },
+            },
+          },
+        }),
+      }) as never;
+    const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: true, warnings: [] });
+    for (const pin of ['1.0.0', '1.2.0']) {
+      expect(await check(ref('extensions', 'ext', pin))).toBe(
+        "Catalog lookup failed: Extension 'ext' release '1.2.0' needs a SHA-256 digest.",
+      );
+    }
+  });
+
+  test('discovery-only winner and unversioned legacy entries', async () => {
+    primitiveDeps.presetCatalog = async () =>
+      ({ getPackInfo: () => null, downloadPack: () => '', ...fakeCatalog('presets', { p: { version: '1.0.0' } }, { installAllowed: false }) }) as never;
+    const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: true, warnings: [] });
+    expect(await check(ref('presets', 'p'))).toContain('is not available');
+    primitiveDeps.presetCatalog = async () =>
+      ({ getPackInfo: () => null, downloadPack: () => '', ...fakeCatalog('presets', { p: { name: 'legacy' } }) }) as never;
+    expect(await check(ref('presets', 'p'))).toBeNull();
+  });
+
+  test('a malformed higher-priority catalog is a validation error, not a fallback', async () => {
+    primitiveDeps.workflowCatalog = async () => fakeCatalog('workflows', { wf: 'not-an-object' });
+    const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: true, warnings: [] });
+    expect(await check(ref('workflows', 'wf'))).toBe(
+      "Catalog lookup failed: Invalid workflow catalog entry for 'wf' from https://example.com/catalog.json: expected an object.",
+    );
+    primitiveDeps.workflowCatalog = async () => fakeCatalog('workflows', { wf: { id: 'other', version: '1.0.0' } });
+    expect(await check(ref('workflows', 'wf'))).toBe(
+      "Catalog lookup failed: Invalid workflow catalog entry for 'wf' from https://example.com/catalog.json: " +
+        "declared ID 'other' does not match the catalog key.",
+    );
+    primitiveDeps.stepCatalog = async () =>
+      fakeCatalog('steps', [
+        { id: 's', version: '1.0.0' },
+        { id: ' s ', version: '1.0.0' },
+      ]);
+    expect(await check(ref('steps', 's'))).toBe(
+      "Catalog lookup failed: Duplicate step ID 's' in catalog https://example.com/catalog.json.",
+    );
+  });
+
+  test('step releases must pin exactly their files', async () => {
+    const step = (sha: unknown) => ({ version: '1.0.0', url: 'https://example.com/step.yml', sha256: sha });
+    primitiveDeps.stepCatalog = async () =>
+      fakeCatalog('steps', [{ id: 'good', ...step({ 'step.yml': 'a'.repeat(64), '__init__.py': 'b'.repeat(64) }) }, { id: 'bad', ...step('a'.repeat(64)) }]);
+    const check = makeReferenceChecker(makeProject(tmp), { allowNetwork: true, warnings: [] });
+    expect(await check(ref('steps', 'good'))).toBeNull();
+    expect(await check(ref('steps', 'bad'))).toBe(
+      "Catalog lookup failed: Step 'bad' needs SHA-256 digests for exactly ['__init__.py', 'step.yml'].",
+    );
   });
 });

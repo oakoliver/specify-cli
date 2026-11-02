@@ -17,6 +17,7 @@ import {
   type ParsedOptions,
   type RegistrarConfig,
   type SetupOptions,
+  type ExecArgsOptions,
 } from './base.js';
 import { isRelativeTo, resolvePath, type IntegrationManifest } from './manifest.js';
 
@@ -110,5 +111,16 @@ export class JunieIntegration extends MarkdownIntegration {
       }
     }
     return created;
+  }
+
+  /** ``junie --task <prompt>``: Junie's ``-p`` is ``--project <path>``. */
+  buildExecArgs(prompt: string, opts: ExecArgsOptions = {}): string[] | null {
+    this.validateRuntimeConfig(opts.integrationArgs, opts.integrationOptions);
+    if (!this.config || !this.config.requires_cli) return null;
+    const args: string[] = [this.resolveExecutable(), '--task', prompt];
+    this.applyExtraArgsEnvVar(args);
+    if (opts.model) args.push('--model', opts.model);
+    if (opts.outputJson ?? true) args.push('--output-format', 'json');
+    return args;
   }
 }

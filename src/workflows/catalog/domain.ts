@@ -13,6 +13,8 @@
  * @module workflows/catalog/domain
  */
 
+import type { FileHelper } from '../../file-helper.js';
+import { FileHelperError, isErrno } from '../../file-helper.js';
 import { createHash, randomBytes } from 'node:crypto';
 import {
   closeSync,
@@ -32,7 +34,10 @@ import { basename, dirname, join } from 'node:path';
 
 import { openUrl } from '../../authentication/http.js';
 import { MAX_JSON_CATALOG_BYTES, readResponseLimited } from '../../download-security.js';
+import { loadsUniqueJson } from '../../json-unique.js';
 import { dumpYaml, parseYaml } from '../../yaml.js';
+import { readCacheJson, writeCacheJson } from '../catalog-cache.js';
+import { availableVersions, selectRelease } from './versions.js';
 import {
   isMapping,
   isSymlink,
@@ -176,6 +181,29 @@ export interface CatalogStackSpec {
   noConfigMessage: string;
   catalogError: ErrorCtor;
   validationError: ErrorCtor;
+  /**
+   * Step catalogs parse JSON with ``object_pairs_hook=_unique_json_fields``:
+   * a repeated key raises this error, which is never treated as a fetch
+   * failure (no stale-cache fallback, not counted as an unreachable source).
+   */
+  duplicateFieldError?: new (message: string) => Error;
+  /** Step catalogs reject a list-form source that repeats an ID. */
+  rejectDuplicateListIds?: boolean;
+  /** Cache-write warning label (``Could not safely cache <label> ...``). */
+  cacheWarningLabel: string;
+}
+
+/** Python ``logging.getLogger(...).warning`` with no handlers configured (lastResort → stderr). */
+export const catalogLogger: { warning: (message: string) => void } = {
+  warning: (message: string) => {
+    process.stderr.write(`${message}\n`);
+  },
+};
+
+function isNodeOsError(exc: unknown): boolean {
+  if (!(exc instanceof Error)) return false;
+  const code = (exc as NodeJS.ErrnoException).code;
+  return exc.name === 'OSError' || (typeof code === 'string' && /^E[A-Z0-9]+$/.test(code));
 }
 
 /**
@@ -192,11 +220,6 @@ export abstract class CatalogStackCore {
   constructor(projectRoot: string, cacheDir: string) {
     this.projectRoot = projectRoot;
     this.cacheDir = cacheDir;
-  }
-
-  /** Whether the cache directory may be used (step catalogs refuse symlinks). */
-  protected isCachePathSafe(): boolean {
-    return true;
   }
 
   // -- Catalog resolution ------------------------------------------------
@@ -230,6 +253,14 @@ export abstract class CatalogStackCore {
     } catch (exc) {
       throw new V(`Failed to read catalog config ${configPath}: ${osErrorMessage(exc)}`);
     }
+    const indexed = this.parseCatalogConfig(data, configPath);
+    if (indexed === null) return null;
+    return indexed.map(([, entry]) => entry);
+  }
+
+  /** Validate and order sources, retaining their original YAML positions (``_parse_catalog_config``). */
+  protected parseCatalogConfig(data: unknown, configPath: string): Array<[number, WorkflowCatalogEntry]> | null {
+    const V = this.spec.validationError;
     // Only None means "no document"; falsy non-mappings are shape errors.
     if (data === null || data === undefined) return null;
     if (!isMapping(data)) {
@@ -246,7 +277,7 @@ export abstract class CatalogStackCore {
       return null;
     }
 
-    const entries: WorkflowCatalogEntry[] = [];
+    const entries: Array<[number, WorkflowCatalogEntry]> = [];
     catalogsData.forEach((item, idx) => {
       if (!isMapping(item)) {
         throw new V(`Invalid catalog entry at index ${idx}: ` + `expected a mapping, got ${pyTypeName(item)}`);
@@ -268,16 +299,19 @@ export abstract class CatalogStackCore {
         typeof rawInstall === 'string'
           ? ['true', 'yes', '1'].includes(rawInstall.trim().toLowerCase())
           : pyTruthy(rawInstall);
-      entries.push({
-        url,
-        name: pyStr('name' in item ? item.name : `catalog-${idx + 1}`),
-        priority,
-        install_allowed: installAllowed,
-        description: pyStr('description' in item ? item.description : ''),
-      });
+      entries.push([
+        idx,
+        {
+          url,
+          name: pyStr('name' in item ? item.name : `catalog-${idx + 1}`),
+          priority,
+          install_allowed: installAllowed,
+          description: pyStr('description' in item ? item.description : ''),
+        },
+      ]);
     });
     // Stable sort by priority (Python ``list.sort`` is stable).
-    entries.sort((a, b) => a.priority - b.priority);
+    entries.sort((a, b) => a[1].priority - b[1].priority);
     if (entries.length === 0) {
       throw new V(`Catalog config ${configPath} contains ${catalogsData.length} ` + 'entries but none have valid URLs.');
     }
@@ -338,9 +372,8 @@ export abstract class CatalogStackCore {
   /** Check if cached data for a URL is still fresh. */
   isUrlCacheValid(url: string): boolean {
     const [, metaFile] = this.getCachePaths(url);
-    if (!pathExists(metaFile)) return false;
     try {
-      const meta = JSON.parse(readFileSync(metaFile, 'utf-8')) as unknown;
+      const meta = readCacheJson(this.projectRoot, metaFile);
       if (!isMapping(meta)) return false;
       const raw = 'fetched_at' in meta ? meta.fetched_at : 0;
       const fetchedAt = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN;
@@ -351,11 +384,25 @@ export abstract class CatalogStackCore {
     }
   }
 
+  /** Parse catalog JSON text (duplicate keys rejected for step catalogs). */
+  protected parseCatalogJson(text: string): unknown {
+    const D = this.spec.duplicateFieldError;
+    if (D === undefined) return JSON.parse(text);
+    return loadsUniqueJson(text, (key) => new D(`Duplicate field '${key}' in ${this.spec.label}.`));
+  }
+
+  private isDuplicateFieldError(exc: unknown): boolean {
+    const D = this.spec.duplicateFieldError;
+    return D !== undefined && exc instanceof D;
+  }
+
+  /** Read a cached catalog through the confined cache reader; null when unusable. */
   private readCachedDict(cacheFile: string): Record<string, unknown> | null {
     try {
-      const cached = JSON.parse(readFileSync(cacheFile, 'utf-8')) as unknown;
+      const cached = readCacheJson(this.projectRoot, cacheFile, { parse: (t) => this.parseCatalogJson(t) });
       return isMapping(cached) ? cached : null;
-    } catch {
+    } catch (exc) {
+      if (this.isDuplicateFieldError(exc)) throw exc;
       return null;
     }
   }
@@ -363,10 +410,9 @@ export abstract class CatalogStackCore {
   /** Fetch a single catalog, using cache when possible. */
   async fetchSingleCatalog(entry: WorkflowCatalogEntry, forceRefresh = false): Promise<Record<string, unknown>> {
     const C = this.spec.catalogError;
-    const cacheSafe = this.isCachePathSafe();
     const [cacheFile, metaFile] = this.getCachePaths(entry.url);
 
-    if (cacheSafe && !forceRefresh && this.isUrlCacheValid(entry.url)) {
+    if (!forceRefresh && this.isUrlCacheValid(entry.url)) {
       const cached = this.readCachedDict(cacheFile);
       if (cached !== null) return cached;
     }
@@ -402,12 +448,11 @@ export abstract class CatalogStackCore {
         errorType: C,
         label: this.spec.label,
       });
-      data = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body)) as unknown;
+      data = this.parseCatalogJson(new TextDecoder('utf-8', { fatal: true }).decode(body));
     } catch (exc) {
-      if (cacheSafe && pathExists(cacheFile)) {
-        const cached = this.readCachedDict(cacheFile);
-        if (cached !== null) return cached;
-      }
+      if (this.isDuplicateFieldError(exc)) throw exc;
+      const cached = this.readCachedDict(cacheFile);
+      if (cached !== null) return cached;
       const msg = exc instanceof Error ? exc.message : String(exc);
       throw new C(`Failed to fetch catalog from ${entry.url}: ${msg}`);
     }
@@ -416,14 +461,14 @@ export abstract class CatalogStackCore {
       throw new C(`Catalog from ${entry.url} is not a valid JSON object.`);
     }
 
-    if (cacheSafe) {
-      try {
-        mkdirSync(this.cacheDir, { recursive: true });
-        writeFileSync(cacheFile, pyJsonDump(data, 2), 'utf-8');
-        writeFileSync(metaFile, pyJsonDump({ url: entry.url, fetched_at: nowSeconds() }), 'utf-8');
-      } catch {
-        // Proceed without caching if disk write fails
-      }
+    try {
+      writeCacheJson(this.projectRoot, cacheFile, pyJsonDump(data, 2));
+      writeCacheJson(this.projectRoot, metaFile, pyJsonDump({ url: entry.url, fetched_at: nowSeconds() }));
+    } catch (exc) {
+      if (!isNodeOsError(exc)) throw exc;
+      catalogLogger.warning(
+        `Could not safely cache ${this.spec.cacheWarningLabel} ${entry.url}: ${exc instanceof Error ? exc.message : String(exc)}`,
+      );
     }
     return data;
   }
@@ -444,6 +489,7 @@ export abstract class CatalogStackCore {
       try {
         data = await this.fetchSingleCatalog(entry, forceRefresh);
       } catch (exc) {
+        if (this.isDuplicateFieldError(exc)) throw exc;
         if (exc instanceof this.spec.catalogError) {
           fetchErrors += 1;
           continue;
@@ -459,10 +505,17 @@ export abstract class CatalogStackCore {
           merged.set(itemId, itemData);
         }
       } else if (Array.isArray(items)) {
+        const seenInSource = new Set<string>();
         for (const itemData of items) {
           if (!isMapping(itemData)) continue;
           const itemId = this.listItemId(itemData);
           if (itemId) {
+            if (this.spec.rejectDuplicateListIds) {
+              if (seenInSource.has(itemId)) {
+                throw new this.spec.catalogError(`Duplicate step ID '${itemId}' in catalog '${entry.name}'.`);
+              }
+              seenInSource.add(itemId);
+            }
             itemData._catalog_name = entry.name;
             itemData._install_allowed = entry.install_allowed;
             merged.set(itemId, itemData);
@@ -559,9 +612,15 @@ export abstract class CatalogStackCore {
     return 'added';
   }
 
-  /** Remove a catalog source by index (0-based). Returns the removed name. */
+  /** Remove a project source by its index in the active catalog list. Returns the removed name. */
   removeCatalog(index: number): string {
     const V = this.spec.validationError;
+    if ((process.env[this.spec.envVar] ?? '').trim()) {
+      throw new V(
+        `The active catalog comes from ${this.spec.envVar}. ` +
+          'Unset that variable to remove a project catalog source.',
+      );
+    }
     const configPath = this.configPath();
     if (!pathExists(configPath)) throw new V(this.spec.noConfigMessage);
 
@@ -571,18 +630,15 @@ export abstract class CatalogStackCore {
     } catch (exc) {
       throw new V(`Catalog config file is unreadable or malformed: ${osErrorMessage(exc)}`);
     }
-    if (data === null || data === undefined) data = {};
-    else if (!isMapping(data)) throw new V('Catalog config file is corrupted (expected a mapping).');
-    const doc = data as Record<string, unknown>;
-    const catalogs = 'catalogs' in doc ? doc.catalogs : [];
-    if (!Array.isArray(catalogs)) throw new V("Catalog config 'catalogs' must be a list.");
+    const entries = this.parseCatalogConfig(data, configPath) ?? [];
 
-    if (index < 0 || index >= catalogs.length) {
-      throw new V(`Catalog index ${index} out of range (0-${catalogs.length - 1}).`);
+    if (index < 0 || index >= entries.length) {
+      throw new V(`Catalog index ${index} out of range (0-${entries.length - 1}).`);
     }
 
-    const [removed] = catalogs.splice(index, 1);
-    doc.catalogs = catalogs;
+    const [sourceIndex, entry] = entries[index] as [number, WorkflowCatalogEntry];
+    const doc = data as Record<string, unknown>;
+    (doc.catalogs as unknown[]).splice(sourceIndex, 1);
 
     try {
       writeFileSync(configPath, dumpCatalogConfig(doc), 'utf-8');
@@ -590,10 +646,7 @@ export abstract class CatalogStackCore {
       throw new V(`Failed to write catalog config ${configPath}: ${osErrorMessage(exc)}`);
     }
 
-    if (isMapping(removed)) {
-      return 'name' in removed ? pyStr(removed.name) : `catalog-${index + 1}`;
-    }
-    return `catalog-${index + 1}`;
+    return entry.name;
   }
 }
 
@@ -623,11 +676,14 @@ export class WorkflowRegistry {
   readonly workflowsDir: string;
   readonly registryPath: string;
   data: WorkflowRegistryData;
+  /** Optional read-policy handoff for workflow.list (#5115); mutations keep their behavior. */
+  private readonly readFiles: FileHelper | null;
 
-  constructor(projectRoot: string) {
+  constructor(projectRoot: string, opts: { readFiles?: FileHelper | null } = {}) {
     this.projectRoot = projectRoot;
     this.workflowsDir = join(projectRoot, '.specify', 'workflows');
     this.registryPath = join(this.workflowsDir, WorkflowRegistry.REGISTRY_FILE);
+    this.readFiles = opts.readFiles ?? null;
     this.data = this.load();
   }
 
@@ -649,10 +705,22 @@ export class WorkflowRegistry {
           'a parent directory or the registry file itself is a symlink',
       );
     }
-    if (pathExists(this.registryPath)) {
+    if (this.readFiles !== null || pathExists(this.registryPath)) {
       let text: string;
       try {
-        text = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(this.registryPath));
+        if (this.readFiles === null) {
+          text = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(this.registryPath));
+        } else {
+          try {
+            text = this.readFiles.readText(this.registryPath);
+          } catch (exc) {
+            if (isErrno(exc, 'ENOENT')) return defaultRegistry;
+            if (exc instanceof FileHelperError) throw Object.assign(new Error(exc.message), { code: 'EPOLICY' });
+            throw exc;
+          }
+          // Match the legacy text stream's universal-newline handling.
+          text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        }
       } catch (exc) {
         if (exc instanceof TypeError) {
           throw new WorkflowRegistryError(`Workflow registry at ${this.registryPath} is corrupted: ` + `${exc.message}`);
@@ -822,6 +890,7 @@ export class WorkflowCatalog extends CatalogStackCore {
     noConfigMessage: 'No catalog config file found.',
     catalogError: WorkflowCatalogError,
     validationError: WorkflowValidationError,
+    cacheWarningLabel: 'workflow catalog',
   };
 
   constructor(projectRoot: string) {
@@ -873,11 +942,27 @@ export class WorkflowCatalog extends CatalogStackCore {
     return results;
   }
 
-  /** Get details for a specific workflow from the catalog. */
-  async getWorkflowInfo(workflowId: string): Promise<Record<string, unknown> | null> {
+  /** Get the current or an exact advertised release from the winning source. */
+  async getWorkflowInfo(workflowId: string, version: string | null = null): Promise<Record<string, unknown> | null> {
     const merged = await this.getMergedWorkflows();
-    const wf = merged.get(workflowId) ?? null;
-    if (wf && Object.keys(wf).length > 0 && !('id' in wf)) wf.id = workflowId;
-    return wf;
+    const wf = merged.get(workflowId);
+    if (wf === undefined) return null;
+    if (!('id' in wf)) wf.id = workflowId;
+    return selectRelease(wf, version);
+  }
+
+  /** List versions advertised by the winning catalog entry. */
+  async getWorkflowVersions(workflowId: string): Promise<string[]> {
+    const details = await this.getWorkflowVersionDetails(workflowId);
+    return details !== null ? details[0] : [];
+  }
+
+  /** Return advertised versions and whether their source allows installation. */
+  async getWorkflowVersionDetails(workflowId: string): Promise<[string[], boolean] | null> {
+    const merged = await this.getMergedWorkflows();
+    const wf = merged.get(workflowId);
+    if (wf === undefined) return null;
+    if (!('id' in wf)) wf.id = workflowId;
+    return [availableVersions(wf), pyTruthy('_install_allowed' in wf ? wf._install_allowed : true)];
   }
 }

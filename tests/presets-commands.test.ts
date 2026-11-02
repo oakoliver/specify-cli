@@ -241,7 +241,7 @@ describe('preset add / remove / update', () => {
       out.length = 0;
       PresetCatalog.prototype.getPackInfo = async () => ({ id: 'b', bundled: true });
       expect(await runPresetCommand(['add', 'b-pack'])).toBe(1);
-      expect(stdout()).toContain('is bundled with spec-kit but could not be found in the installed package.');
+      expect(stdout()).toContain('is bundled with spec-kit but the requested version could not be found in the installed package.');
     } finally {
       PresetCatalog.prototype.getPackInfo = origGet;
     }

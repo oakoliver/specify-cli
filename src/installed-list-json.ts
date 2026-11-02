@@ -49,7 +49,13 @@ export function emitJson(value: unknown): void {
 
 /** Write the list-command error contract to stderr and throw `CliExit(exitCode)`. */
 export function emitJsonError(error: unknown, exitCode = 1): never {
-  const raw = error instanceof Error ? error.message : String(error);
+  // Click's ``str(MissingParameter)`` names the parameter, unlike its usage panel.
+  const raw =
+    error instanceof UsageError && error.missingParameter
+      ? `Missing parameter: ${error.missingParameter}`
+      : error instanceof Error
+        ? error.message
+        : String(error);
   const message = raw.trim() || (error instanceof Error ? error.name : 'Error');
   process.stderr.write(pyJsonDumps({ error: message }, { ensureAscii: false }) + '\n');
   throw new CliExit(exitCode);

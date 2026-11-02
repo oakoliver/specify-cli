@@ -12,7 +12,7 @@ export const DOLLAR_SKILLS_AGENTS: ReadonlySet<string> = new Set(['codex', 'zcod
 
 /** Agents that always render /speckit-<name>, regardless of ai_skills. */
 export const ALWAYS_SLASH_AGENTS: ReadonlySet<string> = new Set([
-  'devin', 'droid', 'dsh', 'grok', 'muse', 'qodercli', 'trae', 'zed',
+  'devin', 'docker-agent', 'droid', 'dsh', 'grok', 'mcode', 'muse', 'qodercli', 'trae', 'zed',
 ]);
 
 /** Agents that render /speckit-<name> only when ai_skills is enabled. */

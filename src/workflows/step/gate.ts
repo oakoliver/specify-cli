@@ -9,12 +9,14 @@
 import { readFileSync } from 'node:fs';
 
 import {
+  KeyboardInterrupt,
   StepBase,
   StepContext,
   StepResult,
   StepStatus,
   dget,
   dhas,
+  isDict,
   pyRepr,
   pyStr,
   pyTypeName,
@@ -39,6 +41,46 @@ function stripControl(text: string): string {
 async function readLine(promptText: string): Promise<string | null> {
   process.stdout.write(promptText);
   return consoleReadLine();
+}
+
+/**
+ * ``readLine`` that turns Ctrl+C into a ``KeyboardInterrupt`` instead of a
+ * verdict (upstream #4529): the engine maps a propagated interrupt to a paused
+ * run, so an interrupted reviewer can resume rather than having ``on_reject``
+ * fire. ADAPTATION: Python receives SIGINT as an exception in ``input()``;
+ * here a temporary SIGINT listener rejects the pending read.
+ */
+async function readLineOrInterrupt(promptText: string, onInterrupt: () => void): Promise<string | null> {
+  let listener: (() => void) | null = null;
+  const interrupted = new Promise<never>((_, reject) => {
+    listener = () => {
+      onInterrupt();
+      reject(new KeyboardInterrupt());
+    };
+    process.once('SIGINT', listener);
+  });
+  try {
+    return await Promise.race([readLine(promptText), interrupted]);
+  } finally {
+    if (listener) process.removeListener('SIGINT', listener);
+  }
+}
+
+/** ``json.dumps(value)`` succeeds (no functions, symbols or cycles). */
+function isJsonSafe(value: unknown, seen: Set<unknown> = new Set()): boolean {
+  if (value === null || value === undefined) return true;
+  const t = typeof value;
+  if (t === 'string' || t === 'number' || t === 'boolean') return true;
+  if (t !== 'object') return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+  try {
+    if (Array.isArray(value)) return value.every((v) => isJsonSafe(v, seen));
+    if (!isDict(value)) return false;
+    return Object.values(value).every((v) => isJsonSafe(v, seen));
+  } finally {
+    seen.delete(value);
+  }
 }
 
 /** Python ``str.isdecimal()`` for ASCII input. */
@@ -69,6 +111,9 @@ export class GateStep extends StepBase {
     if (typeof message === 'string' && message.includes('{{')) {
       message = evaluateExpression(message, context);
     }
+    // Keep JSON values typed; only values the JSON checkpoint cannot persist
+    // are stored as text. (YAML dates already load as strings in this port.)
+    if (!isJsonSafe(message)) message = pyStr(message);
 
     const options = dget(config, 'options', ['approve', 'reject']);
     const onReject = dget(config, 'on_reject', 'abort');
@@ -209,10 +254,13 @@ export class GateStep extends StepBase {
     out('  └────────────────────────────────────────────');
 
     for (;;) {
-      const line = await readLine(`  Choose [1-${options.length}]: `);
+      const line = await readLineOrInterrupt(`  Choose [1-${options.length}]: `, () => out(''));
       if (line === null) {
+        // EOF: stdin is closed, so there is no operator to resume. Fall back to
+        // the declared reject/abort option (not merely the last one, which
+        // ``validate`` never requires to be the rejection).
         out('');
-        return options[options.length - 1] as string;
+        return options.find((o) => ['reject', 'abort'].includes(o.toLowerCase())) ?? (options[options.length - 1] as string);
       }
       const raw = line.trim();
       if (isDecimal(raw)) {

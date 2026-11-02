@@ -8,9 +8,11 @@ Spec-Driven Development CLI for AI coding agents. Zero runtime dependencies, mul
 
 <p align="center"><sub>Every picture in this README is recorded from this repository with <a href="https://github.com/oakoliver/vhs">@oakoliver/vhs</a>; the tapes are in <code>assets/tapes/</code>.</sub></p>
 
-Ported from [github/spec-kit](https://github.com/github/spec-kit) (Python) to TypeScript, at **1:1 parity with spec-kit v1.0.12** (run `specify version` to see the parity line).
+Ported from [github/spec-kit](https://github.com/github/spec-kit) (Python) to TypeScript, at **1:1 parity with spec-kit v1.2.5** (run `specify version` to see the parity line). See [CHANGELOG.md](CHANGELOG.md) for what each upstream release brought and the few places the port differs.
 
-> **v2.0.0 is a breaking release**, mirroring upstream's 1.0 line: the legacy `--ai`, `--ai-commands-dir`, `--ai-skills` and `--no-git` init flags are gone (use `--integration` / `--integration-options`; git is now the opt-in `git` extension), the roo/windsurf/iflow agents were retired upstream, and extensions/presets use `extension.yml` / `preset.yml` manifests.
+> **v2.1.0** follows upstream's 1.1 and 1.2 lines: a `specify mcp` server, exact catalog releases (`--version` / `--versions`), workflow composition and output capture, bundles that reference other bundles, the `mcode` and `none` integrations, and a persisted symlink policy (`init --allow-symlinks`).
+>
+> **v2.0.0 was a breaking release**, mirroring upstream's 1.0 line: the legacy `--ai`, `--ai-commands-dir`, `--ai-skills` and `--no-git` init flags are gone (use `--integration` / `--integration-options`; git is now the opt-in `git` extension), the roo/windsurf/iflow agents were retired upstream, and extensions/presets use `extension.yml` / `preset.yml` manifests.
 
 **Read the article:** [Getting Started with specify-cli](https://engineering.oakoliver.com/articles/getting-started-specify-cli-spec-driven-development) · [Porting spec-kit from Python to TypeScript](https://engineering.oakoliver.com/articles/porting-python-spec-kit-to-typescript-sdd-with-sdd)
 
@@ -532,7 +534,7 @@ Creates `checklists/security.md`:
 
 ## Supported AI Agents
 
-41 integrations (upstream spec-kit v1.0.12 registry, including `generic`). Skills-based integrations install one `<name>/SKILL.md` per command and invoke as `/speckit-<name>`; command-based ones use `/speckit.<name>`.
+43 integrations (upstream spec-kit v1.2.5 registry, including `generic` and `none`, which installs only the shared scaffolding). Skills-based integrations install one `<name>/SKILL.md` per command and invoke as `/speckit-<name>`; command-based ones use `/speckit.<name>`.
 
 Without `--integration`, `specify init` asks which one to use. The picker scrolls to fit the terminal:
 
@@ -572,7 +574,9 @@ Without `--integration`, `specify init` asks which one to use. The picker scroll
 | kimi | Kimi Code | `.kimi-code/skills` | SKILL.md |
 | kiro-cli | Kiro CLI | `.kiro/prompts` | Markdown |
 | lingma | Lingma | `.lingma/skills` | SKILL.md |
+| mcode | MiniMax Code | `.minimax/skills` | SKILL.md |
 | muse | Muse Code | `.agents/skills` | SKILL.md |
+| none | None (shared scaffolding only) | — | — |
 | omp | Oh My Pi | `.omp/commands` | Markdown |
 | opencode | opencode | `.opencode/commands` | Markdown |
 | pi | Pi Coding Agent | `.pi/prompts` | Markdown |
@@ -586,7 +590,7 @@ Without `--integration`, `specify init` asks which one to use. The picker scroll
 | zcode | ZCode | `.zcode/skills` | SKILL.md |
 | zed | Zed | `.agents/skills` | SKILL.md |
 
-`copilot` installs skills (`.github/skills/`) by default; pass `--integration-options="--commands"` for legacy `.github/agents/` prompt files. `bob` likewise installs skills (`.bob/skills/`); `--integration-options="--legacy-commands"` keeps the deprecated Bob 1.x `.bob/commands/` layout. `generic` requires `--integration-options="--commands-dir <dir>"`.
+`copilot` installs skills (`.github/skills/`) by default; pass `--integration-options="--commands"` for legacy `.github/agents/` prompt files. `bob` likewise installs skills (`.bob/skills/`); `--integration-options="--legacy-commands"` keeps the deprecated Bob 1.x `.bob/commands/` layout. `generic` requires `--integration-options="--commands-dir <dir>"`. `claude` and `vibe` accept `--integration-options="--no-model-invocation"` to stop the agent invoking the skills on its own.
 
 ## CLI Reference
 
@@ -595,7 +599,8 @@ Without `--integration`, `specify init` asks which one to use. The picker scroll
 ```text
 specify init [PROJECT_NAME]   Initialize a new Specify project
 specify check                 Check that all required tools are installed
-specify version               Display version and system information
+specify version [--json]      Display version and system information
+specify mcp                   Run the experimental MCP server over stdio (version, artifact and workflow tools)
 specify self check|upgrade    Check for / install newer CLI releases (npm/bun/pnpm/yarn)
 specify integration ...       list, install, uninstall, switch, use, upgrade, status, scaffold, search, info, catalog
 specify extension ...         list [--json], add, remove, search, info, update, enable, disable, set-priority, catalog
@@ -620,6 +625,7 @@ Every command supports `--help`. Key `specify init` options:
 --extension SPEC             Bundled name, local path or HTTPS URL (repeatable)
 --trust-extension-urls       Pre-authorize URL extensions without the trust prompt
 --ignore-agent-tools         Skip checks for coding agent CLIs
+--allow-symlinks             Persist permission for contained symlinks in project file operations (default: deny)
 ```
 
 ## Project Structure
@@ -682,6 +688,17 @@ specify preset add lean
 specify workflow run speckit         # full specify -> plan -> tasks -> implement cycle
 ```
 
+## Differences from upstream
+
+The port follows upstream behaviour and output byte for byte where it can (`specify init` produces the same files, contents and permissions as upstream 1.2.5 in 14 checked configurations, and `specify mcp` answers 36 recorded requests with the same bytes). Where Python and Node differ, it adapts:
+
+- **Self-upgrade** checks npm and upgrades with npm, bun, pnpm or yarn instead of PyPI.
+- **Custom workflow steps** load JavaScript (`index.mjs` / `index.js`) instead of a Python `__init__.py`, whether installed from a catalog, a local directory or an archive. A Python-only step package is rejected.
+- **Catalog-installed integration adapters** (upstream 1.1.3) are not supported: upstream imports them as Python packages, and every adapter in its catalog is one. The project scaffolding still matches upstream's.
+- **`specify mcp`** is a built-in JSON-RPC server, not the `mcp` Python SDK. The version tool reports the JavaScript runtime instead of Python.
+- **`specify version --json`** reports `runtime` as `{name, version, openssl}` and adds `upstream_spec_kit_version`.
+- **`specify doctor` and `specify status`** are additions with no upstream equivalent.
+
 ## Programmatic API
 
 ```typescript
@@ -692,7 +709,7 @@ import {
   CommandRegistrar,
   WorkflowEngine,
   parseYaml,
-  UPSTREAM_SPEC_KIT_VERSION, // '1.0.12'
+  UPSTREAM_SPEC_KIT_VERSION, // '1.2.5'
   extensions, presets, workflows, bundles, events, artifacts, // full domain namespaces
 } from '@oakoliver/specify-cli';
 
@@ -700,7 +717,7 @@ const code = await runInitCommand(['my-project', '--integration', 'claude', '--n
 
 const claude = getIntegration('claude');
 console.log(claude?.config?.name);          // 'Claude Code'
-console.log(Object.keys(INTEGRATION_REGISTRY).length); // 41
+console.log(Object.keys(INTEGRATION_REGISTRY).length); // 43
 
 const manager = new extensions.ExtensionManager('/path/to/project');
 console.log(manager.listInstalled());

@@ -261,6 +261,7 @@ describe('installer', () => {
     makeProject(tmp);
     const installer = new FakeInstaller();
     installer.installed.add('extensions:ext-a');
+    installer.versions.set('extensions:ext-a', '1.0.0');
     const m = bundle('demo', ['ext-a', 'ext-b']);
     const result = await installBundle(tmp, plan(m), installer, m, true);
     expect(result.skipped.map((c) => c.id)).toEqual(['ext-a']);

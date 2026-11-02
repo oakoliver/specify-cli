@@ -45,12 +45,13 @@ export function validateEvents(data: Record<string, unknown>): void {
         `Unknown event '${eventName}': must be one of ${pyRepr([...CANONICAL_EVENTS].sort())}`,
       );
     }
+    // An explicit ``matcher: null`` / ``timeout: null`` is invalid too.
     const matcher = eventConfig.matcher;
-    if (matcher !== null && matcher !== undefined && typeof matcher !== 'string') {
+    if ('matcher' in eventConfig && typeof matcher !== 'string') {
       throw new ValidationError(`Event '${eventName}' has invalid 'matcher': must be a string`);
     }
     const timeout = eventConfig.timeout;
-    if (timeout !== null && timeout !== undefined) {
+    if ('timeout' in eventConfig) {
       if (typeof timeout !== 'number' || !Number.isInteger(timeout) || timeout <= 0) {
         throw new ValidationError(
           `Event '${eventName}' has invalid 'timeout': must be a positive integer`,

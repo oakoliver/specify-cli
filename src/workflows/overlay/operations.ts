@@ -463,7 +463,11 @@ export function workflowResolve(projectRoot: string, workflowId: string): Workfl
   const [, layers, attribution] = resolved;
 
   console.print(`Resolved workflow '${workflowId}':`);
-  console.print('Layers (highest precedence first):');
+  // The list is sorted by (priority, source) ascending, which puts the
+  // winning layer first only while priorities DIFFER. On a tie the merge
+  // gives the conflict to the LAST id, so spell the tie-break out rather than
+  // reorder the list (upstream #4542).
+  console.print('Layers (highest precedence first; on equal priority the last ID wins):');
   for (const layer of layers) {
     const priority = layer.tier === 'base' ? 'n/a' : String(normalizePriority(layer.priority));
     // ``\[`` keeps the literal bracket so the tier label is not parsed as markup.

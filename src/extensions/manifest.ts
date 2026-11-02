@@ -346,8 +346,11 @@ export class ExtensionManifest {
               `Invalid hook '${hookName}': expected a mapping or list of mappings`,
             );
           }
-          if (!truthy(entry.command)) {
-            throw new ValidationError(`Hook '${hookName}' missing required 'command' field`);
+          // Same rule as validateEvents() in events: a truthy non-string
+          // (e.g. ``command: [foo]``) used to pass and crash hook registration.
+          const command = entry.command;
+          if (typeof command !== 'string' || !command.trim()) {
+            throw new ValidationError(`Hook '${hookName}' missing required 'command' string`);
           }
           if (hasKey(entry, 'priority')) {
             const priority = entry.priority;

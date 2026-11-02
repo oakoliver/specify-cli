@@ -32,6 +32,61 @@ export interface ShellOutcome {
   stdout: string;
   stderr: string;
   error?: Error;
+  /** Per-stream decode failures (upstream #5064), in stdout/stderr order. */
+  decodeErrors?: string[];
+}
+
+/**
+ * Strict UTF-8 decode with Python's ``UnicodeDecodeError`` text, or ``[null,
+ * message]`` when the bytes are malformed. ADAPTATION: upstream decodes with
+ * ``locale.getpreferredencoding(False)``; this port always uses UTF-8.
+ */
+export function decodeUtf8Strict(buf: Uint8Array): [string, null] | [null, string] {
+  try {
+    return [new TextDecoder('utf-8', { fatal: true }).decode(buf), null];
+  } catch {
+    // Locate the first malformed sequence to word the error like CPython.
+  }
+  const n = buf.length;
+  let i = 0;
+  while (i < n) {
+    const b = buf[i] as number;
+    let need = 0;
+    let lo = 0x80;
+    let hi = 0xbf;
+    if (b < 0x80) {
+      i++;
+      continue;
+    } else if (b >= 0xc2 && b <= 0xdf) need = 1;
+    else if (b >= 0xe0 && b <= 0xef) {
+      need = 2;
+      if (b === 0xe0) lo = 0xa0;
+      if (b === 0xed) hi = 0x9f;
+    } else if (b >= 0xf0 && b <= 0xf4) {
+      need = 3;
+      if (b === 0xf0) lo = 0x90;
+      if (b === 0xf4) hi = 0x8f;
+    } else {
+      return [null, `'utf-8' codec can't decode byte 0x${b.toString(16).padStart(2, '0')} in position ${i}: invalid start byte`];
+    }
+    let k = 0;
+    for (; k < need; k++) {
+      const j = i + 1 + k;
+      if (j >= n) {
+        const where = k === 0 ? `byte 0x${b.toString(16).padStart(2, '0')} in position ${i}` : `bytes in position ${i}-${i + k}`;
+        return [null, `'utf-8' codec can't decode ${where}: unexpected end of data`];
+      }
+      const c = buf[j] as number;
+      const min = k === 0 ? lo : 0x80;
+      const max = k === 0 ? hi : 0xbf;
+      if (c < min || c > max) {
+        const where = k === 0 ? `byte 0x${b.toString(16).padStart(2, '0')} in position ${i}` : `bytes in position ${i}-${i + k}`;
+        return [null, `'utf-8' codec can't decode ${where}: invalid continuation byte`];
+      }
+    }
+    i += need + 1;
+  }
+  return [null, "'utf-8' codec can't decode bytes: invalid data"];
 }
 
 /** Python ``OSError`` text for a Node spawn error (best effort). */
@@ -52,8 +107,8 @@ export function runShell(
   opts: { cwd: string; env: NodeJS.ProcessEnv; timeoutSeconds: number },
 ): Promise<ShellOutcome> {
   return new Promise((resolve) => {
-    let stdout = '';
-    let stderr = '';
+    const stdoutChunks: Buffer[] = [];
+    const stderrChunks: Buffer[] = [];
     let settled = false;
     let timedOut = false;
     const finish = (outcome: ShellOutcome): void => {
@@ -85,13 +140,11 @@ export function runShell(
       }
       finish({ kind: 'timeout', exitCode: -1, stdout: '', stderr: 'timeout' });
     }, Math.min(opts.timeoutSeconds * 1000, 2 ** 31 - 1));
-    child.stdout?.setEncoding('utf8');
-    child.stderr?.setEncoding('utf8');
-    child.stdout?.on('data', (d: string) => {
-      stdout += d;
+    child.stdout?.on('data', (d: Buffer) => {
+      stdoutChunks.push(d);
     });
-    child.stderr?.on('data', (d: string) => {
-      stderr += d;
+    child.stderr?.on('data', (d: Buffer) => {
+      stderrChunks.push(d);
     });
     child.on('error', (exc: NodeJS.ErrnoException) => {
       finish({ kind: 'oserror', exitCode: -1, stdout: '', stderr: osErrorText(exc, opts.cwd), error: exc });
@@ -100,11 +153,22 @@ export function runShell(
       if (timedOut) return;
       // Python reports a signal-terminated child as a negative return code.
       const exitCode = code !== null ? code : signal ? -(osSignalNumber(signal)) : -1;
+      const decoded: Record<string, string> = { stdout: '', stderr: '' };
+      const decodeErrors: string[] = [];
+      for (const [name, chunks] of [
+        ['stdout', stdoutChunks],
+        ['stderr', stderrChunks],
+      ] as const) {
+        const [text, error] = decodeUtf8Strict(Buffer.concat(chunks));
+        if (text !== null) decoded[name] = universalNewlines(text);
+        else decodeErrors.push(`Shell command ${name} could not be decoded: ${error}`);
+      }
       finish({
         kind: 'exited',
         exitCode,
-        stdout: universalNewlines(stdout),
-        stderr: universalNewlines(stderr),
+        stdout: decoded.stdout as string,
+        stderr: decoded.stderr as string,
+        ...(decodeErrors.length ? { decodeErrors } : {}),
       });
     });
   });
@@ -161,6 +225,10 @@ export class ShellStep extends StepBase {
       });
     }
     const output: Dict = { exit_code: proc.exitCode, stdout: proc.stdout, stderr: proc.stderr };
+    // Malformed output is a step failure, not mojibake (upstream #5064).
+    if (proc.decodeErrors?.length) {
+      return new StepResult({ status: StepStatus.FAILED, error: proc.decodeErrors.join('; '), output });
+    }
     if (proc.exitCode !== 0) {
       return new StepResult({
         status: StepStatus.FAILED,

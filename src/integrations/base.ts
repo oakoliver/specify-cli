@@ -27,6 +27,7 @@ import { parseYaml, dumpYaml } from '../yaml.js';
 import { escapeTomlBasic, hasIllegalTomlControl } from '../toml-string.js';
 import { getInvocationPrefix, isDollarSkillsAgent } from '../invocation-style.js';
 import { runtimeIO } from '../workflows/base.js';
+import { runCaptured, type CapturedProcess } from './capture.js';
 import {
   IntegrationManifest,
   NotImplementedError,
@@ -83,8 +84,14 @@ export interface IntegrationEventsBridge {
     projectRoot: string,
     manifest: IntegrationManifest,
     events: IntegrationEvents,
+    opts?: { force?: boolean },
   ): string[];
-  removeIntegrationEvents(integration: IntegrationBase, projectRoot: string, manifest: IntegrationManifest): void;
+  removeIntegrationEvents(
+    integration: IntegrationBase,
+    projectRoot: string,
+    manifest: IntegrationManifest,
+    opts?: { force?: boolean },
+  ): void;
   eventsStaleExclusions(key: string): Iterable<string>;
 }
 
@@ -444,6 +451,8 @@ export interface SetupOptions {
   rawOptions?: string | null;
   /** Canonical events configuration forwarded to ``emitEvents``. */
   events?: IntegrationEvents | null;
+  /** Forced install/upgrade: allows replacing a modified owned dispatcher. */
+  force?: boolean;
   /** snake_case aliases accepted for convenience. */
   script_type?: string;
   raw_options?: string | null;
@@ -472,6 +481,18 @@ export interface DispatchOptions {
   stream?: boolean;
   integrationArgs?: readonly string[] | null;
   integrationOptions?: Record<string, unknown> | null;
+  /**
+   * CLI output format, independent of ``stream``. ``null``/omitted keeps the
+   * historical coupling: text when streaming, structured when capturing.
+   */
+  outputJson?: boolean | null;
+  /**
+   * Bounded capture (requires ``stream: false``): each stream capped at that
+   * many raw bytes (``-1`` for no cap) and decoded as UTF-8; a timeout or
+   * interruption is reported on the result instead of thrown. The call then
+   * returns a ``Promise`` of the captured result (upstream #4957).
+   */
+  captureMaxBytes?: number | null;
 }
 
 /** Result of ``dispatchCommand()`` (Python dict). */
@@ -480,6 +501,9 @@ export interface DispatchResult {
   stdout: string;
   stderr: string;
 }
+
+/** Options that select bounded capture. */
+export type CaptureDispatchOptions = DispatchOptions & { captureMaxBytes: number };
 
 /** Raised when a captured dispatch exceeds its timeout (``subprocess.TimeoutExpired``). */
 export class TimeoutExpired extends Error {
@@ -845,14 +869,23 @@ export abstract class IntegrationBase {
    * Returns ``{exit_code, stdout, stderr}``. Throws
    * {@link NotImplementedError} if dispatch is unsupported.
    */
-  dispatchCommand(commandName: string, argsOrOpts: string | DispatchOptions = '', maybeOpts: DispatchOptions = {}): DispatchResult {
+  dispatchCommand(commandName: string, opts: CaptureDispatchOptions): Promise<CapturedProcess>;
+  dispatchCommand(commandName: string, argsOrOpts?: string | DispatchOptions, maybeOpts?: DispatchOptions): DispatchResult;
+  dispatchCommand(
+    commandName: string,
+    argsOrOpts: string | DispatchOptions = '',
+    maybeOpts: DispatchOptions = {},
+  ): DispatchResult | Promise<CapturedProcess> {
     const [args, opts] = normalizeDispatchArgs(argsOrOpts, maybeOpts);
     const stream = opts.stream ?? true;
+    const captureMaxBytes = opts.captureMaxBytes ?? null;
+    if (stream && captureMaxBytes !== null) throw new ValueError('capture_max_bytes requires stream=False.');
+    const outputJson = opts.outputJson ?? !stream;
     this.validateRuntimeConfig(opts.integrationArgs, opts.integrationOptions);
     const prompt = this.buildDispatchPrompt(commandName, args, opts.projectRoot ?? null);
     let execArgs = this.buildExecArgs(prompt, {
       model: opts.model ?? null,
-      outputJson: !stream,
+      outputJson,
       integrationArgs: opts.integrationArgs,
       integrationOptions: opts.integrationOptions,
       projectRoot: opts.projectRoot ?? null,
@@ -864,6 +897,9 @@ export abstract class IntegrationBase {
     }
     const resolved = shutilWhich(execArgs[0]);
     if (resolved) execArgs = [resolved, ...execArgs.slice(1)];
+    if (captureMaxBytes !== null) {
+      return runCaptured(execArgs, { cwd: opts.projectRoot ?? null, timeout: opts.timeout ?? 600, maxBytes: captureMaxBytes });
+    }
     return runSubprocess(execArgs, opts.projectRoot ?? null, stream, opts.timeout ?? 600);
   }
 
@@ -1211,8 +1247,9 @@ export abstract class IntegrationBase {
 
   /** Uninstall integration files. Returns ``[removed, skipped]``. */
   teardown(projectRoot: string, manifest: IntegrationManifest, opts: { force?: boolean } = {}): [string[], string[]] {
-    this.removeEvents(projectRoot, manifest);
-    return manifest.uninstall(projectRoot, { force: opts.force ?? false });
+    const force = opts.force ?? false;
+    this.removeEvents(projectRoot, manifest, { force });
+    return manifest.uninstall(projectRoot, { force });
   }
 
   /** Emit native event configuration for this integration. */
@@ -1221,14 +1258,19 @@ export abstract class IntegrationBase {
     manifest: IntegrationManifest,
     events?: IntegrationEvents | null,
     _parsedOptions?: ParsedOptions | null,
+    opts: { force?: boolean } = {},
   ): string[] {
     if (!eventsBridge) return [];
-    return eventsBridge.installIntegrationEvents(this, projectRoot, manifest, events ?? {});
+    return eventsBridge.installIntegrationEvents(this, projectRoot, manifest, events ?? {}, { force: opts.force ?? false });
   }
 
-  /** Remove Specify-authored event entries from native config. */
-  removeEvents(projectRoot: string, manifest: IntegrationManifest): void {
-    eventsBridge?.removeIntegrationEvents(this, projectRoot, manifest);
+  /**
+   * Remove Specify-authored event entries from native config. The shared
+   * dispatcher is deleted only if this integration owns it and no other
+   * installed integration references it; modified copies require force.
+   */
+  removeEvents(projectRoot: string, manifest: IntegrationManifest, opts: { force?: boolean } = {}): void {
+    eventsBridge?.removeIntegrationEvents(this, projectRoot, manifest, { force: opts.force ?? false });
   }
 
   /** True if this integration supports agent-native events. */
@@ -1355,7 +1397,7 @@ export class MarkdownIntegration extends IntegrationBase {
       const dstName = this.commandFilename(parsePath(src).name);
       created.push(this.writeFileAndRecord(processed, join(dest, dstName), projectRoot, manifest));
     }
-    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions));
+    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions, { force: Boolean(opts.force) }));
     return created;
   }
 }
@@ -1444,7 +1486,7 @@ export class TomlIntegration extends IntegrationBase {
       const toml = TomlIntegration.renderToml(description, body);
       created.push(this.writeFileAndRecord(toml, join(dest, this.commandFilename(parsePath(src).name)), projectRoot, manifest));
     }
-    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions));
+    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions, { force: Boolean(opts.force) }));
     return created;
   }
 }
@@ -1550,7 +1592,7 @@ export class YamlIntegration extends IntegrationBase {
       );
       created.push(this.writeFileAndRecord(content, join(dest, this.commandFilename(stemName)), projectRoot, manifest));
     }
-    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions));
+    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions, { force: Boolean(opts.force) }));
     return created;
   }
 }
@@ -1633,7 +1675,7 @@ export class SkillsIntegration extends IntegrationBase {
       const skillContent = this.postProcessSkillContent(rawContent);
       created.push(this.writeFileAndRecord(skillContent, join(skillsDir, skillName, 'SKILL.md'), projectRoot, manifest));
     }
-    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions));
+    created.push(...this.emitEvents(projectRoot, manifest, opts.events, parsedOptions, { force: Boolean(opts.force) }));
     return created;
   }
 }
@@ -1766,6 +1808,13 @@ export function injectArgumentHint(content: string, hint: string): string {
  * ``name:`` field (``speckit-`` prefix stripped).
  */
 export function skillStemFromContent(content: string): string | null {
+  const name = skillNameFromContent(content);
+  if (name && name.startsWith('speckit-')) return name.slice('speckit-'.length);
+  return name;
+}
+
+/** Return the ``name:`` field of a skill's first frontmatter block (``_skill_name_from_content``). */
+export function skillNameFromContent(content: string): string | null {
   let dashCount = 0;
   for (const line of splitlines(content)) {
     const stripped = line.replace(/[\r\n]+$/, '');
@@ -1776,7 +1825,6 @@ export function skillStemFromContent(content: string): string | null {
     }
     if (dashCount === 1 && stripped.startsWith('name:')) {
       const name = pyStrip(stripped.slice('name:'.length)).replace(/^"+|"+$/g, '').replace(/^'+|'+$/g, '');
-      if (name.startsWith('speckit-')) return name.slice('speckit-'.length);
       return name || null;
     }
   }

@@ -16,8 +16,9 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { StepBase, KeyError, ValueError, isDict, pyRepr } from './base.js';
@@ -26,6 +27,7 @@ import { DoWhileStep } from './step/do-while.js';
 import { FanInStep } from './step/fan-in.js';
 import { FanOutStep } from './step/fan-out.js';
 import { GateStep } from './step/gate.js';
+import { GitHubStep } from './step/github.js';
 import { IfThenStep } from './step/if-then.js';
 import { InitStep } from './step/init.js';
 import { PromptStep } from './step/prompt.js';
@@ -33,6 +35,7 @@ import { ShellStep } from './step/shell.js';
 import { SlotStep } from './step/slot.js';
 import { SwitchStep } from './step/switch.js';
 import { WhileStep } from './step/while-loop.js';
+import { WorkflowStep } from './step/workflow.js';
 import { parseYaml } from '../yaml.js';
 
 export * from './base.js';
@@ -51,6 +54,7 @@ export {
   FanInStep,
   FanOutStep,
   GateStep,
+  GitHubStep,
   IfThenStep,
   InitStep,
   PromptStep,
@@ -58,6 +62,7 @@ export {
   SlotStep,
   SwitchStep,
   WhileStep,
+  WorkflowStep,
 };
 
 // ============================================================================
@@ -93,6 +98,7 @@ function registerBuiltinSteps(): void {
   registerStep(new FanInStep());
   registerStep(new FanOutStep());
   registerStep(new GateStep());
+  registerStep(new GitHubStep());
   registerStep(new IfThenStep());
   registerStep(new InitStep());
   registerStep(new PromptStep());
@@ -100,6 +106,7 @@ function registerBuiltinSteps(): void {
   registerStep(new SlotStep());
   registerStep(new SwitchStep());
   registerStep(new WhileStep());
+  registerStep(new WorkflowStep());
 }
 
 registerBuiltinSteps();
@@ -107,10 +114,53 @@ registerBuiltinSteps();
 /**
  * The step types Spec Kit ships, snapshotted before any community step can be
  * loaded. ``loadCustomSteps`` adds project-installed ids to the process-global
- * ``STEP_REGISTRY`` and never removes them, so callers that need the
- * immutable built-in set must use this instead.
+ * ``STEP_REGISTRY`` and refreshes them for each project, so it cannot answer
+ * "is this bundled with Spec Kit?" in a long-lived process: callers that need
+ * the immutable built-in set must use this instead.
  */
 export const BUILTIN_STEP_TYPES: ReadonlySet<string> = new Set(STEP_REGISTRY.keys());
+
+/**
+ * Import generation for custom step modules. ESM caches modules by URL and
+ * cannot evict them, so each unload bumps the generation that is appended to
+ * the import URL; the next load re-evaluates the package like upstream's
+ * ``sys.modules`` eviction does.
+ */
+let customStepGeneration = 0;
+
+/**
+ * Package directories whose modules were imported (``_CUSTOM_STEP_MODULES``).
+ * Bun keys its ESM cache by path and ignores the query string, so those
+ * entries are also evicted from ``require.cache`` (a no-op under Node, which
+ * honours the generation query instead).
+ */
+const CUSTOM_STEP_DIRS: Set<string> = new Set();
+
+/** Clear custom registrations and imports from a prior project (``_unload_custom_steps``). */
+export function unloadCustomSteps(): void {
+  for (const typeKey of [...STEP_REGISTRY.keys()]) {
+    if (!BUILTIN_STEP_TYPES.has(typeKey)) STEP_REGISTRY.delete(typeKey);
+  }
+  if (CUSTOM_STEP_DIRS.size) {
+    try {
+      const cache = createRequire(import.meta.url).cache as Record<string, unknown> | undefined;
+      if (cache) {
+        for (const key of Object.keys(cache)) {
+          for (const dir of CUSTOM_STEP_DIRS) {
+            if (key.startsWith(dir + sep)) {
+              delete cache[key];
+              break;
+            }
+          }
+        }
+      }
+    } catch {
+      // Runtimes without a CommonJS cache rely on the generation query.
+    }
+    CUSTOM_STEP_DIRS.clear();
+  }
+  customStepGeneration += 1;
+}
 
 // ============================================================================
 // Custom steps
@@ -172,6 +222,7 @@ function isStepClass(value: unknown, typeKey: string): value is StepClass {
  * packages that fail to import or validate.
  */
 export async function loadCustomSteps(projectRoot: string): Promise<string[]> {
+  unloadCustomSteps();
   const stepsDir = join(projectRoot, '.specify', 'workflows', 'steps');
 
   // Defense-in-depth: refuse to execute step code from a symlinked parent
@@ -211,7 +262,13 @@ export async function loadCustomSteps(projectRoot: string): Promise<string[]> {
       // Cache-bust per type key so a re-install in a long-lived process is
       // not served a stale module (mirrors upstream's hashed module names).
       const keyHash = createHash('sha256').update(typeKey).digest('hex').slice(0, 8);
-      const url = pathToFileURL(entry).href + `?speckit_custom_step=${keyHash}`;
+      const url = pathToFileURL(entry).href + `?speckit_custom_step=${keyHash}&generation=${customStepGeneration}`;
+      CUSTOM_STEP_DIRS.add(stepDir);
+      try {
+        CUSTOM_STEP_DIRS.add(realpathSync(stepDir));
+      } catch {
+        // keep the lexical path only
+      }
       const mod = (await import(url)) as Record<string, unknown>;
 
       let stepClass: StepClass | null = null;

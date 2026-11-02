@@ -4,7 +4,10 @@
  * tests/specify_cli/events/test_command_run.py.
  */
 
-import { describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { MAX_STDIN_BYTES, runEventCommand, type EventRunDeps } from '../src/events/commands.js';
 
@@ -15,7 +18,10 @@ interface Harness {
   err: string[];
 }
 
-function harness(opts: { tty?: boolean; stdin?: Uint8Array | string; code?: number } = {}): Harness {
+const PROJECT = realpathSync(mkdtempSync(join(tmpdir(), 'speckit-event-run-')));
+afterAll(() => rmSync(PROJECT, { recursive: true, force: true }));
+
+function harness(opts: { tty?: boolean; stdin?: Uint8Array | string; code?: number; cwd?: string } = {}): Harness {
   const calls: Harness['calls'] = [];
   const out: string[] = [];
   const err: string[] = [];
@@ -23,7 +29,7 @@ function harness(opts: { tty?: boolean; stdin?: Uint8Array | string; code?: numb
   const deps: EventRunDeps = {
     stdinIsTTY: () => opts.tty ?? false,
     readStdin: async (limit) => raw.subarray(0, limit),
-    cwd: () => '/project',
+    cwd: () => opts.cwd ?? PROJECT,
     resolveAndRun: (command, event, payload, root, runOpts) => {
       calls.push({ command, event, payload, root, timeout: runOpts.timeout });
       return opts.code ?? 0;
@@ -39,7 +45,7 @@ describe('specify event run', () => {
     const h = harness({ stdin: '{"key": "value"}' });
     expect(await runEventCommand(['run', 'some-command', 'session_start'], h.deps)).toBe(0);
     expect(h.calls).toEqual([
-      { command: 'some-command', event: 'session_start', payload: '{"key": "value"}', root: '/project', timeout: 120 },
+      { command: 'some-command', event: 'session_start', payload: '{"key": "value"}', root: PROJECT, timeout: 120 },
     ]);
   });
 
@@ -113,4 +119,61 @@ describe('specify event run', () => {
     expect(await runEventCommand(['--help'], g.deps)).toBe(0);
     expect(g.out.join('')).toContain('Manage and execute event-driven commands');
   });
+});
+
+// v1.2.5 (#4934): persisted symlink policy is validated before the handler runs.
+describe('event run project policy', () => {
+  const fresh = (): string => realpathSync(mkdtempSync(join(tmpdir(), 'speckit-event-policy-')));
+
+  for (const options of [null, {}, { allow_symlinks: false }, { allow_symlinks: true }]) {
+    test(`accepts missing or valid configuration ${JSON.stringify(options)}`, async () => {
+      const root = fresh();
+      if (options !== null) {
+        mkdirSync(join(root, '.specify'));
+        writeFileSync(join(root, '.specify/init-options.json'), JSON.stringify(options));
+      }
+      const h = harness({ stdin: '{}', cwd: root });
+      expect(await runEventCommand(['run', 'test', 'session_start'], h.deps)).toBe(0);
+      expect(h.calls[0]!.root).toBe(root);
+      rmSync(root, { recursive: true, force: true });
+    });
+  }
+
+  for (const document of ['{', '[]', 'null', '{"allow_symlinks": "true"}', '{"allow_symlinks": 1}', '{"allow_symlinks": null}']) {
+    test(`rejects invalid configuration before handler: ${document}`, async () => {
+      const root = fresh();
+      mkdirSync(join(root, '.specify'));
+      writeFileSync(join(root, '.specify/init-options.json'), document);
+      const h = harness({ stdin: '{}', cwd: root });
+      expect(await runEventCommand(['run', 'test', 'session_start'], h.deps)).toBe(1);
+      expect(h.err.join('')).toContain('init-options.json');
+      expect(h.calls).toHaveLength(0);
+      rmSync(root, { recursive: true, force: true });
+    });
+  }
+
+  for (const [leaf, dangling] of [[false, false], [false, true], [true, false], [true, true]] as const) {
+    test(`denies bootstrap links before handler (leaf=${leaf}, dangling=${dangling})`, async () => {
+      const root = fresh();
+      const target = join(root, 'target');
+      let marker: string;
+      if (leaf) {
+        mkdirSync(join(root, '.specify'));
+        if (!dangling) writeFileSync(target, '{"allow_symlinks": true}');
+        marker = join(root, '.specify/init-options.json');
+      } else {
+        if (!dangling) {
+          mkdirSync(target);
+          writeFileSync(join(target, 'init-options.json'), '{"allow_symlinks": true}');
+        }
+        marker = join(root, '.specify');
+      }
+      symlinkSync(target, marker, leaf ? 'file' : 'dir');
+      const h = harness({ stdin: '{}', cwd: root });
+      expect(await runEventCommand(['run', 'test', 'session_start'], h.deps)).toBe(1);
+      expect(h.err.join('')).toContain('symlink');
+      expect(h.calls).toHaveLength(0);
+      rmSync(root, { recursive: true, force: true });
+    });
+  }
 });

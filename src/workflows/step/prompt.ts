@@ -26,7 +26,9 @@ import {
   type Dict,
 } from '../base.js';
 import { evaluateExpression } from '../expressions.js';
-import { loadIntegration, type DispatchResult } from './command.js';
+import { runCaptured } from '../../integrations/capture.js';
+import { captureErrors, captureFailure, captureLimit, recordCapture } from './capture.js';
+import { isNotImplementedOrOSError, loadIntegration, type DispatchResult } from './command.js';
 
 /**
  * Send a free-form prompt to an integration CLI.
@@ -75,6 +77,14 @@ export class PromptStep extends StepBase {
     const timeoutError = PromptStep.timeoutError(config);
     if (timeoutError !== null) return new StepResult({ status: StepStatus.FAILED, error: timeoutError });
 
+    // Fail the step on a malformed capture config rather than silently
+    // streaming or capturing with a coerced limit (#4957).
+    const captureConfigErrors = captureErrors(config, 'Prompt');
+    if (captureConfigErrors.length) {
+      return new StepResult({ status: StepStatus.FAILED, error: captureConfigErrors[0] as string });
+    }
+    const captureMaxBytes = captureLimit(config);
+
     const timeout = dget(config, 'timeout', 300) as number;
     const dispatchResult = await PromptStep.tryDispatch(
       promptText,
@@ -82,6 +92,7 @@ export class PromptStep extends StepBase {
       (model as string | null) ?? null,
       context,
       timeout,
+      captureMaxBytes,
     );
 
     const output: Dict = { prompt: promptText, integration: integration ?? null, model: model ?? null };
@@ -91,12 +102,13 @@ export class PromptStep extends StepBase {
       output.stdout = dispatchResult.stdout;
       output.stderr = dispatchResult.stderr;
       output.dispatched = true;
+      if (captureMaxBytes !== null) recordCapture(output, dispatchResult as unknown as Dict);
       if (dispatchResult.exit_code !== 0) {
-        return new StepResult({
-          status: StepStatus.FAILED,
-          output,
-          error: dispatchResult.stderr || `Prompt exited with code ${dispatchResult.exit_code}`,
-        });
+        const error =
+          captureMaxBytes !== null
+            ? captureFailure(dispatchResult as unknown as Dict, 'Prompt', timeout)
+            : dispatchResult.stderr || `Prompt exited with code ${dispatchResult.exit_code}`;
+        return new StepResult({ status: StepStatus.FAILED, output, error });
       }
       return new StepResult({ status: StepStatus.COMPLETED, output });
     }
@@ -108,7 +120,11 @@ export class PromptStep extends StepBase {
       error:
         'Cannot dispatch prompt: ' +
         `integration ${pyRepr(integration ?? null)} ` +
-        'CLI not found or not installed.',
+        'CLI not found or not installed, ' +
+        'or the integration does not support CLI dispatch. ' +
+        'If the CLI is missing, install it; if the integration ' +
+        "does not support CLI dispatch, set the step's " +
+        "'integration' to one that does.",
     });
   }
 
@@ -136,6 +152,7 @@ export class PromptStep extends StepBase {
     model: string | null,
     context: StepContext,
     timeout = 300,
+    captureMaxBytes: number | null = null,
   ): Promise<DispatchResult | null> => {
     if (!integrationKey || typeof integrationKey !== 'string' || !prompt) return null;
 
@@ -153,6 +170,15 @@ export class PromptStep extends StepBase {
     if (!execArgs || !execArgs.length) return null;
 
     if (fallbackCliPath) execArgs = [fallbackCliPath, ...execArgs.slice(1)];
+
+    if (captureMaxBytes !== null) {
+      try {
+        return (await runCaptured(execArgs, { cwd: projectRoot, timeout, maxBytes: captureMaxBytes })) as DispatchResult;
+      } catch (exc) {
+        if (isNotImplementedOrOSError(exc)) return null;
+        throw exc;
+      }
+    }
 
     try {
       const exitCode = await PromptStep.runInherited(execArgs, projectRoot, timeout);
@@ -215,6 +241,7 @@ export class PromptStep extends StepBase {
     }
     const timeoutError = PromptStep.timeoutError(config);
     if (timeoutError !== null) errors.push(timeoutError);
+    errors.push(...captureErrors(config, 'Prompt'));
     return errors;
   }
 }

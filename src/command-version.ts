@@ -1,9 +1,10 @@
 /**
  * @oakoliver/specify-cli - `specify version`
  *
- * Port of spec-kit `command_version.py` (v1.0.12): displays version and
- * system information, or local CLI feature capabilities (`--features`,
- * optionally as JSON with `--json`).
+ * Port of spec-kit `command_version.py` (v1.2.5): displays version and
+ * system information, local CLI feature capabilities (`--features`), or the
+ * complete version information as JSON (`--json`, #4821) collected by the
+ * shared `version` operation (#4863).
  *
  * @module command-version
  */
@@ -11,25 +12,14 @@
 import { getSpeckitVersion } from './assets.js';
 import { CliExit, Panel, Table, console, escapeMarkup } from './console.js';
 import { printBanner } from './ui.js';
+import { collectVersionResult, featureCapabilities, versionResultPayload } from './operation-version.js';
+import { pyJsonDumps } from './utils.js';
 import { UPSTREAM_SPEC_KIT_VERSION, getRuntimeInfo } from './version.js';
 import type { RuntimeInfo } from './version.js';
 
-// ============================================================================
-// Feature capabilities
-// ============================================================================
+const INTERNAL_ERROR_MESSAGE = 'Unable to collect version information.';
 
-/** Stable local CLI capability flags for humans and agents. */
-export function featureCapabilities(): Record<string, boolean> {
-  return {
-    controlled_multi_install_integrations: true,
-    integration_use_command: true,
-    multi_install_safe_registry_metadata: true,
-    integration_upgrade_command: true,
-    self_check_command: true,
-    workflow_catalog: true,
-    bundled_templates: true,
-  };
-}
+export { featureCapabilities } from './operation-version.js';
 
 // ============================================================================
 // Injection surface (tests)
@@ -42,6 +32,9 @@ export const versionCommandDeps = {
   showBanner: (): Promise<void> => printBanner(),
   write: (text: string): void => {
     console.out(text, '');
+  },
+  writeErr: (text: string): void => {
+    process.stderr.write(text);
   },
 };
 
@@ -90,24 +83,33 @@ export const VERSION_HELP = `Usage: specify version [OPTIONS]
 
 Options:
   --features  Show local CLI feature capabilities.
-  --json      Emit feature capabilities as JSON. Requires --features.
+  --json      Emit complete version information as JSON.
   --help      Show this message and exit.
 `;
 
 async function version(features: boolean, jsonOutput: boolean): Promise<void> {
-  const cliVersion = versionCommandDeps.getSpeckitVersion();
-
-  if (jsonOutput && !features) {
-    console.print('[red]Error:[/red] --json requires --features.');
-    throw new CliExit(1);
+  if (jsonOutput) {
+    // --features is an exact alias here: it neither filters nor changes the bytes.
+    let rendered: string;
+    try {
+      const result = await collectVersionResult({
+        cliVersionGetter: versionCommandDeps.getSpeckitVersion,
+        runtimeInfoGetter: versionCommandDeps.getRuntimeInfo,
+      });
+      rendered = pyJsonDumps(versionResultPayload(result), { indent: 2 });
+    } catch {
+      // JSON mode must normalize every unexpected command failure.
+      const failure = { error: { code: 'internal_error', message: INTERNAL_ERROR_MESSAGE, details: {} } };
+      versionCommandDeps.writeErr(pyJsonDumps(failure, { indent: 2 }) + '\n');
+      throw new CliExit(1);
+    }
+    versionCommandDeps.write(rendered + '\n');
+    return;
   }
 
+  const cliVersion = versionCommandDeps.getSpeckitVersion();
   if (features) {
     const capabilities = featureCapabilities();
-    if (jsonOutput) {
-      versionCommandDeps.write(JSON.stringify({ version: cliVersion, features: capabilities }, null, 2) + '\n');
-      return;
-    }
     versionCommandDeps.write(`Spec Kit CLI: ${cliVersion}\n\nFeatures:\n`);
     for (const [key, enabled] of Object.entries(capabilities)) {
       versionCommandDeps.write(`- ${key.replace(/_/g, ' ')}: ${enabled ? 'yes' : 'no'}\n`);

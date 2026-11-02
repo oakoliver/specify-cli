@@ -182,13 +182,66 @@ export function loadJson(p: string): unknown {
 
 /** Parse JSON from a string (used for catalog payloads fetched as text). */
 export function loadsJson(text: string, opts: { origin?: string } = {}): unknown {
+  const origin = opts.origin ?? '<string>';
+  let value: unknown;
   try {
-    return JSON.parse(text);
+    value = JSON.parse(text);
   } catch (exc) {
-    throw new BundlerError(`Invalid JSON from ${opts.origin ?? '<string>'}: ${errText(exc)}`, {
+    throw new BundlerError(`Invalid JSON from ${origin}: ${errText(exc)}`, {
       cause: exc,
     });
   }
+  // Python ``object_pairs_hook``: reject duplicate keys (JSON.parse keeps the last).
+  const duplicate = findDuplicateJsonKey(text);
+  if (duplicate !== null) {
+    throw new BundlerError(`Invalid JSON from ${origin}: duplicate key '${duplicate}'.`);
+  }
+  return value;
+}
+
+/**
+ * Scan already-valid JSON *text* and return the first duplicate object key in
+ * the order Python's ``object_pairs_hook`` would see it (an object is checked
+ * when it closes, so inner objects first), or ``null``.
+ */
+export function findDuplicateJsonKey(text: string): string | null {
+  const stack: Array<{ keys: string[] } | null> = [];
+  let i = 0;
+  let expectKey = false;
+  const n = text.length;
+  while (i < n) {
+    const ch = text[i];
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < n && text[j] !== '"') j += text[j] === '\\' ? 2 : 1;
+      const raw = text.slice(i, j + 1);
+      const top = stack[stack.length - 1];
+      if (expectKey && top) top.keys.push(JSON.parse(raw) as string);
+      expectKey = false;
+      i = j + 1;
+      continue;
+    }
+    if (ch === '{') {
+      stack.push({ keys: [] });
+      expectKey = true;
+    } else if (ch === '[') {
+      stack.push(null);
+    } else if (ch === ',') {
+      expectKey = stack[stack.length - 1] !== null && stack.length > 0;
+    } else if (ch === '}' || ch === ']') {
+      const top = stack.pop();
+      if (top) {
+        const seen = new Set<string>();
+        for (const key of top.keys) {
+          if (seen.has(key)) return key;
+          seen.add(key);
+        }
+      }
+      expectKey = false;
+    }
+    i += 1;
+  }
+  return null;
 }
 
 /** Atomically write pretty JSON to *p* (optionally confined to *within*). */

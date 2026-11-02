@@ -47,14 +47,21 @@ export class ConfigManager {
     const manifestPath = join(this.extensionDir, 'extension.yml');
     if (!exists(manifestPath)) return {};
     const manifestData = this.loadYamlConfig(manifestPath);
+    // The top-level ``defaults`` key (documented in the extension template and
+    // API reference) merges under ``config.defaults``, which wins on conflicts.
+    let topLevelDefaults: Dict = Object.prototype.hasOwnProperty.call(manifestData, 'defaults')
+      ? manifestData.defaults
+      : {};
+    if (!isMapping(topLevelDefaults)) topLevelDefaults = {};
     const configSection = Object.prototype.hasOwnProperty.call(manifestData, 'config')
       ? manifestData.config
       : {};
-    if (!isMapping(configSection)) return {};
+    if (!isMapping(configSection)) return topLevelDefaults;
     const defaults = Object.prototype.hasOwnProperty.call(configSection, 'defaults')
       ? configSection.defaults
       : {};
-    return isMapping(defaults) ? defaults : {};
+    if (!isMapping(defaults)) return topLevelDefaults;
+    return this.mergeConfigs(topLevelDefaults, defaults);
   }
 
   /** Project-level configuration. */

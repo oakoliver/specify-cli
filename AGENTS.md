@@ -24,6 +24,7 @@ bun test && bunx tsc --noEmit
 TypeScript 5.0+ targeting ES2022: Follow standard conventions
 
 ## Recent Changes
+- v2.1.0 upstream sync: parity with github/spec-kit v1.2.5 (from 1.0.12). Per-PR dispositions in CHANGELOG.md. Golden fixtures are regenerated from upstream Python by the scripts in `tests/fixtures/generate/` (integrations, workflow expressions, YAML hashes, MCP wire/tool catalog).
 - v2.0.0 upstream sync: 1:1 parity with github/spec-kit v1.0.12. Bundled assets live in `core_pack/` (mirrors upstream wheel `specify_cli/core_pack`); source modules mirror `specify_cli/*` (e.g. `_download_security.py` -> `src/download-security.ts`, `presets/_manager.py` -> `src/presets/manager.ts`). Zero-dep YAML in `src/yaml.ts`, Rich-markup console in `src/console.ts`, Typer-like parser in `src/cli-args.ts`.
 - 009-cli-commands-implementation: Added TypeScript 5.0+ targeting ES2022 + None (zero runtime dependencies per constitution). `@oakoliver/huh` and `@oakoliver/lipgloss` are the only permitted runtime dependencies.
 - 009-cli-commands-implementation: Added TypeScript 5.0+ targeting ES2022 + None (zero runtime dependencies per constitution)

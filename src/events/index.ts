@@ -17,6 +17,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   accessSync,
   chmodSync,
@@ -119,9 +120,10 @@ export interface EventIntegration {
 /** Structural view of ``IntegrationManifest`` used by the events subsystem. */
 export interface EventManifest {
   readonly files: unknown;
-  recordFile(relPath: string, content: Uint8Array | string): unknown;
-  recordExisting(relPath: string): unknown;
+  recordFile(relPath: string, content: Uint8Array | string, opts?: { ownership?: string }): unknown;
+  recordExisting(relPath: string, opts?: { recovered?: boolean; ownership?: string | null }): unknown;
   remove(relPath: string): unknown;
+  setOwnership?(relPath: string, mode: string): void;
 }
 
 // ============================================================================
@@ -597,7 +599,10 @@ export function emitEventStdout(output: string, envelope: string, nativeEvent = 
 // Sourcing events map
 // ============================================================================
 
-/** Coerce a single handler config or a list of them into a validated list. */
+/**
+ * Coerce a single handler config or a list of them into a list of mappings.
+ * Drops non-mapping entries with a warning; callers validate the rest.
+ */
 export function normalizeHandlers(value: unknown): EventHandler[] {
   let list: unknown = value;
   if (isPlainObject(list)) list = [list];
@@ -627,12 +632,13 @@ export function validateResolvedEvent(eventName: string, handlers: EventHandler[
     if (typeof command !== 'string' || !command.trim()) {
       throw new ValidationError(`Event '${eventName}' handler missing required non-empty 'command' string`);
     }
+    // An explicit ``matcher: null`` / ``timeout: null`` is invalid too.
     const matcher = handler.matcher;
-    if (matcher !== null && matcher !== undefined && typeof matcher !== 'string') {
+    if (Object.prototype.hasOwnProperty.call(handler, 'matcher') && typeof matcher !== 'string') {
       throw new ValidationError(`Event '${eventName}' handler has invalid 'matcher': must be a string`);
     }
     const timeout = handler.timeout;
-    if (timeout !== null && timeout !== undefined) {
+    if (Object.prototype.hasOwnProperty.call(handler, 'timeout')) {
       if (!isPyInt(timeout) || timeout <= 0) {
         throw new ValidationError(`Event '${eventName}' handler has invalid 'timeout': must be a positive integer`);
       }
@@ -698,7 +704,8 @@ export function resolveEvents(
       if (!isPlainObject(keyData)) {
         logWarning(`Override ${overrideFile}: entry for '${integrationKey}' is not a mapping; ignoring override`);
       } else {
-        const keyEvents = Object.prototype.hasOwnProperty.call(keyData, 'events') ? keyData.events : {};
+        // An override that omits ``events`` keeps the resolved hooks (#5102).
+        const keyEvents = Object.prototype.hasOwnProperty.call(keyData, 'events') ? keyData.events : null;
         if (!isPlainObject(keyEvents)) {
           logWarning(`Override ${overrideFile}: 'events' for '${integrationKey}' is not a mapping; ignoring override`);
         } else {
@@ -812,8 +819,16 @@ export function collectExtensionEvents(projectRoot: string): ResolvedEvents {
     }
     if (!isPlainObject(runtime)) continue;
     for (const [event, config] of Object.entries(runtime)) {
-      const handlers = normalizeHandlers(config);
-      if (handlers.length) appendHandlers(events, event, handlers);
+      for (const handler of normalizeHandlers(config)) {
+        try {
+          validateResolvedEvent(event, [handler]);
+        } catch (exc) {
+          if (!(exc instanceof ValidationError)) throw exc;
+          logWarning(`Extension ${extId}: skipping invalid event handler for '${event}': ${exc.message}`);
+          continue;
+        }
+        appendHandlers(events, event, [handler]);
+      }
     }
   }
   return events;
@@ -863,8 +878,18 @@ export function shellQuote(value: string, targetOs: string): string {
   return shlexQuote(value);
 }
 
-function vibeTargetOs(): string {
-  return isWindows() ? 'cmd' : 'host';
+/** The Vibe-specific seam ``toml-vibe`` integrations implement (``merge_vibe_event_hooks``). */
+export interface VibeEventHooks {
+  mergeVibeEventHooks(
+    projectRoot: string,
+    events: ResolvedEvents,
+    helpers: {
+      buildDispatcherCommand: (command: string, event: string, targetOs: string, timeout: unknown) => string;
+      nativeTimeout: (seconds: unknown) => number;
+      ensureSafeDestination: (path: string) => void;
+    },
+  ): boolean;
+  removeVibeEventHooks(projectRoot: string, helpers: { ensureSafeDestination: (path: string) => void }): boolean;
 }
 
 export interface DispatcherCommandOptions {
@@ -920,7 +945,9 @@ function relPosix(projectRoot: string, p: string): string {
 
 function trackConfig(manifest: EventManifest, projectRoot: string, configPath: string, created: string[]): void {
   const rel = relPosix(projectRoot, configPath);
-  if (!manifestHas(manifest, rel)) manifest.recordExisting(rel);
+  // Native config files are shared with the user: partial ownership keeps
+  // manifest.uninstall() from deleting them (event removal cleans them up).
+  manifest.recordExisting(rel, { ownership: 'partial' });
   created.push(configPath);
 }
 
@@ -935,6 +962,7 @@ export function installIntegrationEvents(
   projectRoot: string,
   manifest: EventManifest,
   events: ResolvedEvents,
+  opts: { force?: boolean } = {},
 ): string[] {
   const c2n = canonicalToNative(integration);
   if (!Object.keys(c2n).length) return [];
@@ -951,7 +979,7 @@ export function installIntegrationEvents(
 
   if (!Object.keys(filtered).length) {
     removeNativeEventHooks(integration, projectRoot, manifest);
-    cleanupSharedDispatcher(integration, projectRoot, manifest);
+    cleanupSharedDispatcher(integration, projectRoot, manifest, opts);
     return [];
   }
 
@@ -964,7 +992,7 @@ export function installIntegrationEvents(
   mkdirSync(dispatcherDir, { recursive: true });
   writeFileSync(dispatcherPath, EVENTS_DISPATCHER_TEMPLATE, 'utf8');
   chmodSync(dispatcherPath, 0o755);
-  manifest.recordFile(relPosix(projectRoot, dispatcherPath), readFileSync(dispatcherPath));
+  manifest.recordFile(relPosix(projectRoot, dispatcherPath), readFileSync(dispatcherPath), { ownership: 'shared' });
   created.push(dispatcherPath);
 
   // 2. Format-specific merge/write
@@ -973,6 +1001,7 @@ export function installIntegrationEvents(
   if (!configFile) return created;
 
   const configPath = join(projectRoot, configFile);
+  manifest.setOwnership?.(configFile, 'partial');
   const timeoutOf = (cfg: EventHandler): unknown => handlerGet(cfg, 'timeout', 60);
 
   if (fmt === 'ts-plugin') {
@@ -1031,40 +1060,25 @@ export function installIntegrationEvents(
     }
     if (mergeTomlFragment(configPath, lines.join('\n'))) trackConfig(manifest, projectRoot, configPath, created);
   } else if (fmt === 'toml-vibe') {
-    const lines: string[] = [];
-    const usedNames = new Set<string>();
-    for (const [ev, handlers] of Object.entries(filtered)) {
-      const nativeName = c2n[ev]!;
-      for (const cfg of handlers) {
-        const command = String(handlerGet(cfg, 'command', ''));
-        const cmd = dispatcherCommand(integration, projectRoot, command, ev, {
-          targetOs: vibeTargetOs(),
-          timeoutSeconds: timeoutOf(cfg),
-        });
-        let commandStem = command ? command.split('.').pop()! : 'unknown';
-        commandStem = commandStem.replace(/[^A-Za-z0-9_-]+/g, '-') || 'unknown';
-        const baseName = `speckit-${nativeName}-${commandStem}`;
-        let hookName = baseName;
-        let suffix = 2;
-        while (usedNames.has(hookName)) {
-          hookName = `${baseName}-${suffix}`;
-          suffix += 1;
-        }
-        usedNames.add(hookName);
-        lines.push('[[hooks]]');
-        lines.push(`name = ${tomlQuote(hookName)}`);
-        lines.push(`type = ${tomlQuote(nativeName)}`);
-        const matcher = handlerGet(cfg, 'matcher', '*');
-        if (truthy(matcher) && matcher !== '*' && (nativeName === 'pre_tool' || nativeName === 'post_tool')) {
-          lines.push(`match = ${tomlQuote('re:' + String(matcher))}`);
-        }
-        lines.push(`command = ${tomlQuote(cmd)}`);
-        lines.push(`timeout = ${nativeTimeout(integration, addTimeoutBuffer(timeoutOf(cfg)))}`);
-        lines.push('speckit_marker = true');
-        lines.push('');
-      }
+    // Vibe owns its native TOML schema and its managed-entry boundaries.
+    // Shared events supplies only dispatcher construction and manifest handling.
+    const vibe = integration as unknown as Partial<VibeEventHooks>;
+    if (typeof vibe.mergeVibeEventHooks !== 'function') {
+      throw new TypeError('toml-vibe integrations must implement mergeVibeEventHooks');
     }
-    if (mergeVibeTomlFragment(configPath, lines.join('\n'))) trackConfig(manifest, projectRoot, configPath, created);
+    if (
+      vibe.mergeVibeEventHooks(projectRoot, filtered, {
+        buildDispatcherCommand: (command, event, targetOs, timeout) =>
+          dispatcherCommand(integration, projectRoot, command, event, { targetOs, timeoutSeconds: timeout }),
+        nativeTimeout: (seconds) => nativeTimeout(integration, seconds),
+        ensureSafeDestination,
+      })
+    ) {
+      const rel = relPosix(projectRoot, configPath);
+      manifest.recordExisting(rel);
+      manifest.setOwnership?.(rel, 'partial');
+      created.push(configPath);
+    }
   } else if (fmt === 'json-flat') {
     const cursorHooks: Record<string, Record<string, unknown>[]> = {};
     for (const [ev, handlers] of Object.entries(filtered)) {
@@ -1126,7 +1140,13 @@ export function removeNativeEventHooks(
   ensureSafeDestination(configPath);
   if (fmt === 'copilot-json') removeCopilotEntries(configPath);
   else if (fmt === 'toml') removeTomlEntries(configPath);
-  else if (fmt === 'toml-vibe') removeVibeTomlEntries(configPath);
+  else if (fmt === 'toml-vibe') {
+    const vibe = integration as unknown as Partial<VibeEventHooks>;
+    if (typeof vibe.removeVibeEventHooks !== 'function') {
+      throw new TypeError('toml-vibe integrations must implement removeVibeEventHooks');
+    }
+    vibe.removeVibeEventHooks(projectRoot, { ensureSafeDestination });
+  }
   else if (fmt === 'json-nested' || fmt === 'json-flat') removeJsonEntries(configPath);
   else if (fmt === 'json-root-nested') removeJsonRootEntries(configPath);
   else if (fmt === 'ts-plugin') removeOpencodeEntries(configPath);
@@ -1158,18 +1178,70 @@ export function otherEventIntegrationsReferenceDispatcher(projectRoot: string, e
  * the file only when no other installed event-capable integration still
  * references it (#10, S3).
  */
+/**
+ * Release this integration's claim on the shared dispatcher; delete only its
+ * last managed copy. Unowned, recovered, partial, modified (without force)
+ * and still-referenced copies are preserved.
+ */
 export function cleanupSharedDispatcher(
   integration: EventIntegration,
   projectRoot: string,
   manifest: EventManifest,
+  opts: { force?: boolean } = {},
 ): void {
-  if (manifestHas(manifest, EVENTS_DISPATCHER_REL)) manifest.remove(EVENTS_DISPATCHER_REL);
-  if (!otherEventIntegrationsReferenceDispatcher(projectRoot, integration.key)) {
-    const dispatcherPath = join(projectRoot, EVENTS_DISPATCHER_REL);
-    if (pathExists(dispatcherPath)) {
-      ensureSafeDestination(dispatcherPath);
-      unlinkMissingOk(dispatcherPath);
+  const force = opts.force ?? false;
+  const dispatcherRel = EVENTS_DISPATCHER_REL;
+  let owner: EventManifest = manifest;
+  // Upgrades emit into a fresh manifest before replacing the installed one.
+  // Only this integration's prior manifest can supply its missing claim.
+  if (!manifestHas(owner, dispatcherRel)) {
+    try {
+      owner = IntegrationManifest.load(integration.key, projectRoot);
+    } catch (exc) {
+      if ((exc as NodeJS.ErrnoException).code === 'ENOENT') {
+        owner = manifest;
+      } else {
+        logWarning(
+          `Could not read prior dispatcher manifest for '${integration.key}'; preserving ` +
+            `${join(projectRoot, dispatcherRel)}: ${(exc as Error).message}`,
+        );
+        return;
+      }
     }
+  }
+  const expectedHash = manifestFiles(owner)[dispatcherRel];
+  const ownerManifest = owner as Partial<IntegrationManifest>;
+  const recovered = typeof ownerManifest.isRecovered === 'function' ? ownerManifest.isRecovered(dispatcherRel) : false;
+  const partial = (ownerManifest.ownershipModes ?? {})[dispatcherRel] === 'partial';
+
+  // Release even retained claims so manifest-only teardown cannot delete a
+  // user-owned copy or a dispatcher still used by another integration.
+  if (manifestHas(manifest, dispatcherRel)) manifest.remove(dispatcherRel);
+  if (!expectedHash || recovered || partial) return;
+  if (otherEventIntegrationsReferenceDispatcher(projectRoot, integration.key)) return;
+  const dispatcherPath = join(projectRoot, dispatcherRel);
+  if (pathExists(dispatcherPath)) {
+    ensureSafeDestination(dispatcherPath);
+    if (!force) {
+      let content: Buffer;
+      try {
+        content = readFileSync(dispatcherPath);
+      } catch (exc) {
+        logWarning(`Preserving unreadable dispatcher ${dispatcherPath}: ${(exc as Error).message}`);
+        return;
+      }
+      // Another integration may have regenerated the shared file since this
+      // manifest recorded it. Accept only exact generated LF/CRLF.
+      const matches =
+        createHash('sha256').update(content).digest('hex') === expectedHash ||
+        content.equals(Buffer.from(EVENTS_DISPATCHER_TEMPLATE, 'utf-8')) ||
+        content.equals(Buffer.from(EVENTS_DISPATCHER_TEMPLATE.replace(/\n/g, '\r\n'), 'utf-8'));
+      if (!matches) {
+        logWarning(`Preserving modified dispatcher: ${dispatcherPath}`);
+        return;
+      }
+    }
+    unlinkMissingOk(dispatcherPath);
   }
 }
 
@@ -1186,9 +1258,10 @@ export function removeIntegrationEvents(
   integration: EventIntegration,
   projectRoot: string,
   manifest: EventManifest,
+  opts: { force?: boolean } = {},
 ): void {
   removeNativeEventHooks(integration, projectRoot, manifest);
-  cleanupSharedDispatcher(integration, projectRoot, manifest);
+  cleanupSharedDispatcher(integration, projectRoot, manifest, opts);
 
   if (integration.key === 'opencode') {
     if (manifestHas(manifest, OPENCODE_PLUGIN_REL)) {
@@ -1295,12 +1368,13 @@ export function validateEvents(data: Record<string, unknown>): void {
       if (!CANONICAL_EVENTS.has(eventName)) {
         throw new ValidationError(`Unknown event '${eventName}': must be one of ${sortedCanonicalEventsRepr()}`);
       }
+      // An explicit ``matcher: null`` / ``timeout: null`` is invalid too.
       const matcher = eventConfig.matcher;
-      if (matcher !== null && matcher !== undefined && typeof matcher !== 'string') {
+      if (Object.prototype.hasOwnProperty.call(eventConfig, 'matcher') && typeof matcher !== 'string') {
         throw new ValidationError(`Event '${eventName}' has invalid 'matcher': must be a string`);
       }
       const timeout = eventConfig.timeout;
-      if (timeout !== null && timeout !== undefined) {
+      if (Object.prototype.hasOwnProperty.call(eventConfig, 'timeout')) {
         if (!isPyInt(timeout) || timeout <= 0) {
           throw new ValidationError(`Event '${eventName}' has invalid 'timeout': must be a positive integer`);
         }
@@ -1454,12 +1528,12 @@ export function removeOpencodeEntries(configPath: string): boolean {
   const existing = loadUserJson(configPath);
   if (existing === null) return false;
   const plugins = Object.prototype.hasOwnProperty.call(existing, 'plugin') ? existing.plugin : [];
-  if (Array.isArray(plugins)) {
-    const ref = `./${OPENCODE_PLUGIN_REL}`;
-    const kept = plugins.filter((p) => p !== ref);
-    if (kept.length) existing.plugin = kept;
-    else delete existing.plugin;
-  }
+  const ref = `./${OPENCODE_PLUGIN_REL}`;
+  // No Spec Kit plugin ref to strip: leave the user's file untouched (#5017).
+  if (!Array.isArray(plugins) || !plugins.includes(ref)) return false;
+  const kept = plugins.filter((p) => p !== ref);
+  if (kept.length) existing.plugin = kept;
+  else delete existing.plugin;
   if (!Object.keys(existing).length) {
     unlinkMissingOk(configPath);
     return true;
@@ -1469,7 +1543,6 @@ export function removeOpencodeEntries(configPath: string): boolean {
 }
 
 const TOML_OWNED_BLOCK = /\[\[hooks\.[\p{L}\p{N}_]+\]\]\n(?:(?!\[\[hooks\.[\p{L}\p{N}_]+\]\])[\s\S])*?speckit_marker = true\n*/gu;
-const VIBE_OWNED_BLOCK = /\[\[hooks\]\]\n(?:(?!\[\[hooks\]\])[\s\S])*?speckit_marker = true\n*/g;
 
 function readUtf8(p: string): string {
   return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(readFileSync(p));
@@ -1506,24 +1579,6 @@ export function mergeTomlFragment(dst: string, fragment: string): boolean {
   return true;
 }
 
-/** Merge Specify-owned Vibe TOML hook entries into *dst*. */
-export function mergeVibeTomlFragment(dst: string, fragment: string): boolean {
-  ensureSafeDestination(dst);
-  let existing = '';
-  if (pathExists(dst)) {
-    try {
-      existing = readUtf8(dst);
-    } catch {
-      warnUnreadable(dst, 'merge');
-      return false;
-    }
-  }
-  existing = existing.replace(VIBE_OWNED_BLOCK, '');
-  mkdirSync(dirname(dst), { recursive: true });
-  writeFileSync(dst, rstrip(existing) + '\n\n' + fragment + '\n', 'utf8');
-  return true;
-}
-
 function hasUserTomlContent(cleaned: string): boolean {
   return splitLines(cleaned).some((line) => line.trim() && !line.trim().startsWith('#'));
 }
@@ -1541,26 +1596,6 @@ export function removeTomlEntries(dst: string): boolean {
   }
   const cleaned = existing.replace(TOML_OWNED_BLOCK, '');
   if (cleaned === existing) return false;
-  if (!hasUserTomlContent(cleaned)) {
-    unlinkMissingOk(dst);
-    return true;
-  }
-  writeFileSync(dst, cleaned, 'utf8');
-  return false;
-}
-
-/** Remove Specify-marked Vibe TOML hook entries; delete the file if now empty. */
-export function removeVibeTomlEntries(dst: string): boolean {
-  if (!pathExists(dst)) return false;
-  ensureSafeDestination(dst);
-  let existing: string;
-  try {
-    existing = readUtf8(dst);
-  } catch {
-    warnUnreadable(dst, 'cleanup');
-    return false;
-  }
-  const cleaned = existing.replace(VIBE_OWNED_BLOCK, '');
   if (!hasUserTomlContent(cleaned)) {
     unlinkMissingOk(dst);
     return true;
@@ -1609,7 +1644,10 @@ export function removeCopilotEntries(dst: string): boolean {
   ensureSafeDestination(dst);
   const existing = loadUserJson(dst);
   if (existing === null) return false;
-  const cleaned = stripMarkedHooks(existing.hooks ?? {});
+  const hooks = Object.prototype.hasOwnProperty.call(existing, 'hooks') ? existing.hooks : {};
+  // Nothing Specify-owned to strip: leave the user's file untouched (#5017).
+  if (!isPlainObject(hooks) || !hasMarkedEntry(Object.values(hooks))) return false;
+  const cleaned = stripMarkedHooks(hooks);
   if (Object.keys(cleaned).length) existing.hooks = cleaned;
   else delete existing.hooks;
   const userKeys = Object.keys(existing).filter((k) => k !== 'version');
@@ -1670,6 +1708,8 @@ export function removeJsonRootEntries(dst: string): boolean {
   ensureSafeDestination(dst);
   const existing = loadUserJson(dst);
   if (existing === null) return false;
+  // Nothing Specify-owned to strip: leave the user's file untouched (#5017).
+  if (!hasMarkedEntry(Object.values(existing))) return false;
   const cleaned: Record<string, unknown> = {};
   for (const [event, entries] of Object.entries(existing)) {
     if (!Array.isArray(entries)) {
@@ -1738,7 +1778,10 @@ export function loadUserJson(path: string): Record<string, unknown> | null {
 function safeWriteJson(dst: string, data: Record<string, unknown>): void {
   ensureSafeDestination(dst);
   mkdirSync(dirname(dst), { recursive: true });
-  writeFileSync(dst, pyJsonDumps(data, { indent: 2 }) + '\n', 'utf8');
+  // ensure_ascii=False: keep non-ASCII readable; a lone surrogate is written
+  // back as its JSON escape (JSON.stringify does this, like Python's
+  // errors="backslashreplace").
+  writeFileSync(dst, pyJsonDumps(data, { indent: 2, ensureAscii: false }) + '\n', 'utf8');
 }
 
 /**
@@ -1769,7 +1812,9 @@ export function removeJsonEntries(dst: string): boolean {
   const existing = loadUserJson(dst);
   if (existing === null) return false;
   const hooks = Object.prototype.hasOwnProperty.call(existing, 'hooks') ? existing.hooks : {};
-  if (!isPlainObject(hooks)) return false;
+  // Nothing Specify-owned to strip: leave the user's file untouched, so a
+  // no-op event refresh neither reformats nor deletes it (#5017).
+  if (!isPlainObject(hooks) || !hasMarkedEntry(Object.values(hooks))) return false;
   const cleaned = stripMarkedHooks(hooks);
   if (Object.keys(cleaned).length) existing.hooks = cleaned;
   else delete existing.hooks;
@@ -1779,6 +1824,14 @@ export function removeJsonEntries(dst: string): boolean {
     return true;
   }
   safeWriteJson(dst, existing);
+  return false;
+}
+
+/** Return true if any list among *groups* holds a Specify-marked entry. */
+export function hasMarkedEntry(groups: Iterable<unknown>): boolean {
+  for (const entries of groups) {
+    if (Array.isArray(entries) && entries.some((entry) => hasMarker(entry))) return true;
+  }
   return false;
 }
 

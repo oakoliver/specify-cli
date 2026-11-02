@@ -326,6 +326,18 @@
    ".lingma/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
   }
  },
+ "mcode": {
+  "registered": [
+   "speckit.git.commit",
+   "speckit.git.ci",
+   "speckit.git.status"
+  ],
+  "files": {
+   ".minimax/skills/speckit-git-ci/SKILL.md": "---\nname: speckit-git-ci\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: mcode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".minimax/skills/speckit-git-commit/SKILL.md": "---\nname: speckit-git-commit\ndescription: Commit changes with a conventional message — über fast. This description is deliberately long so that YAML emitters would fold it across multiple lines if width were limited\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/commit.md\n---\n\n# Commit\n\nUser input: $ARGUMENTS\n\nRun `.specify/extensions/git/scripts/bash/commit.sh --json $ARGUMENTS` from the repo root, then read `.specify/extensions/git/agents/helper.md` and .specify/templates/commit-template.md.\nCall /speckit-git-commit or /speckit-plan when done (see .specify/scripts/bash/common.sh).\nAgent: mcode\n\n## Hooks\n\n- For each executable hook, output the following\n  - `/speckit.git.commit`\nWindows path: C:\\Users\\dev\\file",
+   ".minimax/skills/speckit-git-status/SKILL.md": "---\nname: speckit-git-status\ndescription: Show status\ncompatibility: Requires spec-kit project structure with .specify/ directory\nmetadata:\n  author: github-spec-kit\n  source: git:commands/status.md\n---\n\nStatus for $ARGUMENTS"
+  }
+ },
  "muse": {
   "registered": [
    "speckit.git.commit",

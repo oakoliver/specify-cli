@@ -27,9 +27,10 @@ import {
 import { CliExit, Panel, confirm, console, escapeMarkup } from '../console.js';
 import { emitJson, emitJsonError, installedListItem } from '../installed-list-json.js';
 import { resolveSpecifyProjectRoot } from '../project.js';
+import { isAiSkillsEnabled } from '../init-options.js';
 import { isHttpsOrLocalhostHttp } from '../download-security.js';
-import { formatClineCommandName } from '../integrations/cline.js';
-import { formatForgeCommandName } from '../integrations/forge.js';
+import { InvalidVersion, Version } from '../version.js';
+import { extensionInfoItem } from '../installed-info-json.js';
 import { urlHostname, urlparse, urlPort } from '../bundles/pycompat.js';
 import { CATALOG_APP_HELP, CATALOG_GROUP } from './catalog/commands.js';
 import {
@@ -39,6 +40,7 @@ import {
   loadInitOptions,
   locateBundledExtension,
   refreshEventsAndWarn,
+  registeredCommandName,
   requireSpecifyProject,
   resolveCatalogExtension,
   resolveInstalledExtension,
@@ -46,10 +48,18 @@ import {
 import { runUpdateCommand } from './command-update-transaction.js';
 import { resolveStrictFalse, unlink } from './fs-utils.js';
 import { CompatibilityError, ExtensionError, ValidationError } from './errors.js';
+import { availableVersions, selectRelease } from './catalog-versions.js';
 import { ExtensionCatalog } from './extension-catalog.js';
 import { HookExecutor } from './hooks.js';
 import { ExtensionManager } from './manager.js';
-import { type Dict, type ExtensionManifest, REINSTALL_COMMAND, isMapping, normalizePriority } from './manifest.js';
+import {
+  type Dict,
+  type ExtensionManifest,
+  ExtensionManifest as ExtensionManifestClass,
+  REINSTALL_COMMAND,
+  isMapping,
+  normalizePriority,
+} from './manifest.js';
 
 // Shared ``_commands.py`` helpers, re-exported under the conventional module.
 export {
@@ -193,16 +203,21 @@ export async function extensionList(opts: { available?: boolean; all?: boolean; 
 /** ``specify extension add``. */
 export async function extensionAdd(
   extension: string,
-  opts: { dev?: boolean; fromUrl?: string | null; force?: boolean; priority?: number } = {},
+  opts: { dev?: boolean; fromUrl?: string | null; force?: boolean; priority?: number; version?: string | null } = {},
 ): Promise<void> {
   const dev = opts.dev ?? false;
   const fromUrl = opts.fromUrl ?? null;
   const force = opts.force ?? false;
   const priority = opts.priority ?? 10;
+  const version = typeof opts.version === 'string' ? opts.version : null;
 
   const projectRoot = requireSpecifyProject();
   if (priority < 1) {
     console.print('[red]Error:[/red] Priority must be a positive integer (1 or higher)');
+    throw new CliExit(1);
+  }
+  if (version !== null && (!version.trim() || dev || fromUrl)) {
+    console.print('[red]Error:[/red] --version requires a catalog install (without --dev or --from).');
     throw new CliExit(1);
   }
 
@@ -289,13 +304,14 @@ export async function extensionAdd(
           return installExtensionFromUrl(manager, projectRoot, fromUrl, speckitVersion, { priority, force });
         }
 
-        let bundledPath = locateBundledExtension(extension);
+        let bundledPath = version === null ? locateBundledExtension(extension) : null;
         if (bundledPath !== null && bundledPath !== undefined) {
           return manager.installFromDirectory(bundledPath, speckitVersion, { priority, force });
         }
 
         const catalog = new ExtensionCatalog(projectRoot);
-        const [extInfo, catalogError] = await resolveCatalogExtension(extension, catalog, 'add');
+        const [resolvedInfo, catalogError] = await resolveCatalogExtension(extension, catalog, 'add');
+        let extInfo = resolvedInfo;
         if (catalogError) {
           console.print(
             `[red]Error:[/red] Could not query extension catalog: ${escapeMarkup(catalogError.message)}`,
@@ -309,8 +325,52 @@ export async function extensionAdd(
           throw new CliExit(1);
         }
 
+        if (version !== null) {
+          // Resolve within the winning catalog source. A missing historical
+          // release must not fall through to a lower priority (or
+          // discovery-only) catalog. Reuse the entry already resolved above.
+          const selected = selectRelease(extInfo, version);
+          if (selected === null) {
+            console.print(
+              `[red]Error:[/red] Extension '${escapeMarkup(s(extInfo.id))}' ` +
+                `has no catalog release for version ${escapeMarkup(version)}.`,
+            );
+            throw new CliExit(1);
+          }
+          extInfo = selected;
+          if (!(Object.prototype.hasOwnProperty.call(extInfo, '_install_allowed') ? extInfo._install_allowed : true)) {
+            console.print(
+              `[red]Error:[/red] Extension '${escapeMarkup(s(extInfo.id))}' ` +
+                'is from a discovery-only catalog and cannot be installed.',
+            );
+            throw new CliExit(1);
+          }
+        }
+
         const resolvedId = extInfo.id;
-        if (resolvedId !== extension) {
+        if (version !== null && extInfo.bundled && !extInfo.download_url) {
+          const candidate = locateBundledExtension(resolvedId);
+          if (candidate !== null && candidate !== undefined) {
+            const bundledManifest = new ExtensionManifestClass(join(candidate, 'extension.yml'));
+            let packagedMatches: boolean;
+            try {
+              packagedMatches = new Version(String(bundledManifest.version)).equals(new Version(version));
+            } catch (e) {
+              if (!(e instanceof InvalidVersion)) throw e;
+              packagedMatches = false;
+            }
+            if (packagedMatches) {
+              return manager.installFromDirectory(candidate, speckitVersion, { priority, force });
+            }
+          }
+          console.print(
+            `[red]Error:[/red] Bundled extension '${escapeMarkup(resolvedId)}' ` +
+              `version ${escapeMarkup(version)} is not shipped with this Spec Kit release. ` +
+              'Upgrade Spec Kit or choose an available catalog archive.',
+          );
+          throw new CliExit(1);
+        }
+        if (version === null && resolvedId !== extension) {
           bundledPath = locateBundledExtension(resolvedId);
           if (bundledPath !== null && bundledPath !== undefined) {
             return manager.installFromDirectory(bundledPath, speckitVersion, { priority, force });
@@ -357,12 +417,14 @@ export async function extensionAdd(
         console.print(
           `Downloading ${escapeMarkup(s(extInfo.name))} v${escapeMarkup(s(extInfo.version ?? 'unknown'))}...`,
         );
-        const archivePath = await catalog.downloadExtension(extensionId);
+        const archivePath =
+          version !== null ? await catalog.downloadExtensionInfo(extInfo) : await catalog.downloadExtension(extensionId);
         try {
           return manager.installFromZip(archivePath, speckitVersion, {
             priority,
             force,
             catalogName: (extInfo._catalog_name ?? null) as string | null,
+            ...(version !== null ? { expectedId: extensionId, expectedVersion: version } : {}),
           });
         } finally {
           unlink(archivePath, true);
@@ -380,15 +442,9 @@ export async function extensionAdd(
       console.print(`\n[yellow]⚠  Compatibility warning:[/yellow] ${escapeMarkup(s(warning))}`);
     }
 
-    const selectedAi = (loadInitOptions(projectRoot) as Dict).ai;
-    const isCline = selectedAi === 'cline';
-    const isForge = selectedAi === 'forge';
-
     console.print('\n[bold cyan]Provided commands:[/bold cyan]');
     for (const cmd of manifest.commands) {
-      let cmdName: string = cmd.name;
-      if (isCline) cmdName = formatClineCommandName(cmdName);
-      else if (isForge) cmdName = formatForgeCommandName(cmdName);
+      const cmdName = registeredCommandName(projectRoot, cmd.name);
       console.print(`  • ${escapeMarkup(s(cmdName))} - ${escapeMarkup(s(cmd.description ?? ''))}`);
     }
 
@@ -661,7 +717,21 @@ export function printExtensionInfo(extInfo: Dict, manager: ExtensionManager): vo
 }
 
 /** ``specify extension info``. */
-export async function extensionInfo(extension: string): Promise<void> {
+export async function extensionInfo(
+  extension: string,
+  opts: { versions?: boolean; json?: boolean } = {},
+): Promise<void> {
+  if (opts.json === true) {
+    if (opts.versions === true) emitJsonError(new Error('--json cannot be combined with --versions'), 2);
+    try {
+      const manager = new ExtensionManager(resolveSpecifyProjectRoot());
+      emitJson(extensionInfoItem(manager.listInstalled() as unknown as Dict[], manager, extension));
+      return;
+    } catch (error) {
+      if (error instanceof CliExit) throw error;
+      emitJsonError(error);
+    }
+  }
   const projectRoot = requireSpecifyProject();
   const catalog = new ExtensionCatalog(projectRoot);
   const manager = new ExtensionManager(projectRoot);
@@ -670,10 +740,41 @@ export async function extensionInfo(extension: string): Promise<void> {
   const [resolvedInstalledId, resolvedInstalledName] = resolveInstalledExtension(extension, installed, 'info', true);
   const lookupKey = resolvedInstalledId ? resolvedInstalledId : extension;
   const [extInfo, catalogError] = await resolveCatalogExtension(lookupKey, catalog, 'info');
+  const showVersions = opts.versions === true;
 
   if (extInfo) {
+    if (showVersions) {
+      let available: string[];
+      try {
+        available = availableVersions(extInfo);
+      } catch (exc) {
+        if (exc instanceof ExtensionError) {
+          console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+          throw new CliExit(1);
+        }
+        throw exc;
+      }
+      console.print(`Catalog versions for ${escapeMarkup(s(extInfo.id))}:`);
+      available.forEach((availableVersion, index) => {
+        const current = index === 0 ? ' (current)' : '';
+        console.print(`  ${escapeMarkup(availableVersion)}${current}`);
+      });
+      if (!(Object.prototype.hasOwnProperty.call(extInfo, '_install_allowed') ? extInfo._install_allowed : true)) {
+        console.print('[yellow]Discovery only; catalog installation is disabled.[/yellow]');
+      }
+      return;
+    }
     printExtensionInfo(extInfo, manager);
     return;
+  }
+
+  if (showVersions) {
+    if (catalogError) {
+      console.print(`[red]Error:[/red] Could not query extension catalog: ${escapeMarkup(catalogError.message)}`);
+      throw new CliExit(1);
+    }
+    console.print(`[red]Error:[/red] No catalog versions found for ${escapeMarkup(extension)}.`);
+    throw new CliExit(1);
   }
 
   if (resolvedInstalledId) {
@@ -701,13 +802,11 @@ export async function extensionInfo(extension: string): Promise<void> {
       console.print();
 
       if (extManifest.commands.length) {
-        const selectedAi = (loadInitOptions(projectRoot) as Dict).ai;
-        const formatCommandName =
-          selectedAi === 'cline' ? formatClineCommandName : selectedAi === 'forge' ? formatForgeCommandName : null;
+        // Print each command the way the active agent registers it, matching
+        // `extension add`'s "Provided commands" listing.
         console.print('[bold]Commands:[/bold]');
         for (const cmd of extManifest.commands) {
-          let cmdName: string = cmd.name;
-          if (formatCommandName !== null) cmdName = formatCommandName(cmdName);
+          const cmdName = registeredCommandName(projectRoot, cmd.name);
           console.print(`  • ${escapeMarkup(s(cmdName))}: ${escapeMarkup(s(cmd.description ?? ''))}`);
         }
         console.print();
@@ -777,6 +876,36 @@ export async function extensionEnable(extension: string): Promise<void> {
   }
 
   manager.registry.update(extensionId, { enabled: true });
+
+  // Generic projects re-register invocations into --commands-dir (#4785).
+  const initOptions = loadInitOptions(projectRoot);
+  if (isMapping(initOptions) && initOptions.ai === 'generic') {
+    try {
+      const manifest = manager.getExtension(extensionId);
+      if (manifest === null) throw new ExtensionError(`Cannot read manifest for '${extensionId}'`);
+      if (manifest.commands.length) {
+        manager.registerEnabledExtensionsForAgent('generic');
+        const refreshed = manager.registry.get(extensionId) ?? {};
+        const skills = isAiSkillsEnabled(initOptions);
+        const expected = skills
+          ? [...new Set(manifest.commands.map((c: Dict) => ExtensionManager.skillNameForCommand(c.name as string)))]
+          : [...ExtensionManager.collectManifestCommandNames(manifest).keys()];
+        const owned = new Set(manager.genericOwnedNames(refreshed, expected, { skills, extensionId }));
+        const missing = expected.filter((name) => !owned.has(name)).sort();
+        if (missing.length) {
+          manager.disableGenericExtensionArtifacts(extensionId);
+          throw new ExtensionError(`Missing invocation artifacts: ${missing.join(', ')}`);
+        }
+      }
+    } catch (exc) {
+      manager.registry.update(extensionId, { enabled: false });
+      console.print(
+        `[red]Error:[/red] Could not register generic invocations for '${escapeMarkup(String(extensionId))}': ` +
+          escapeMarkup((exc as Error).message),
+      );
+      throw new CliExit(1);
+    }
+  }
   setHooksEnabledInConfig(hookExecutor, extensionId, true);
 
   console.print(`[green]✓[/green] Extension '${escapeMarkup(String(displayName))}' enabled`);
@@ -819,7 +948,16 @@ export async function extensionDisable(extension: string): Promise<void> {
     throw new CliExit(0);
   }
 
-  manager.registry.update(extensionId, { enabled: false });
+  if (loadInitOptions(projectRoot).ai === 'generic') {
+    try {
+      manager.disableGenericExtensionArtifacts(extensionId);
+    } catch (exc) {
+      console.print(`[red]Error:[/red] ${escapeMarkup((exc as Error).message)}`);
+      throw new CliExit(1);
+    }
+  } else {
+    manager.registry.update(extensionId, { enabled: false });
+  }
   setHooksEnabledInConfig(hookExecutor, extensionId, false);
 
   console.print(`[green]✓[/green] Extension '${escapeMarkup(String(displayName))}' disabled`);
@@ -906,6 +1044,7 @@ export const EXTENSION_GROUP: GroupSpec = {
             showDefault: true,
             help: 'Resolution priority (lower = higher precedence, default 10)',
           },
+          { name: 'version', flags: ['--version'], type: 'string', help: 'Install an exact version from a catalog' },
         ],
       },
       (p: ParsedArgs) =>
@@ -914,6 +1053,7 @@ export const EXTENSION_GROUP: GroupSpec = {
           fromUrl: (p.options.from as string | undefined) ?? null,
           force: Boolean(p.options.force),
           priority: p.options.priority as number,
+          version: (p.options.version as string | undefined) ?? null,
         }),
     ),
     defineCommand(
@@ -932,14 +1072,11 @@ export const EXTENSION_GROUP: GroupSpec = {
       },
       (p: ParsedArgs) => extensionEnable(String(p.args.extension)),
     ),
-    defineCommand(
-      {
-        name: 'info',
-        help: 'Show detailed information about an extension.',
-        arguments: [{ name: 'extension', required: true, help: 'Extension ID or name' }],
-      },
-      (p: ParsedArgs) => extensionInfo(String(p.args.extension)),
-    ),
+    {
+      name: 'info',
+      help: 'Show detailed information about an extension.',
+      run: (args, progName) => runInfoCommand(args, progName),
+    },
     {
       name: 'list',
       help: 'List installed extensions.',
@@ -1005,6 +1142,38 @@ export const EXTENSION_GROUP: GroupSpec = {
     },
   ],
 };
+
+const INFO_SPEC: CommandSpec = {
+  name: 'info',
+  help: 'Show detailed information about an extension.',
+  arguments: [{ name: 'extension', required: true, help: 'Extension ID or name' }],
+  options: [
+    { name: 'versions', flags: ['--versions'], type: 'boolean', help: 'List catalog versions' },
+    { name: 'json', flags: ['--json'], type: 'boolean', help: 'Output the installed extension as JSON' },
+  ],
+};
+
+/** ``extension info`` keeps parse failures on the JSON error contract when ``--json`` is given. */
+async function runInfoCommand(args: string[], progName: string): Promise<number> {
+  if (args.includes('--json') && !args.includes('--help')) {
+    try {
+      parseArgs(INFO_SPEC, args, progName);
+    } catch (e) {
+      if (e instanceof UsageError) {
+        try {
+          emitJsonError(e, e.exitCode);
+        } catch (exit) {
+          if (exit instanceof CliExit) return exit.code;
+          throw exit;
+        }
+      }
+      throw e;
+    }
+  }
+  return runCommand(INFO_SPEC, args, progName, (p: ParsedArgs) =>
+    extensionInfo(String(p.args.extension), { versions: Boolean(p.options.versions), json: Boolean(p.options.json) }),
+  );
+}
 
 /** ``extension list`` keeps parse failures on the JSON error contract when ``--json`` is given. */
 async function runListCommand(args: string[], progName: string): Promise<number> {

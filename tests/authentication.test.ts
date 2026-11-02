@@ -44,6 +44,7 @@ import {
   resolveGithubReleaseAssetApiUrl,
 } from '../src/authentication/github-http.js';
 import { ValueError } from '../src/download-security.js';
+import { GitHubAuth, GitHubCliAuthError, githubCliDeps, isSafeCliHostname } from '../src/authentication/github.js';
 
 // ============================================================================
 // Helpers
@@ -158,7 +159,7 @@ describe('loadAuthConfig', () => {
     ['{}', /must contain a 'providers' array/],
     [{ providers: [{ hosts: [], provider: 'github', auth: 'bearer', token: 't' }] }, /'hosts' must be a non-empty array/],
     [{ providers: [{ hosts: ['github.com'], auth: 'bearer', token: 't' }] }, /'provider' must be a non-empty string/],
-    [{ providers: [{ hosts: ['github.com'], provider: 'github', auth: 'basic-pat', token: 't' }] }, /does not support auth scheme 'basic-pat'; supported: \['bearer'\]/],
+    [{ providers: [{ hosts: ['github.com'], provider: 'github', auth: 'basic-pat', token: 't' }] }, /does not support auth scheme 'basic-pat'; supported: \['bearer', 'github-cli'\]/],
     [{ providers: [{ hosts: ['github.com'], provider: 'github', auth: 'bearer' }] }, /auth='bearer' requires 'token' or 'token_env'/],
     [{ providers: [{ hosts: ['x'], provider: 'azure-devops', auth: 'azure-ad', tenant_id: 't' }] }, /requires 'tenant_id', 'client_id', and 'client_secret_env'/],
     [{ providers: [{ hosts: ['x'], provider: 'gitlab', auth: 'bearer', token: 't' }] }, /unknown provider 'gitlab'; registered: \['azure-devops', 'bitbucket', 'github'\]/],
@@ -590,5 +591,180 @@ describe('resolveGithubReleaseAssetApiUrl', () => {
     expect(fnmatch('corp', '*.corp')).toBe(false);
     expect(fnmatch('ab', 'a?')).toBe(true);
     expect(fnmatch('ac', 'a[!b]')).toBe(true);
+  });
+});
+
+// ============================================================================
+// GHE.com release assets (#4807)
+// ============================================================================
+
+describe('resolveGithubReleaseAssetApiUrl (GHE.com)', () => {
+  const pair = ['msft.ghe.com', 'api.msft.ghe.com'];
+  const opener = (assets: unknown[], seen: string[] = []) => async (url: string) => {
+    seen.push(url);
+    return new Response(JSON.stringify({ assets }));
+  };
+  const noop = async (): Promise<Response> => {
+    throw new Error('must not be called');
+  };
+
+  test('a GHE.com browser URL resolves through its paired API subdomain', async () => {
+    const asset = 'https://api.msft.ghe.com/repos/org/repo/releases/assets/42';
+    const seen: string[] = [];
+    const got = await resolveGithubReleaseAssetApiUrl(
+      'https://msft.ghe.com/org/repo/releases/download/v1.0/bundle.zip',
+      opener([{ name: 'bundle.zip', url: asset }], seen),
+      { githubHosts: pair },
+    );
+    expect(got).toBe(asset);
+    expect(seen).toEqual(['https://api.msft.ghe.com/repos/org/repo/releases/tags/v1.0']);
+  });
+
+  test('a trusted direct GHE.com API asset URL passes through', async () => {
+    const url = 'https://api.msft.ghe.com/repos/org/repo/releases/assets/42';
+    expect(await resolveGithubReleaseAssetApiUrl(url, noop, { githubHosts: pair })).toBe(url);
+  });
+
+  for (const url of [
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/42?',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/42#',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/42/',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/%34%32',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/42 ',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/42;',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/%ZZ',
+  ]) {
+    test(`rejects a noncanonical direct GHE.com asset URL: ${JSON.stringify(url)}`, async () => {
+      expect(await resolveGithubReleaseAssetApiUrl(url, noop, { githubHosts: pair })).toBeNull();
+    });
+  }
+
+  test('a direct GHE.com API URL needs both trusted tenant hostnames', async () => {
+    const url = 'https://api.msft.ghe.com/repos/org/repo/releases/assets/42';
+    expect(await resolveGithubReleaseAssetApiUrl(url, noop, { githubHosts: ['api.msft.ghe.com'] })).toBeNull();
+  });
+
+  for (const hosts of [[], pair]) {
+    test(`a GHE.com API host never accepts the GHES /api/v3 path (${hosts.length} hosts)`, async () => {
+      const url = 'https://api.msft.ghe.com/api/v3/repos/org/repo/releases/assets/42';
+      expect(await resolveGithubReleaseAssetApiUrl(url, noop, { githubHosts: hosts })).toBeNull();
+    });
+  }
+
+  for (const hosts of [['msft.ghe.com'], ['api.msft.ghe.com'], ['other.ghe.com', 'api.other.ghe.com']]) {
+    test(`resolution requires the trusted web and API pair: ${hosts.join(',')}`, async () => {
+      const seen: string[] = [];
+      const got = await resolveGithubReleaseAssetApiUrl(
+        'https://msft.ghe.com/org/repo/releases/download/v1.0/bundle.zip',
+        opener([], seen),
+        { githubHosts: hosts },
+      );
+      expect(got).toBeNull();
+      expect(seen).toEqual([]);
+    });
+  }
+
+  for (const asset of [
+    'https://api.other.ghe.com/repos/org/repo/releases/assets/42',
+    'http://api.msft.ghe.com/repos/org/repo/releases/assets/42',
+    'https://msft.ghe.com/api/v3/repos/org/repo/releases/assets/42',
+    'https://api.msft.ghe.com/repos/other/repo/releases/assets/42',
+    'https://api.msft.ghe.com/repos/org/other/releases/assets/42',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/not-a-number',
+    'https://api.msft.ghe.com/repos/org/repo/releases/assets/42?download=1',
+  ]) {
+    test(`rejects a wrong origin or path in GHE.com metadata: ${asset}`, async () => {
+      const got = await resolveGithubReleaseAssetApiUrl(
+        'https://msft.ghe.com/org/repo/releases/download/v1.0/bundle.zip',
+        opener([{ name: 'bundle.zip', url: asset }]),
+        { githubHosts: pair },
+      );
+      expect(got).toBeNull();
+    });
+  }
+});
+
+// ============================================================================
+// GitHub CLI credentials (#4960)
+// ============================================================================
+
+describe('GitHubAuth github-cli scheme', () => {
+  const saved = { ...githubCliDeps };
+  afterEach(() => Object.assign(githubCliDeps, saved));
+  const entry = (hosts: string[]) =>
+    ({ hosts, provider: 'github', auth: 'github-cli', token: null, token_env: null }) as never;
+
+  test('acquires the token for the first configured host and caches it', () => {
+    const calls: string[][] = [];
+    githubCliDeps.which = () => '/usr/bin/gh';
+    githubCliDeps.run = (argv) => {
+      calls.push(argv);
+      return { status: 0, stdout: ' gho_token \n', timedOut: false };
+    };
+    const auth = new GitHubAuth();
+    expect(auth.resolveToken(entry(['ghe.corp', 'api.ghe.corp']))).toBe('gho_token');
+    expect(auth.resolveToken(entry(['ghe.corp']))).toBe('gho_token');
+    expect(calls).toEqual([['/usr/bin/gh', 'auth', 'token', '--hostname', 'ghe.corp']]);
+    expect(auth.authHeaders('gho_token', 'github-cli')).toEqual({ Authorization: 'Bearer gho_token' });
+  });
+
+  test('failures are sanitized, cached and raised as URL errors', () => {
+    let runs = 0;
+    githubCliDeps.which = () => '/usr/bin/gh';
+    githubCliDeps.run = () => {
+      runs++;
+      return { status: 1, stdout: 'secret output', timedOut: false };
+    };
+    const auth = new GitHubAuth();
+    for (let i = 0; i < 2; i++) {
+      let err: unknown = null;
+      try {
+        auth.resolveToken(entry(['github.com']));
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(GitHubCliAuthError);
+      expect(err).toBeInstanceOf(URLError);
+      expect(String((err as GitHubCliAuthError).reason)).toBe(
+        "GitHub authentication failed for provider 'github': GitHub CLI could not provide a token for 'github.com'. Run 'gh auth login --hostname github.com'.",
+      );
+      expect((err as Error).message).not.toContain('secret');
+    }
+    expect(runs).toBe(1);
+  });
+
+  for (const [label, run, message] of [
+    ['missing gh', null, "GitHub CLI ('gh') was not found."],
+    ['timeout', { status: null, stdout: '', timedOut: true }, "GitHub CLI timed out while requesting a token for 'github.com'."],
+    ['empty token', { status: 0, stdout: '  \n', timedOut: false }, "GitHub CLI returned an empty token for 'github.com'."],
+    ['multiline token', { status: 0, stdout: 'a\nb', timedOut: false }, "GitHub CLI returned a malformed token for 'github.com'."],
+    ['non-ASCII token', { status: 0, stdout: 'tökén', timedOut: false }, "GitHub CLI returned a malformed token for 'github.com'."],
+  ] as const) {
+    test(`acquisition failure: ${label}`, () => {
+      githubCliDeps.which = () => (run === null ? null : '/usr/bin/gh');
+      if (run !== null) githubCliDeps.run = () => ({ ...run });
+      expect(() => new GitHubAuth().resolveToken(entry(['github.com']))).toThrow(message);
+    });
+  }
+
+  test('wildcard first hosts and unsafe hostnames are rejected before running gh', () => {
+    githubCliDeps.which = () => {
+      throw new Error('must not look up gh');
+    };
+    expect(() => new GitHubAuth().resolveToken(entry(['*.ghe.corp']))).toThrow('must be an exact hostname, not a wildcard');
+    expect(() => new GitHubAuth().resolveToken(entry(['bad_host']))).toThrow(
+      'the configured hostname is not valid for GitHub CLI authentication',
+    );
+    expect(isSafeCliHostname('ghe.corp')).toBe(true);
+    expect(isSafeCliHostname('-bad.corp')).toBe(false);
+    expect(isSafeCliHostname('a'.repeat(64) + '.corp')).toBe(false);
+  });
+
+  test('auth.json accepts github-cli without a token', () => {
+    const p = path.join(tmp, 'auth-cli.json');
+    fs.writeFileSync(p, JSON.stringify({ providers: [{ hosts: ['github.com'], provider: 'github', auth: 'github-cli' }] }), {
+      mode: 0o600,
+    });
+    expect(loadAuthConfig(p).map((e) => e.auth)).toEqual(['github-cli']);
   });
 });

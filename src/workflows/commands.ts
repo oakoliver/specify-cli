@@ -50,8 +50,14 @@ import {
   readResponseLimited,
   safeExtractArchive,
 } from '../download-security.js';
-import { resolveInitDirOverride } from '../project.js';
-import { ensureSafeSharedDirectory, verifyArchiveSha256 } from '../shared-infra.js';
+import {
+  ProjectResolutionError,
+  preflightProjectPolicy,
+  renderProjectError,
+  requireSpecifyProject as requireSpecifyProjectRoot,
+  resolveInitDirOverride,
+} from '../project.js';
+import { ensureSafeSharedDirectory, exclusiveProjectLock, verifyArchiveSha256 } from '../shared-infra.js';
 import { InvalidVersion, Version } from '../version.js';
 import { YAMLError } from '../yaml.js';
 import {
@@ -60,6 +66,7 @@ import {
   dget,
   errorMessage,
   isDict,
+  pyEquals,
   pyJsonDumps,
   pyRepr,
   pyStr,
@@ -69,6 +76,13 @@ import {
 } from './base.js';
 import { WorkflowCatalog, WorkflowCatalogError, WorkflowRegistry, httpDeps, responseUrl } from './catalog/domain.js';
 import { runWorkflowCatalogCommand } from './catalog/commands.js';
+import {
+  WorkflowListError,
+  WorkflowStorageError,
+  listWorkflows,
+  validateWorkflowStorage,
+  type WorkflowListResult,
+} from './operation-list.js';
 import { resolveRunOwnerRoot as resolveRunOwnerRootImpl } from './command-resume-state.js';
 import {
   resolveInstalledWorkflowOwnership as resolveInstalledWorkflowOwnershipImpl,
@@ -76,6 +90,7 @@ import {
 } from './command-run-ownership.js';
 import { workflowAdd } from './command-add.js';
 import { RunState, WorkflowDefinition, WorkflowEngine, validateWorkflow } from './engine.js';
+import { CheckpointError, activeStep, scopeSummaries } from './execution.js';
 import { loadCustomSteps } from './index.js';
 import { runWorkflowOverlayCommand } from './overlay/commands.js';
 import { workflowResolve } from './overlay/operations.js';
@@ -270,10 +285,15 @@ export function rejectUnsafeDir(path: string, label: string): void {
 
 /** Refuse symlinked workflow storage directories before workflow commands run. */
 export function rejectUnsafeWorkflowStorage(projectRoot: string): void {
-  rejectUnsafeDir(join(projectRoot, '.specify'), '.specify');
-  rejectUnsafeDir(join(projectRoot, '.specify', 'workflows'), '.specify/workflows');
-  rejectUnsafeDir(join(projectRoot, '.specify', 'workflows', 'runs'), '.specify/workflows/runs');
-  rejectUnsafeDir(join(projectRoot, '.specify', 'workflows', 'overlays'), '.specify/workflows/overlays');
+  try {
+    validateWorkflowStorage(projectRoot);
+  } catch (exc) {
+    if (exc instanceof WorkflowStorageError) {
+      errConsole.print(`[red]Error:[/red] ${exc.message}`);
+      throw new CliExit(1);
+    }
+    throw exc;
+  }
 }
 
 /** Forward to the run-private installed-workflow ownership resolver. */
@@ -566,92 +586,13 @@ export function stageWorkflowFile(destDir: string, opts: { useProjectFileMode?: 
   return new StagedWorkflowFile(stagedFile, fd);
 }
 
-function sleepSync(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-const LOCK_STALE_MS = 10 * 60 * 1000;
-
 /**
- * Serialize workflow file swaps with their registry updates.
- *
- * Upstream holds an ``flock`` on ``.specify/.workflow-install.lock``. Node has
- * no ``flock``, so the port keeps the same (symlink-checked) lock file and
- * serializes on an exclusively created sibling directory
- * ``.workflow-install.lock.d`` (removed on exit; reclaimed when stale).
- * Accepts a synchronous or asynchronous body.
+ * Serialize workflow file swaps with their registry updates
+ * (``_workflow_install_transaction``: ``_exclusive_project_lock`` on
+ * ``.specify/.workflow-install.lock``). Accepts a sync or async body.
  */
 export function workflowInstallTransaction<T>(projectRoot: string, fn: () => T): T {
-  const lockDir = join(projectRoot, '.specify');
-  try {
-    ensureSafeSharedDirectory(projectRoot, lockDir, { context: 'workflow install lock directory' });
-  } catch (exc) {
-    if (isOsError(exc)) throw exc;
-    throw osError(errorMessage(exc), 'EPERM');
-  }
-  const lockFile = join(lockDir, '.workflow-install.lock');
-  if (isSymlink(lockFile)) throw osError(`Refusing to use symlinked workflow install lock: ${lockFile}`, 'ELOOP');
-
-  const fd = openSync(lockFile, fsConstants.O_RDWR | fsConstants.O_CREAT | O_NOFOLLOW, 0o600);
-  let mutex: string | null = null;
-  const release = (): void => {
-    if (mutex !== null) {
-      try {
-        rmdirSync(mutex);
-      } catch {
-        // ignore
-      }
-      mutex = null;
-    }
-    try {
-      closeSync(fd);
-    } catch {
-      // ignore
-    }
-  };
-  try {
-    if (isSymlink(lockFile)) throw osError(`Refusing to use symlinked workflow install lock: ${lockFile}`, 'ELOOP');
-    const mutexPath = `${lockFile}.d`;
-    for (;;) {
-      try {
-        mkdirSync(mutexPath);
-        mutex = mutexPath;
-        break;
-      } catch (exc) {
-        if ((exc as NodeJS.ErrnoException).code !== 'EEXIST') throw exc;
-        try {
-          if (Date.now() - statSync(mutexPath).mtimeMs > LOCK_STALE_MS) rmdirSync(mutexPath);
-        } catch {
-          // Raced with the holder; retry.
-        }
-        sleepSync(50);
-      }
-    }
-  } catch (exc) {
-    release();
-    throw exc;
-  }
-  let result: T;
-  try {
-    result = fn();
-  } catch (exc) {
-    release();
-    throw exc;
-  }
-  if (result && typeof (result as unknown as Promise<unknown>).then === 'function') {
-    return (result as unknown as Promise<unknown>).then(
-      (v) => {
-        release();
-        return v;
-      },
-      (e: unknown) => {
-        release();
-        throw e;
-      },
-    ) as unknown as T;
-  }
-  release();
-  return result;
+  return exclusiveProjectLock(projectRoot, '.workflow-install.lock', { context: 'workflow install' }, fn);
 }
 
 /**
@@ -872,10 +813,24 @@ export function validateLocalWorkflowPackage(packageDir: string): void {
   walk(packageDir);
 }
 
+/** Compare workflow versions without treating equivalent spellings as changes (``_workflow_versions_match``). */
+export function workflowVersionsMatch(actual: unknown, expected: string): boolean {
+  try {
+    return new Version(pyStr(actual)).equals(new Version(expected));
+  } catch (exc) {
+    if (exc instanceof InvalidVersion) return pyStr(actual) === expected;
+    throw exc;
+  }
+}
+
 /** Options for {@link installWorkflowPackage}. */
 export interface InstallWorkflowPackageOptions {
   expectedId?: string | null;
   expectedVersion?: string | null;
+  /** Selected catalog release ``requires`` the definition must equal. */
+  expectedRequires?: Dict | null;
+  /** Compare ``expectedVersion`` by exact spelling (selected releases). */
+  exactVersion?: boolean;
   expectedInstalledVersion?: string | null;
   catalogInfo?: Dict | null;
 }
@@ -890,6 +845,8 @@ export async function installWorkflowPackage(
 ): Promise<void> {
   const expectedId = opts.expectedId ?? null;
   const expectedVersion = opts.expectedVersion ?? null;
+  const expectedRequires = opts.expectedRequires ?? null;
+  const exactVersion = opts.exactVersion ?? false;
   const expectedInstalledVersion = opts.expectedInstalledVersion ?? null;
   const catalogInfo = opts.catalogInfo ?? null;
   const workflowFile = join(packageDir, 'workflow.yml');
@@ -925,12 +882,21 @@ export async function installWorkflowPackage(
     );
     throw new CliExit(1);
   }
-  if (expectedVersion !== null && pyStr(definition.version) !== expectedVersion) {
+  if (
+    expectedVersion !== null &&
+    !(exactVersion
+      ? pyStr(definition.version) === expectedVersion
+      : workflowVersionsMatch(definition.version, expectedVersion))
+  ) {
     console.print(
       '[red]Error:[/red] Downloaded workflow version ' +
         `(${escapeMarkup(pyStr(definition.version))}) does not match the catalog ` +
         `version (${escapeMarkup(expectedVersion)}).`,
     );
+    throw new CliExit(1);
+  }
+  if (expectedRequires !== null && !pyEquals(definition.requires, expectedRequires)) {
+    console.print('[red]Error:[/red] Downloaded workflow requirements do not match the selected catalog release.');
     throw new CliExit(1);
   }
 
@@ -959,7 +925,7 @@ export async function installWorkflowPackage(
         expectedInstalledVersion !== null &&
         (!isDict(existing) ||
           dget(existing, 'source', null) !== 'catalog' ||
-          pyStr(dget(existing, 'version', null)) !== expectedInstalledVersion)
+          !workflowVersionsMatch(dget(existing, 'version', null), expectedInstalledVersion))
       ) {
         console.print(
           `[yellow]Warning:[/yellow] Workflow '${escapeMarkup(defId)}' changed during update; rerun the command.`,
@@ -1062,18 +1028,8 @@ export async function installWorkflowPackage(
  * refuse symlinked workflow storage (``_commands._require_specify_project``).
  */
 export function requireSpecifyProject(): string {
-  const override = resolveInitDirOverride();
-  let projectRoot: string;
-  if (override !== null && override !== undefined) {
-    projectRoot = override;
-  } else {
-    projectRoot = process.cwd();
-    if (!isDir(join(projectRoot, '.specify'))) {
-      errConsole.print('[red]Error:[/red] Not a Spec Kit project (no .specify/ directory)');
-      errConsole.print('Run this command from a Spec Kit project root or set SPECIFY_INIT_DIR to one.');
-      throw new CliExit(1);
-    }
-  }
+  // #4934: the root helper now preflights the persisted symlink policy.
+  const projectRoot = requireSpecifyProjectRoot();
   rejectUnsafeWorkflowStorage(projectRoot);
   return projectRoot;
 }
@@ -1107,18 +1063,32 @@ export function normalizeGateOptions(options: unknown): string[] | null {
 /** Gate detail for the structured outcome, when the run rests at a gate. */
 export function gateOutcome(state: RunState): Dict | null {
   if (state.status !== 'paused' && state.status !== 'aborted') return null;
-  const step = state.currentStepId !== null ? (state.stepResults ?? {})[state.currentStepId] : undefined;
+  let step: unknown = state.currentStepId !== null ? (state.stepResults ?? {})[state.currentStepId] : undefined;
+  let stepId: string | null = state.currentStepId;
+  let scopePath: string[] | null = null;
+  if (state.execution) {
+    // The tree knows which occurrence (possibly inside a called workflow)
+    // the run rests on.
+    const active = activeStep(state.execution);
+    if (active === null) return null;
+    const [path, node, activeId] = active;
+    stepId = activeId;
+    scopePath = path.slice(0, -1);
+    step = dget(node, 'result', null);
+  }
   if (!isDict(step) || !isGateStep(step)) return null;
   const rawOutput = dget(step, 'output', null);
   const output = isDict(rawOutput) ? rawOutput : {};
   const message = dget(output, 'message', null);
   const choice = dget(output, 'choice', null);
-  return {
-    step_id: state.currentStepId,
+  const detail: Dict = {
+    step_id: stepId,
     message: message === null || message === undefined ? null : pyStr(message),
     options: normalizeGateOptions(dget(output, 'options', null)),
     choice: choice === null || choice === undefined ? null : pyStr(choice),
   };
+  if (scopePath !== null && scopePath.length) detail.scope_path = scopePath;
+  return detail;
 }
 
 /** Machine-readable summary of a run/resume outcome. */
@@ -1134,7 +1104,41 @@ export function workflowRunPayload(state: RunState): Dict {
   if (gate !== null) payload.gate = gate;
   const error = failedStepError(state);
   if (error !== null) payload.error = error;
+  if (state.execution) {
+    const scopes = scopeSummaries(state.execution, state.status);
+    if (scopes.length) payload.workflow_scopes = scopes;
+  }
   return payload;
+}
+
+/**
+ * Report an execution failure with the actual, context-local run state
+ * (upstream ``_fail_workflow_execution``): under ``--json`` the run payload
+ * with ``status: failed`` and the error, otherwise a labelled message.
+ */
+export function failWorkflowExecution(exc: unknown, jsonOutput: boolean, state: RunState | null, resume = false): never {
+  const message = isOsError(exc) ? osErrorText(exc) : errorMessage(exc);
+  if (jsonOutput) {
+    const payload: Dict =
+      state !== null
+        ? workflowRunPayload(state)
+        : { run_id: null, workflow_id: null, current_step_id: null, current_step_index: null };
+    payload.status = 'failed';
+    payload.error = message;
+    emitWorkflowJson(payload);
+  } else {
+    const label = resume ? 'Resume failed' : 'Workflow failed';
+    console.print(`[red]${label}:[/red] ${escapeMarkup(message)}`);
+  }
+  throw new CliExit(1);
+}
+
+/**
+ * Report *exc* as the run's outcome when the engine recorded it as one
+ * (upstream #5015); otherwise return so the caller reports it as before.
+ */
+export function failRecordedRun(exc: unknown, jsonOutput: boolean, state: RunState | null, resume = false): void {
+  if (state !== null && state.recordedException === exc) failWorkflowExecution(exc, jsonOutput, state, resume);
 }
 
 /** Exit code for a finished run/resume: non-zero on terminal failure. */
@@ -1190,19 +1194,27 @@ function urlHasInvalidPort(url: string): boolean {
   return parseInt(port, 10) > 65535;
 }
 
-function versionsMatch(actual: unknown, expected: string): boolean {
-  try {
-    return new Version(pyStr(actual)).equals(new Version(expected));
-  } catch (exc) {
-    if (exc instanceof InvalidVersion) return pyStr(actual) === expected;
-    throw exc;
-  }
+/** Extra options for {@link installWorkflowFromCatalog}. */
+export interface InstallWorkflowFromCatalogOptions {
+  /** ``workflow add --version``: install this exact advertised release. */
+  requestedVersion?: string | null;
+  /**
+   * A bundle-selected catalog record, used without a second catalog lookup
+   * while retaining the same download and commit checks.
+   */
+  selectedInfo?: Dict | null;
 }
 
 /**
  * Download, validate, and register a catalog workflow. Shared by
  * ``workflow add`` and ``workflow update``. Throws ``CliExit`` on any failure;
  * the registry entry is only written on full success.
+ *
+ * ``expectedVersion``, when given by ``workflow update``, aborts if the
+ * downloaded version does not match the catalog version that triggered the
+ * install. ``expectedInstalledVersion``, when given by ``workflow update``,
+ * aborts if another process changes the installed source or version before
+ * commit.
  */
 export async function installWorkflowFromCatalog(
   projectRoot: string,
@@ -1210,25 +1222,43 @@ export async function installWorkflowFromCatalog(
   workflowId: string,
   expectedVersion: string | null = null,
   expectedInstalledVersion: string | null = null,
+  opts: InstallWorkflowFromCatalogOptions = {},
 ): Promise<void> {
+  const requestedVersion = opts.requestedVersion ?? null;
   const safeWfId = escapeMarkup(workflowId);
 
-  const catalog = new WorkflowCatalog(projectRoot);
   let info: Dict | null;
-  try {
-    info = await catalog.getWorkflowInfo(workflowId);
-  } catch (exc) {
-    if (exc instanceof WorkflowCatalogError) {
-      console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
-      throw new CliExit(1);
+  if (opts.selectedInfo !== undefined && opts.selectedInfo !== null) {
+    info = opts.selectedInfo;
+  } else {
+    const catalog = new WorkflowCatalog(projectRoot);
+    try {
+      info =
+        requestedVersion !== null
+          ? await catalog.getWorkflowInfo(workflowId, requestedVersion)
+          : await catalog.getWorkflowInfo(workflowId);
+    } catch (exc) {
+      if (exc instanceof WorkflowCatalogError) {
+        console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+        throw new CliExit(1);
+      }
+      throw exc;
     }
-    throw exc;
   }
 
   if (!info || !Object.keys(info).length) {
+    if (requestedVersion !== null) {
+      console.print(
+        `[red]Error:[/red] Workflow '${safeWfId}' version ` +
+          `'${escapeMarkup(requestedVersion)}' not found in the winning catalog.`,
+      );
+      throw new CliExit(1);
+    }
     console.print(`[red]Error:[/red] Workflow '${safeWfId}' not found in catalog`);
     throw new CliExit(1);
   }
+
+  if (requestedVersion !== null) expectedVersion = info.version as string;
 
   if (!pyTruthy(dget(info, '_install_allowed', true))) {
     console.print(`[yellow]Warning:[/yellow] Workflow '${safeWfId}' is from a discovery-only catalog`);
@@ -1332,10 +1362,18 @@ export async function installWorkflowFromCatalog(
     throw new CliExit(1);
   }
 
+  try {
+    verifyArchiveSha256(downloadedContent, dget(info, 'sha256', null) as string | null, workflowId, ValueError);
+  } catch (exc) {
+    if (!(exc instanceof ValueError || (exc instanceof Error && exc.name === 'ValueError'))) throw exc;
+    safeDiscardStagedWorkflowFile(stagedFile, workflowDir, existedBefore);
+    console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+    throw new CliExit(1);
+  }
+
   if (downloadedArchiveFormat !== null) {
     const extractDir = mkdtempSync(join(tmpdir(), 'speckit-workflow-archive-'));
     try {
-      verifyArchiveSha256(downloadedContent, dget(info, 'sha256', null) as string | null, workflowId, ValueError);
       await safeExtractArchive(stagedFile.path, extractDir, {
         archiveFile: Buffer.from(downloadedContent),
         sourceName: originalWorkflowUrl,
@@ -1346,6 +1384,8 @@ export async function installWorkflowFromCatalog(
       await installWorkflowPackage(projectRoot, workflowsDir, packageRoot, workflowUrl as string, {
         expectedId: workflowId,
         expectedVersion,
+        expectedRequires: requestedVersion !== null ? ((info as Dict).requires as Dict | undefined) ?? null : null,
+        exactVersion: requestedVersion !== null,
         expectedInstalledVersion,
         catalogInfo: { ...info, url: workflowUrl },
       });
@@ -1393,13 +1433,23 @@ export async function installWorkflowFromCatalog(
     throw new CliExit(1);
   }
 
-  if (expectedVersion !== null && !versionsMatch(definition.version, expectedVersion)) {
+  if (
+    expectedVersion !== null &&
+    !(requestedVersion !== null
+      ? pyStr(definition.version) === expectedVersion
+      : workflowVersionsMatch(definition.version, expectedVersion))
+  ) {
     safeDiscardStagedWorkflowFile(stagedFile, workflowDir, existedBefore);
     console.print(
       `[red]Error:[/red] Downloaded workflow version (${escapeMarkup(pyStr(definition.version))}) ` +
         `does not match the catalog version (${escapeMarkup(expectedVersion)}). ` +
         'The catalog entry may be stale or misconfigured.',
     );
+    throw new CliExit(1);
+  }
+  if (requestedVersion !== null && 'requires' in info && !pyEquals(definition.requires, info.requires)) {
+    safeDiscardStagedWorkflowFile(stagedFile, workflowDir, existedBefore);
+    console.print('[red]Error:[/red] Downloaded workflow requirements do not match the selected catalog release.');
     throw new CliExit(1);
   }
 
@@ -1412,7 +1462,7 @@ export async function installWorkflowFromCatalog(
         if (
           !isDict(current) ||
           dget(current, 'source', null) !== 'catalog' ||
-          !versionsMatch(dget(current, 'version', null), expectedInstalledVersion)
+          !workflowVersionsMatch(dget(current, 'version', null), expectedInstalledVersion)
         ) {
           console.print(
             `[yellow]Warning:[/yellow] Workflow '${safeWfId}' ` +
@@ -1553,6 +1603,12 @@ export async function workflowRun(source: string, inputValues: string[] | null, 
   if (isFileSource) {
     const override = resolveInitDirOverride();
     projectRoot = override !== null && override !== undefined ? override : process.cwd();
+    try {
+      preflightProjectPolicy(projectRoot);
+    } catch (e) {
+      if (e instanceof ProjectResolutionError) renderProjectError(e);
+      throw e;
+    }
     rejectUnsafeWorkflowStorage(projectRoot);
   } else {
     projectRoot = requireSpecifyProject();
@@ -1622,10 +1678,13 @@ export async function workflowRun(source: string, inputValues: string[] | null, 
     );
   } catch (exc) {
     if (exc instanceof CliExit) throw exc;
+    if (isOsError(exc)) failWorkflowExecution(exc, jsonOutput, engine.executionState);
     if (exc instanceof ValueError || (exc instanceof Error && exc.name === 'ValueError')) {
+      failRecordedRun(exc, jsonOutput, engine.executionState);
       err.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
       throw new CliExit(1);
     }
+    failRecordedRun(exc, jsonOutput, engine.executionState);
     err.print(`[red]Workflow failed:[/red] ${escapeMarkup(errorMessage(exc))}`);
     throw new CliExit(1);
   }
@@ -1697,8 +1756,8 @@ export async function workflowResume(runId: string, inputValues: string[] | null
     try {
       preState.save();
     } catch (exc) {
-      if (!isOsError(exc)) throw exc;
-      err.print(`[red]Resume failed:[/red] ${escapeMarkup(osErrorText(exc))}`);
+      if (!isOsError(exc) && !(exc instanceof CheckpointError)) throw exc;
+      err.print(`[red]Resume failed:[/red] ${escapeMarkup(isOsError(exc) ? osErrorText(exc) : exc.message)}`);
       throw new CliExit(1);
     }
   }
@@ -1711,13 +1770,17 @@ export async function workflowResume(runId: string, inputValues: string[] | null
   } catch (exc) {
     if (exc instanceof CliExit) throw exc;
     if (exc instanceof FileNotFoundError) {
+      if (engine.executionState !== null) failWorkflowExecution(exc, jsonOutput, engine.executionState, true);
       err.print(`[red]Error:[/red] Run not found: ${runId}`);
       throw new CliExit(1);
     }
+    if (isOsError(exc)) failWorkflowExecution(exc, jsonOutput, engine.executionState, true);
     if (exc instanceof ValueError || (exc instanceof Error && exc.name === 'ValueError')) {
+      failRecordedRun(exc, jsonOutput, engine.executionState, true);
       err.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
       throw new CliExit(1);
     }
+    failRecordedRun(exc, jsonOutput, engine.executionState, true);
     err.print(`[red]Resume failed:[/red] ${escapeMarkup(errorMessage(exc))}`);
     throw new CliExit(1);
   }
@@ -1793,6 +1856,12 @@ export function workflowStatus(runId: string | null, jsonOutput = false): number
         console.print(`    [${sc}]●[/${sc}] ${stepId}: ${s}`);
       }
     }
+    if (state.execution) {
+      for (const scope of scopeSummaries(state.execution, state.status)) {
+        const path = (scope.scope_path as string[]).join(' / ');
+        console.print(`  ${escapeMarkup(path)} → ${escapeMarkup(pyStr(scope.workflow_id))}: ${pyStr(scope.status)}`);
+      }
+    }
     return 0;
   }
 
@@ -1832,11 +1901,18 @@ export function workflowStatus(runId: string | null, jsonOutput = false): number
 /** ``specify workflow list``: list installed workflows. */
 export function workflowList(): number {
   const projectRoot = requireSpecifyProject();
-  const registry = openWorkflowRegistry(projectRoot);
-  const installed = registry.list();
-  const entries = Object.entries(installed);
+  let result: WorkflowListResult;
+  try {
+    result = listWorkflows({ projectDirectory: projectRoot });
+  } catch (exc) {
+    if (exc instanceof WorkflowListError) {
+      console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+      throw new CliExit(1);
+    }
+    throw exc;
+  }
 
-  if (!entries.length) {
+  if (!result.items.length) {
     console.print('[yellow]No workflows installed.[/yellow]');
     console.print('\nInstall a workflow with:');
     console.print('  [cyan]specify workflow add <workflow-id>[/cyan]');
@@ -1844,18 +1920,15 @@ export function workflowList(): number {
   }
 
   console.print('\n[bold cyan]Installed Workflows:[/bold cyan]\n');
-  for (const [wfId, wfData] of entries) {
-    const safeId = escapeMarkup(wfId);
-    if (!isDict(wfData)) {
-      console.print(`  [yellow]Warning:[/yellow] Skipping corrupted registry entry '${safeId}'.\n`);
+  for (const item of result.items) {
+    if (item.kind === 'warning') {
+      console.print(`  [yellow]Warning:[/yellow] ${escapeMarkup(item.message)}\n`);
       continue;
     }
-    const marker = pyTruthy(dget(wfData, 'enabled', true)) ? '' : ' [red]\\[disabled][/red]';
-    const name = escapeMarkup(pyStr(dget(wfData, 'name', wfId)));
-    const version = escapeMarkup(pyStr(dget(wfData, 'version', '?')));
-    console.print(`  [bold]${name}[/bold] (${safeId}) v${version}${marker}`);
-    const desc = dget(wfData, 'description', '');
-    if (pyTruthy(desc)) console.print(`    ${escapeMarkup(pyStr(desc))}`);
+    const safeId = escapeMarkup(item.id);
+    const marker = item.enabled ? '' : ' [red]\\[disabled][/red]';
+    console.print(`  [bold]${escapeMarkup(item.name)}[/bold] (${safeId}) v${escapeMarkup(item.version)}${marker}`);
+    if (item.description) console.print(`    ${escapeMarkup(item.description)}`);
     console.print();
   }
   return 0;
@@ -2003,9 +2076,32 @@ export async function workflowSearch(query: string | null, tag: string | null, a
   return 0;
 }
 
-/** ``specify workflow info``: show workflow details and step graph. */
-export async function workflowInfo(workflowId: string): Promise<number> {
+/** ``specify workflow info``: show workflow details and step graph (``--versions`` lists catalog releases). */
+export async function workflowInfo(workflowId: string, opts: { versions?: boolean } = {}): Promise<number> {
   const projectRoot = requireSpecifyProject();
+  if (opts.versions) {
+    const catalog = new WorkflowCatalog(projectRoot);
+    let details: [string[], boolean] | null;
+    try {
+      details = await catalog.getWorkflowVersionDetails(workflowId);
+    } catch (exc) {
+      if (!(exc instanceof WorkflowCatalogError)) throw exc;
+      console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+      throw new CliExit(1);
+    }
+    if (details === null || !details[0].length) {
+      console.print(`[red]Error:[/red] Workflow '${escapeMarkup(workflowId)}' not found in catalog`);
+      throw new CliExit(1);
+    }
+    const [available, installAllowed] = details;
+    console.print(
+      `Catalog versions for ${escapeMarkup(workflowId)}: ` + available.map((v) => escapeMarkup(v)).join(', '),
+    );
+    console.print(
+      installAllowed ? '  Install policy: installable' : '  Install policy: discovery-only (not installable)',
+    );
+    return 0;
+  }
   const registry = openWorkflowRegistry(projectRoot);
   const installed = registry.get(workflowId);
   const engine = new WorkflowEngine(projectRoot);
@@ -2065,7 +2161,8 @@ export async function workflowInfo(workflowId: string): Promise<number> {
     info = await catalog.getWorkflowInfo(workflowId);
   } catch (exc) {
     if (!(exc instanceof WorkflowCatalogError)) throw exc;
-    info = null;
+    console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+    throw new CliExit(1);
   }
 
   if (info && Object.keys(info).length) {
@@ -2090,6 +2187,7 @@ export async function workflowInfo(workflowId: string): Promise<number> {
 /** ``specify workflow update``: update installed workflow(s) to the latest catalog version. */
 export async function workflowUpdate(workflowId: string | null): Promise<number> {
   const projectRoot = requireSpecifyProject();
+  await loadCustomSteps(projectRoot);
   const registry = openWorkflowRegistry(projectRoot);
   const workflowsDir = join(projectRoot, '.specify', 'workflows');
   rejectUnsafeDir(join(projectRoot, '.specify'), '.specify');
@@ -2297,6 +2395,7 @@ const WORKFLOW_GROUP: GroupSpec = {
         options: [
           { name: 'dev', flags: ['--dev'], type: 'boolean', help: 'Install from a local workflow YAML file or directory' },
           { name: 'from', flags: ['--from'], help: 'Install from a custom URL' },
+          { name: 'version', flags: ['--version'], help: 'Install an exact catalog release' },
         ],
       },
       async (p) => {
@@ -2304,6 +2403,7 @@ const WORKFLOW_GROUP: GroupSpec = {
           source: p.args.source as string,
           dev: Boolean(p.options.dev),
           fromUrl: (p.options.from as string | undefined) ?? null,
+          version: (p.options.version as string | undefined) ?? null,
         });
       },
     ),
@@ -2361,8 +2461,11 @@ const WORKFLOW_GROUP: GroupSpec = {
         name: 'info',
         help: 'Show workflow details and step graph.',
         arguments: [{ name: 'workflow_id', required: true, help: 'Workflow ID' }],
+        options: [
+          { name: 'versions', flags: ['--versions'], type: 'boolean', help: 'Show versions available in workflow catalogs' },
+        ],
       },
-      (p) => workflowInfo(p.args.workflow_id as string),
+      (p) => workflowInfo(p.args.workflow_id as string, { versions: Boolean(p.options.versions) }),
     ),
     defineCommand(
       {

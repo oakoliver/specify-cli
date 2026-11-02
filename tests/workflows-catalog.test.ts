@@ -13,6 +13,7 @@ import { HttpResponse } from '../src/authentication/http.js';
 import { console as stdoutConsole, errConsole } from '../src/console.js';
 import { dumpYaml, parseYaml } from '../src/yaml.js';
 import { runWorkflowCatalogCommand } from '../src/workflows/catalog/commands.js';
+import { StepCatalog } from '../src/workflows/step/catalog/domain.js';
 import {
   catalogLimits,
   httpDeps,
@@ -323,10 +324,15 @@ describe('WorkflowCatalog add/remove', () => {
     expect(() => catalog.removeCatalog(5)).toThrow('Catalog index 5 out of range (0-0).');
     const cats = (parseYaml(readFileSync(configPath(), 'utf-8')) as Dict).catalogs as Dict[];
     expect(cats.map((c) => c.name)).toEqual(['second']);
-    for (const body of ['[]\n', 'false\n', '0\n']) {
-      writeFileSync(configPath(), body);
-      expect(() => catalog.removeCatalog(0)).toThrow('Catalog config file is corrupted (expected a mapping).');
+    // v1.2.5: the config is validated like the active stack (#4870).
+    for (const [body, type] of [['[]\n', 'list'], ['false\n', 'bool'], ['0\n', 'int']]) {
+      writeFileSync(configPath(), body as string);
+      expect(() => catalog.removeCatalog(0)).toThrow(`Invalid catalog config: expected a mapping, got ${type}`);
     }
+    writeFileSync(configPath(), 'catalogs: 3\n');
+    expect(() => catalog.removeCatalog(0)).toThrow("Invalid catalog config: 'catalogs' must be a list, got int");
+    writeFileSync(configPath(), '{}\n');
+    expect(() => catalog.removeCatalog(0)).toThrow('Catalog index 0 out of range (0--1).');
   });
 
   test('getCatalogConfigs', () => {
@@ -433,6 +439,31 @@ describe('WorkflowCatalog fetch', () => {
       catalogLimits.maxJsonCatalogBytes = prev;
     }
   });
+
+  // upstream #3766: an oversized catalog fails on its own and does not block a healthy one.
+  for (const kind of ['workflow', 'step'] as const) {
+    test(`oversized ${kind} catalog does not block a healthy one`, async () => {
+      const prev = catalogLimits.maxJsonCatalogBytes;
+      catalogLimits.maxJsonCatalogBytes = 512;
+      try {
+        let calls = 0;
+        httpDeps.openUrl = (async (url: string) => {
+          calls += 1;
+          const body = calls === 1 ? 'x'.repeat(1024) : kind === 'workflow' ? '{"workflows": {}}' : '{"steps": {}}';
+          return fakeResponse(body, url);
+        }) as typeof httpDeps.openUrl;
+        const make = (url: string, name: string): WorkflowCatalogEntry => ({ ...entry(url), name });
+        const catalog = kind === 'workflow' ? new WorkflowCatalog(projectDir) : new StepCatalog(projectDir);
+        await expect(
+          catalog.fetchSingleCatalog(make('https://bad.example.com/catalog.json', 'bad'), true),
+        ).rejects.toThrow(/exceeds maximum size/);
+        const result = await catalog.fetchSingleCatalog(make('https://good.example.com/catalog.json', 'good'), true);
+        expect(typeof result).toBe('object');
+      } finally {
+        catalogLimits.maxJsonCatalogBytes = prev;
+      }
+    });
+  }
 
   test('merge: lower priority number wins; list + dict formats; search filters', async () => {
     writeFileSync(

@@ -28,6 +28,7 @@ import {
   stableReleaseTagForVersion,
   validateTag,
   versionDeps,
+  type RuntimeInfo,
 } from '../src/version.js';
 import {
   buildInfoRows,
@@ -366,25 +367,78 @@ describe('specify version', () => {
     expect(t).toContain('- self check command: yes');
   });
 
-  test('--features --json', async () => {
-    const code = await runVersionCommand(['--features', '--json']);
-    expect(code).toBe(0);
-    expect(JSON.parse(out.text())).toEqual({ version: '1.2.3', features: featureCapabilities() });
-    expect(featureCapabilities()).toEqual({
-      controlled_multi_install_integrations: true,
-      integration_use_command: true,
-      multi_install_safe_registry_metadata: true,
-      integration_upgrade_command: true,
-      self_check_command: true,
-      workflow_catalog: true,
-      bundled_templates: true,
-    });
+  const EXPECTED_FEATURES = {
+    controlled_multi_install_integrations: true,
+    integration_use_command: true,
+    multi_install_safe_registry_metadata: true,
+    integration_upgrade_command: true,
+    self_check_command: true,
+    workflow_catalog: true,
+    bundled_templates: true,
+  };
+  const fakeRuntime = async (): Promise<RuntimeInfo> => ({
+    runtimeName: 'Node',
+    runtimeVersion: '22.1.0',
+    platform: 'ExampleOS',
+    architecture: 'example64',
+    osVersion: 'ExampleOS 4.5',
+    openssl: 'OpenSSL 3.4.0',
   });
 
-  test('--json requires --features', async () => {
+  test('--json emits the complete stable payload (test_version_json_emits_complete_stable_payload)', async () => {
+    versionCommandDeps.getRuntimeInfo = fakeRuntime;
     const code = await runVersionCommand(['--json']);
-    expect(code).not.toBe(0);
-    expect(out.text()).toContain('--json requires --features');
+    expect(code).toBe(0);
+    const expected = {
+      cli_version: '1.2.3',
+      upstream_spec_kit_version: UPSTREAM_SPEC_KIT_VERSION,
+      runtime: { name: 'Node', version: '22.1.0', openssl: 'OpenSSL 3.4.0' },
+      system: { platform: 'ExampleOS', architecture: 'example64', os_version: 'ExampleOS 4.5' },
+      features: EXPECTED_FEATURES,
+    };
+    expect(out.text()).toBe(JSON.stringify(expected, null, 2) + '\n');
+    expect(featureCapabilities()).toEqual(EXPECTED_FEATURES);
+  });
+
+  test('--features --json is an exact alias of --json', async () => {
+    versionCommandDeps.getRuntimeInfo = fakeRuntime;
+    expect(await runVersionCommand(['--json'])).toBe(0);
+    const canonical = out.text();
+    out.restore();
+    out = captureOutput();
+    expect(await runVersionCommand(['--features', '--json'])).toBe(0);
+    expect(out.text()).toBe(canonical);
+  });
+
+  test('--json uses null when the TLS library is unavailable', async () => {
+    versionCommandDeps.getRuntimeInfo = async () => ({ ...(await fakeRuntime()), openssl: '' });
+    expect(await runVersionCommand(['--json'])).toBe(0);
+    expect(JSON.parse(out.text()).runtime.openssl).toBeNull();
+  });
+
+  test('--json sanitizes unexpected failures', async () => {
+    const unsafe = '\x1b[31mSECRET_TOKEN=do-not-print /Users/example/private/project\x1b[0m';
+    versionCommandDeps.getSpeckitVersion = () => {
+      throw new Error(unsafe);
+    };
+    let raw = '';
+    const origErr = versionCommandDeps.writeErr;
+    versionCommandDeps.writeErr = (t) => {
+      raw += t;
+    };
+    const code = await runVersionCommand(['--json']);
+    versionCommandDeps.writeErr = origErr;
+    expect(code).toBe(1);
+    const expected = { error: { code: 'internal_error', message: 'Unable to collect version information.', details: {} } };
+    expect(raw).toBe(JSON.stringify(expected, null, 2) + '\n');
+    expect(raw).not.toContain('SECRET_TOKEN');
+    expect(raw).not.toContain('\x1b');
+    expect(out.text()).toBe('');
+  });
+
+  test('help describes --json as complete version information', async () => {
+    expect(await runVersionCommand(['--help'])).toBe(0);
+    expect(out.text()).toContain('--json      Emit complete version information as JSON.');
   });
 
   test('reports runtime, openssl and upstream parity', async () => {
@@ -395,7 +449,7 @@ describe('specify version', () => {
     expect(t).toContain('CLI Version');
     expect(t).toContain('1.2.3');
     expect(t).toContain(`spec-kit ${UPSTREAM_SPEC_KIT_VERSION}`);
-    expect(UPSTREAM_SPEC_KIT_VERSION).toBe('1.0.12');
+    expect(UPSTREAM_SPEC_KIT_VERSION).toBe('1.2.5');
     const info = await getRuntimeInfo();
     if (info.openssl) {
       expect(t).toContain('OpenSSL');
@@ -436,5 +490,41 @@ describe('specify version', () => {
       'OS Version',
       'OpenSSL',
     ]);
+  });
+});
+
+// ============================================================================
+// Shared version operation (test_operation_version.py, #4863)
+// ============================================================================
+
+describe('collectVersionResult', () => {
+  test('descriptor is local-read with no network access', async () => {
+    const { VERSION_OPERATION } = await import('../src/operation-version.js');
+    expect(VERSION_OPERATION.operationId).toBe('version');
+    expect(VERSION_OPERATION.contractVersion).toBe('1');
+    expect([...VERSION_OPERATION.capabilities]).toEqual(['local-read']);
+    expect(VERSION_OPERATION.networkAccess).toBe('none');
+  });
+
+  test('without environment it never queries the runtime', async () => {
+    const { collectVersionResult } = await import('../src/operation-version.js');
+    const result = await collectVersionResult({
+      includeEnvironment: false,
+      cliVersionGetter: () => '9.9.9',
+      runtimeInfoGetter: async () => {
+        throw new Error('must not be called');
+      },
+    });
+    expect(result.cliVersion).toBe('9.9.9');
+    expect(result.runtime).toBeNull();
+    expect(result.system).toBeNull();
+    expect(result.features).toEqual(featureCapabilities());
+  });
+
+  test('payload requires complete information', async () => {
+    const { versionResultPayload } = await import('../src/operation-version.js');
+    expect(() =>
+      versionResultPayload({ cliVersion: '1', upstreamSpecKitVersion: '1', runtime: null, system: null, features: {} }),
+    ).toThrow('Complete version information is required.');
   });
 });

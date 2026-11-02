@@ -8,7 +8,7 @@
  * @module extensions/catalog/commands
  */
 
-import { writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,6 +16,7 @@ import { type GroupSpec, type ParsedArgs, defineCommand, dispatchGroup } from '.
 import { CliExit, console, escapeMarkup } from '../../console.js';
 import { displayProjectPath } from '../../utils.js';
 import { dumpYaml, parseYaml } from '../../yaml.js';
+import { pyTypeName } from '../../bundles/pycompat.js';
 import { pyEquals, exists, readTextUtf8 } from '../compat.js';
 import { ExtensionCatalog } from '../extension-catalog.js';
 import { ValidationError } from '../errors.js';
@@ -222,21 +223,44 @@ export function catalogRemove(name: string): void {
     console.print("[red]Error:[/red] Invalid catalog config: 'catalogs' must be a list.");
     throw new CliExit(1);
   }
+  (catalogs as unknown[]).forEach((entry, index) => {
+    if (!isMapping(entry)) {
+      console.print(
+        `[red]Error:[/red] Invalid catalog entry at index ${index}: expected a mapping, got ${pyTypeName(entry)}`,
+      );
+      throw new CliExit(1);
+    }
+  });
   const safeName = escapeMarkup(name);
   const originalCount = catalogs.length;
-  catalogs = catalogs.filter((c: unknown) => isMapping(c) && c.name !== name);
+  catalogs = catalogs.filter((c: Dict) => c.name !== name);
 
   if (catalogs.length === originalCount) {
     console.print(`[red]Error:[/red] Catalog '${safeName}' not found.`);
     throw new CliExit(1);
   }
 
-  config.catalogs = catalogs;
-  saveCatalogConfig(configPath, config);
+  if (catalogs.length) {
+    config.catalogs = catalogs;
+    saveCatalogConfig(configPath, config);
+  } else {
+    // The catalog loader rejects an existing config with no entries, so
+    // delete the file instead of writing ``catalogs: []``.
+    try {
+      rmSync(configPath, { force: true });
+    } catch (error) {
+      const configLabel = escapeMarkup(String(displayProjectPath(projectRoot, configPath)));
+      console.print(`[red]Error:[/red] Failed to delete ${configLabel}: ${escapeMarkup((error as Error).message)}`);
+      throw new CliExit(1);
+    }
+  }
 
   console.print(`[green]✓[/green] Removed catalog '${safeName}'`);
   if (!catalogs.length) {
-    console.print('\n[dim]No catalogs remain in config. Built-in defaults will be used.[/dim]');
+    const fallback = process.env.SPECKIT_CATALOG_URL
+      ? 'the SPECKIT_CATALOG_URL environment variable still takes precedence'
+      : 'user configuration or built-in defaults will be used';
+    console.print(`\n[dim]Project catalog override removed; ${fallback}.[/dim]`);
   }
 }
 

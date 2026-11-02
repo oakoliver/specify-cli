@@ -406,7 +406,8 @@ describe('remote manifest download', () => {
   test.each([['https://[::1'], ['https://[not-an-ip]/bundle.yml'], ['https://example.com:notaport/bundle.yml'], ['https://example.com:70000/bundle.yml']])(
     'malformed url (%p) rejected cleanly',
     async (url) => {
-      await rejects(downloadManifest(resolvedEntry({ download_url: url }), { offline: true }), /malformed/);
+      // The shared URL policy rejects malformed hosts/ports as non-HTTPS.
+      await rejects(downloadManifest(resolvedEntry({ download_url: url }), { offline: true }), /malformed|non-HTTPS/);
       expect(() => requireHttps("bundle 'x'", url)).toThrow(BundlerError);
     },
   );

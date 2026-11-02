@@ -97,7 +97,7 @@ describe('specify check', () => {
     expect(agentResults).toEqual({ claude: false, copilot: false });
     const byKey = Object.fromEntries(tracker.steps.map((s) => [s.key, s]));
     expect(byKey.copilot.status).toBe('skipped');
-    expect(byKey.copilot.detail).toBe('IDE-based, no CLI check');
+    expect(byKey.copilot.detail).toBe('no CLI required');
     expect(byKey.claude.status).toBe('error');
     expect(byKey.generic).toBeUndefined();
     expect(byKey.code.label).toBe('Visual Studio Code');
@@ -110,7 +110,7 @@ describe('specify check', () => {
     const t = out.text();
     expect(t).toContain('Check Available Tools');
     expect(t).toContain('Claude Code');
-    expect(t).toContain('IDE-based, no CLI check');
+    expect(t).toContain('no CLI required');
     expect(t).toContain('Tip: Install a coding agent for the best experience');
   });
 

@@ -7,8 +7,23 @@
  * @module workflows/step/catalog/domain
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import {
+  closeSync,
+  constants as fsConstants,
+  fchmodSync,
+  fchownSync,
+  fstatSync,
+  fsyncSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 
 import {
   CatalogStackCore,
@@ -20,6 +35,7 @@ import {
   type WorkflowCatalogEntry,
 } from '../../catalog/domain.js';
 import { deepCopy, isMapping, isSymlink, osErrorMessage, pathExists, pyStr, pyTruthy, utcIsoNow } from '../../overlay/py-compat.js';
+import { availableVersions, selectRelease } from './versions.js';
 
 export { MAX_JSON_CATALOG_BYTES, catalogLimits, type CatalogConfigRow };
 
@@ -37,6 +53,9 @@ export class StepCatalogError extends Error {
 
 /** Validation error for step catalog config or step data. */
 export class StepValidationError extends StepCatalogError {}
+
+/** An ambiguous JSON object in a step catalog (``_DuplicateCatalogField``). */
+export class DuplicateCatalogField extends StepCatalogError {}
 
 // ============================================================================
 // StepCatalogEntry
@@ -115,30 +134,92 @@ export class StepRegistry {
     if (this.hasSymlinkedParent() || isSymlink(this.registryPath)) {
       throw new StepValidationError('Refusing to write step registry through a symlinked path.');
     }
+    let fd = -1;
+    let tmp: string | null = null;
     try {
       mkdirSync(this.stepsDir, { recursive: true });
-      writeFileSync(this.registryPath, pyJsonDump(this.data, 2), 'utf-8');
+      tmp = join(dirname(this.registryPath), `.${basename(this.registryPath)}.${randomBytes(6).toString('hex')}.tmp`);
+      fd = openSync(tmp, fsConstants.O_RDWR | fsConstants.O_CREAT | fsConstants.O_EXCL, 0o600);
+      // Keep the exclusive descriptor open while writing and checking the
+      // path so a replaced temporary file can never be committed.
+      const payload = Buffer.from(pyJsonDump(this.data, 2), 'utf-8');
+      let off = 0;
+      while (off < payload.length) off += writeSync(fd, payload, off);
+      fsyncSync(fd);
+      try {
+        if (pathExists(this.registryPath)) {
+          const existing = lstatSync(this.registryPath);
+          if (existing.isFile()) {
+            fchmodSync(fd, existing.mode & 0o7777);
+            try {
+              fchownSync(fd, existing.uid, existing.gid);
+            } catch {
+              // PermissionError: keep default ownership.
+            }
+          }
+        }
+      } catch {
+        // Persisting valid data is more important than preserving mode or
+        // ownership metadata when that best-effort operation fails.
+      }
+      const staged = lstatSync(tmp);
+      const opened = fstatSync(fd);
+      if (!staged.isFile() || staged.dev !== opened.dev || staged.ino !== opened.ino) {
+        throw new Error('Staged step registry changed before commit');
+      }
+      closeSync(fd);
+      fd = -1;
+      renameSync(tmp, this.registryPath);
+      tmp = null;
     } catch (exc) {
       throw new StepValidationError(`Failed to write step registry at ${this.registryPath}: ${osErrorMessage(exc)}`);
+    } finally {
+      if (fd >= 0) {
+        try {
+          closeSync(fd);
+        } catch {
+          // ignore
+        }
+      }
+      if (tmp !== null) {
+        try {
+          unlinkSync(tmp);
+        } catch {
+          // ignore
+        }
+      }
     }
   }
 
   /** Add or update an installed step entry. */
   add(stepId: string, metadata: Record<string, unknown>): void {
     const rawExisting = this.data.steps[stepId];
+    const hadEntry = Object.prototype.hasOwnProperty.call(this.data.steps, stepId);
     const existing = isMapping(rawExisting) ? rawExisting : {};
     const metadataToStore = deepCopy(metadata);
     metadataToStore.installed_at = 'installed_at' in existing ? existing.installed_at : utcIsoNow();
     metadataToStore.updated_at = utcIsoNow();
     this.data.steps[stepId] = metadataToStore;
-    this.save();
+    try {
+      this.save();
+    } catch (exc) {
+      if (hadEntry) this.data.steps[stepId] = rawExisting;
+      else delete this.data.steps[stepId];
+      throw exc;
+    }
   }
 
   /** Remove an installed step entry. Returns true if found. */
   remove(stepId: string): boolean {
     if (Object.prototype.hasOwnProperty.call(this.data.steps, stepId)) {
+      const removedEntry = this.data.steps[stepId];
       delete this.data.steps[stepId];
-      this.save();
+      try {
+        this.save();
+      } catch (exc) {
+        this.data.steps[stepId] = removedEntry;
+        throw exc;
+      }
       return true;
     }
     return false;
@@ -195,22 +276,15 @@ export class StepCatalog extends CatalogStackCore {
     noConfigMessage: 'No step catalog config file found.',
     catalogError: StepCatalogError,
     validationError: StepValidationError,
+    duplicateFieldError: DuplicateCatalogField,
+    rejectDuplicateListIds: true,
+    cacheWarningLabel: 'step catalog',
   };
 
   constructor(projectRoot: string) {
     const stepsDir = join(projectRoot, '.specify', 'workflows', 'steps');
     super(projectRoot, join(stepsDir, '.cache'));
     this.stepsDir = stepsDir;
-  }
-
-  /** Return false if any component of the cache path is a symlink. */
-  protected override isCachePathSafe(): boolean {
-    let current = this.projectRoot;
-    for (const part of ['.specify', 'workflows', 'steps', '.cache']) {
-      current = join(current, part);
-      if (isSymlink(current)) return false;
-    }
-    return true;
   }
 
   protected listItemId(itemData: Record<string, unknown>): string | null {
@@ -232,6 +306,7 @@ export class StepCatalog extends CatalogStackCore {
     const merged = await this.getMergedSteps();
     const results: Record<string, unknown>[] = [];
     for (const [stepId, stepData] of merged) {
+      availableVersions(stepData, stepId);
       if (!('id' in stepData)) stepData.id = stepId;
       if (query) {
         const q = query.toLowerCase();
@@ -246,11 +321,14 @@ export class StepCatalog extends CatalogStackCore {
     return results;
   }
 
-  /** Get details for a specific step from the catalog. */
-  async getStepInfo(stepId: string): Promise<Record<string, unknown> | null> {
+  /** Get the current or an exact release from the winning catalog. */
+  async getStepInfo(stepId: string, version: string | null = null): Promise<Record<string, unknown> | null> {
     const merged = await this.getMergedSteps();
-    const step = merged.get(stepId) ?? null;
-    if (step && Object.keys(step).length > 0 && !('id' in step)) step.id = stepId;
-    return step;
+    const step = merged.get(stepId);
+    if (step && Object.keys(step).length > 0) {
+      if (!('id' in step)) step.id = stepId;
+      return selectRelease(step, stepId, version);
+    }
+    return null;
   }
 }

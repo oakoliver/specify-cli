@@ -75,7 +75,7 @@ export const SKILL_DESCRIPTIONS: Readonly<Record<string, string>> = {
   clarify: 'Structured clarification workflow for underspecified requirements.',
   constitution: 'Create or update project governing principles and development guidelines.',
   checklist: 'Generate custom quality checklists for validating requirements completeness and clarity.',
-  taskstoissues: 'Convert tasks from tasks.md into GitHub issues.',
+  taskstoissues: 'Deprecated: Convert tasks from tasks.md into GitHub issues.',
 };
 
 /** A manifest-like object exposing ``id`` and ``templates`` (see ``_FilteredManifest``). */
@@ -357,6 +357,9 @@ export abstract class PresetSkillMethods extends PresetCommandMethods {
    * (instead of raising) when it cannot be resolved safely.
    */
   getSkillsDir(): string | null {
+    // Generic skill registration is scoped to extensions (#4785).
+    const genericOpts = loadInitOptions(this.projectRoot);
+    if (isMapping(genericOpts) && genericOpts.ai === 'generic') return null;
     let skillsDir: string | null;
     try {
       skillsDir = resolveActiveSkillsDir(this.projectRoot);

@@ -9,7 +9,8 @@
  * - ``**`` matches zero or more directories
  * - trailing ``/`` restricts a pattern to directories
  * - patterns containing ``/`` (other than trailing) are anchored to the root
- * - ``!`` negates a previously excluded pattern (last match wins)
+ * - ``!`` negates a previously excluded pattern (last match wins); a bare ``!``
+ *   or an invalid character range throws {@link GitIgnorePatternError}
  *
  * @module extensions/gitignore-spec
  */
@@ -81,6 +82,8 @@ function compilePattern(line: string): CompiledPattern | null {
   if (pattern.startsWith('!')) {
     include = false;
     pattern = pattern.slice(1);
+    // pathspec rejects a bare negation.
+    if (!pattern) throw new GitIgnorePatternError(`Invalid git pattern: ${pyStrRepr(line)}`);
   }
   if (pattern.startsWith('\\')) pattern = pattern.slice(1);
   if (!pattern) return null;
@@ -130,7 +133,36 @@ function compilePattern(line: string): CompiledPattern | null {
     }
   });
   out += '$';
-  return { regex: new RegExp(out, 's'), include };
+  // Python ``re`` reports a reversed range as ``re.error``; JS throws a
+  // SyntaxError with different wording, so name the range like Python does.
+  for (const cls of out.matchAll(/\[(?:[^\]\\]|\\.)*\]/g)) {
+    for (const range of cls[0].matchAll(/([^\\])-([^\]])/g)) {
+      if (range[1] > range[2] && range[1] !== '[' && range[1] !== '^') {
+        throw new GitIgnorePatternError(`bad character range ${range[1]}-${range[2]}`);
+      }
+    }
+  }
+  let regex: RegExp;
+  try {
+    regex = new RegExp(out, 's');
+  } catch (e) {
+    throw new GitIgnorePatternError((e as Error).message);
+  }
+  return { regex, include };
+}
+
+/** Raised for a pattern pathspec cannot compile (``GitIgnorePatternError`` / ``re.error``). */
+export class GitIgnorePatternError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GitIgnorePatternError';
+  }
+}
+
+/** Python ``repr()`` of a string (single quotes unless the text contains one). */
+function pyStrRepr(value: string): string {
+  if (value.includes("'") && !value.includes('"')) return `"${value}"`;
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 }
 
 /** Port of ``pathspec.GitIgnoreSpec``. */

@@ -3944,6 +3944,13 @@
     false,
     "true",
     "Enable/disable runtime events (true|false, default: true)"
+   ],
+   [
+    "--no-model-invocation",
+    true,
+    false,
+    false,
+    "Install core command skills as user-invocable only (disable-model-invocation: true)"
    ]
   ],
   "config": {
@@ -14775,7 +14782,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit.plan build it",
      "--output-format",
      "json"
@@ -14791,7 +14798,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.plan build it",
      "--x",
      "a b",
@@ -14806,7 +14813,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit.plan build it"
     ]
    ],
@@ -14820,7 +14827,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.plan build it",
      "--x",
      "a b"
@@ -14833,7 +14840,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit.plan build it",
      "--model",
      "m1",
@@ -14851,7 +14858,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.plan build it",
      "--x",
      "a b",
@@ -14868,7 +14875,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit.plan build it",
      "--model",
      "m1"
@@ -14884,7 +14891,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.plan build it",
      "--x",
      "a b",
@@ -14899,7 +14906,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit-plan",
      "--output-format",
      "json"
@@ -14915,7 +14922,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit-plan",
      "--x",
      "a b",
@@ -14930,7 +14937,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit-plan"
     ]
    ],
@@ -14944,7 +14951,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit-plan",
      "--x",
      "a b"
@@ -14957,7 +14964,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit-plan",
      "--model",
      "m1",
@@ -14975,7 +14982,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit-plan",
      "--x",
      "a b",
@@ -14992,7 +14999,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit-plan",
      "--model",
      "m1"
@@ -15008,7 +15015,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit-plan",
      "--x",
      "a b",
@@ -15023,7 +15030,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "free text",
      "--output-format",
      "json"
@@ -15039,7 +15046,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "free text",
      "--x",
      "a b",
@@ -15054,7 +15061,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "free text"
     ]
    ],
@@ -15068,7 +15075,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "free text",
      "--x",
      "a b"
@@ -15081,7 +15088,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "free text",
      "--model",
      "m1",
@@ -15099,7 +15106,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "free text",
      "--x",
      "a b",
@@ -15116,7 +15123,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "free text",
      "--model",
      "m1"
@@ -15132,7 +15139,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "free text",
      "--x",
      "a b",
@@ -15147,7 +15154,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/help",
      "--output-format",
      "json"
@@ -15163,7 +15170,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/help",
      "--x",
      "a b",
@@ -15178,7 +15185,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/help"
     ]
    ],
@@ -15192,7 +15199,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/help",
      "--x",
      "a b"
@@ -15205,7 +15212,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/help",
      "--model",
      "m1",
@@ -15223,7 +15230,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/help",
      "--x",
      "a b",
@@ -15240,7 +15247,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/help",
      "--model",
      "m1"
@@ -15256,7 +15263,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/help",
      "--x",
      "a b",
@@ -15271,7 +15278,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit.",
      "--output-format",
      "json"
@@ -15287,7 +15294,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.",
      "--x",
      "a b",
@@ -15302,7 +15309,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit."
     ]
    ],
@@ -15316,7 +15323,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.",
      "--x",
      "a b"
@@ -15329,7 +15336,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit.",
      "--model",
      "m1",
@@ -15347,7 +15354,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.",
      "--x",
      "a b",
@@ -15364,7 +15371,7 @@
     {},
     [
      "junie",
-     "-p",
+     "--task",
      "/speckit.",
      "--model",
      "m1"
@@ -15380,7 +15387,7 @@
     },
     [
      "/opt/bin/tool",
-     "-p",
+     "--task",
      "/speckit.",
      "--x",
      "a b",
@@ -15811,7 +15818,7 @@
      "-p",
      "/speckit.plan build it",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -15829,7 +15836,7 @@
      "--x",
      "a b",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -15871,7 +15878,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -15891,7 +15898,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -15935,7 +15942,7 @@
      "-p",
      "/speckit-plan",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -15953,7 +15960,7 @@
      "--x",
      "a b",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -15995,7 +16002,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16015,7 +16022,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16059,7 +16066,7 @@
      "-p",
      "free text",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16077,7 +16084,7 @@
      "--x",
      "a b",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16119,7 +16126,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16139,7 +16146,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16183,7 +16190,7 @@
      "-p",
      "/help",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16201,7 +16208,7 @@
      "--x",
      "a b",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16243,7 +16250,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16263,7 +16270,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16307,7 +16314,7 @@
      "-p",
      "/speckit.",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16325,7 +16332,7 @@
      "--x",
      "a b",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16367,7 +16374,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -16387,7 +16394,7 @@
      "--model",
      "m1",
      "--output-format",
-     "json"
+     "stream-json"
     ]
    ],
    [
@@ -17502,6 +17509,749 @@
   "supports_events": false,
   "command_filename": "speckit.plan.md"
  },
+ "mcode": {
+  "invocations": {
+   "speckit.plan|": "/speckit-plan",
+   "specify|my feature": "/speckit-specify my feature",
+   "speckit.git.commit|-m x": "/speckit-git-commit -m x"
+  },
+  "exec": [
+   [
+    "/speckit.plan build it",
+    null,
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.plan build it",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.plan build it",
+    null,
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full"
+    ]
+   ],
+   [
+    "/speckit.plan build it",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full",
+     "--x",
+     "a b"
+    ]
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.plan build it",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    null,
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    null,
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full",
+     "--x",
+     "a b"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit-plan",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "free text",
+    null,
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "free text",
+     "--permission",
+     "full",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "free text",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "free text",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "free text",
+    null,
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "free text",
+     "--permission",
+     "full"
+    ]
+   ],
+   [
+    "free text",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "free text",
+     "--permission",
+     "full",
+     "--x",
+     "a b"
+    ]
+   ],
+   [
+    "free text",
+    "m1",
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "free text",
+     "--permission",
+     "full",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "free text",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "free text",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "free text",
+    "m1",
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "free text",
+     "--permission",
+     "full",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "free text",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "free text",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "/help",
+    null,
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/help",
+     "--permission",
+     "full",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/help",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/help",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/help",
+    null,
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/help",
+     "--permission",
+     "full"
+    ]
+   ],
+   [
+    "/help",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/help",
+     "--permission",
+     "full",
+     "--x",
+     "a b"
+    ]
+   ],
+   [
+    "/help",
+    "m1",
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/help",
+     "--permission",
+     "full",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/help",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/help",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/help",
+    "m1",
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/help",
+     "--permission",
+     "full",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "/help",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/help",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "/speckit.",
+    null,
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.",
+    null,
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full"
+    ]
+   ],
+   [
+    "/speckit.",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full",
+     "--x",
+     "a b"
+    ]
+   ],
+   [
+    "/speckit.",
+    "m1",
+    true,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1",
+     "--output-format",
+     "json"
+    ]
+   ],
+   [
+    "/speckit.",
+    "m1",
+    false,
+    {},
+    [
+     "mcode",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full",
+     "--model",
+     "m1"
+    ]
+   ],
+   [
+    "/speckit.",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_MCODE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_MCODE_EXECUTABLE": "/opt/bin/tool"
+    },
+    [
+     "/opt/bin/tool",
+     "exec",
+     "/speckit.",
+     "--permission",
+     "full",
+     "--x",
+     "a b",
+     "--model",
+     "m1"
+    ]
+   ]
+  ],
+  "options": [
+   [
+    "--skills",
+    true,
+    false,
+    true,
+    "Install as agent skills (default for MiniMax Code)"
+   ]
+  ],
+  "config": {
+   "name": "MiniMax Code",
+   "folder": ".minimax/",
+   "commands_subdir": "skills",
+   "install_url": "https://github.com/MiniMax-AI/minimax-code",
+   "requires_cli": true
+  },
+  "registrar_config": {
+   "dir": ".minimax/skills",
+   "format": "markdown",
+   "args": "$ARGUMENTS",
+   "extension": "/SKILL.md"
+  },
+  "invoke_separator": "-",
+  "multi_install_safe": true,
+  "effective_sep_default": "-",
+  "effective_sep_skills": "-",
+  "sep_for_mode": [
+   "-",
+   "-"
+  ],
+  "is_skills_mode_default": true,
+  "is_skills_mode_skills": true,
+  "supports_events": false,
+  "command_filename": "speckit.plan.md"
+ },
  "muse": {
   "invocations": {
    "speckit.plan|": "/speckit-plan",
@@ -18141,6 +18891,375 @@
    "-"
   ],
   "is_skills_mode_default": true,
+  "is_skills_mode_skills": true,
+  "supports_events": false,
+  "command_filename": "speckit.plan.md"
+ },
+ "none": {
+  "invocations": {
+   "speckit.plan|": "/speckit.plan",
+   "specify|my feature": "/speckit.specify my feature",
+   "speckit.git.commit|-m x": "/speckit.git.commit -m x"
+  },
+  "exec": [
+   [
+    "/speckit.plan build it",
+    null,
+    true,
+    {},
+    null
+   ],
+   [
+    "/speckit.plan build it",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit.plan build it",
+    null,
+    false,
+    {},
+    null
+   ],
+   [
+    "/speckit.plan build it",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    true,
+    {},
+    null
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    false,
+    {},
+    null
+   ],
+   [
+    "/speckit.plan build it",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit-plan",
+    null,
+    true,
+    {},
+    null
+   ],
+   [
+    "/speckit-plan",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit-plan",
+    null,
+    false,
+    {},
+    null
+   ],
+   [
+    "/speckit-plan",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    true,
+    {},
+    null
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    false,
+    {},
+    null
+   ],
+   [
+    "/speckit-plan",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "free text",
+    null,
+    true,
+    {},
+    null
+   ],
+   [
+    "free text",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "free text",
+    null,
+    false,
+    {},
+    null
+   ],
+   [
+    "free text",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "free text",
+    "m1",
+    true,
+    {},
+    null
+   ],
+   [
+    "free text",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "free text",
+    "m1",
+    false,
+    {},
+    null
+   ],
+   [
+    "free text",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/help",
+    null,
+    true,
+    {},
+    null
+   ],
+   [
+    "/help",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/help",
+    null,
+    false,
+    {},
+    null
+   ],
+   [
+    "/help",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/help",
+    "m1",
+    true,
+    {},
+    null
+   ],
+   [
+    "/help",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/help",
+    "m1",
+    false,
+    {},
+    null
+   ],
+   [
+    "/help",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit.",
+    null,
+    true,
+    {},
+    null
+   ],
+   [
+    "/speckit.",
+    null,
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit.",
+    null,
+    false,
+    {},
+    null
+   ],
+   [
+    "/speckit.",
+    null,
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit.",
+    "m1",
+    true,
+    {},
+    null
+   ],
+   [
+    "/speckit.",
+    "m1",
+    true,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ],
+   [
+    "/speckit.",
+    "m1",
+    false,
+    {},
+    null
+   ],
+   [
+    "/speckit.",
+    "m1",
+    false,
+    {
+     "SPECKIT_INTEGRATION_NONE_EXTRA_ARGS": "--x \"a b\"",
+     "SPECKIT_INTEGRATION_NONE_EXECUTABLE": "/opt/bin/tool"
+    },
+    null
+   ]
+  ],
+  "options": [],
+  "config": {
+   "name": "None (shared scaffolding only)",
+   "folder": null,
+   "install_url": null,
+   "requires_cli": false
+  },
+  "registrar_config": {},
+  "invoke_separator": ".",
+  "multi_install_safe": true,
+  "effective_sep_default": ".",
+  "effective_sep_skills": ".",
+  "sep_for_mode": [
+   ".",
+   "."
+  ],
+  "is_skills_mode_default": false,
   "is_skills_mode_skills": true,
   "supports_events": false,
   "command_filename": "speckit.plan.md"
@@ -19520,7 +20639,7 @@
      "pi",
      "-p",
      "/speckit.plan build it",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19538,7 +20657,7 @@
      "/speckit.plan build it",
      "--x",
      "a b",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19580,7 +20699,7 @@
      "/speckit.plan build it",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19600,7 +20719,7 @@
      "a b",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19644,7 +20763,7 @@
      "pi",
      "-p",
      "/speckit-plan",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19662,7 +20781,7 @@
      "/speckit-plan",
      "--x",
      "a b",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19704,7 +20823,7 @@
      "/speckit-plan",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19724,7 +20843,7 @@
      "a b",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19768,7 +20887,7 @@
      "pi",
      "-p",
      "free text",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19786,7 +20905,7 @@
      "free text",
      "--x",
      "a b",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19828,7 +20947,7 @@
      "free text",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19848,7 +20967,7 @@
      "a b",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19892,7 +21011,7 @@
      "pi",
      "-p",
      "/help",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19910,7 +21029,7 @@
      "/help",
      "--x",
      "a b",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19952,7 +21071,7 @@
      "/help",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -19972,7 +21091,7 @@
      "a b",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -20016,7 +21135,7 @@
      "pi",
      "-p",
      "/speckit.",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -20034,7 +21153,7 @@
      "/speckit.",
      "--x",
      "a b",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -20076,7 +21195,7 @@
      "/speckit.",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -20096,7 +21215,7 @@
      "a b",
      "--model",
      "m1",
-     "--output-format",
+     "--mode",
      "json"
     ]
    ],
@@ -22144,13 +23263,7 @@
     null,
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit.plan build it",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.plan build it",
@@ -22160,26 +23273,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.plan build it",
-     "--x",
-     "a b",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.plan build it",
     null,
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit.plan build it"
-    ]
+    null
    ],
    [
     "/speckit.plan build it",
@@ -22189,28 +23290,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.plan build it",
-     "--x",
-     "a b"
-    ]
+    null
    ],
    [
     "/speckit.plan build it",
     "m1",
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit.plan build it",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.plan build it",
@@ -22220,30 +23307,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.plan build it",
-     "--x",
-     "a b",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.plan build it",
     "m1",
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit.plan build it",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "/speckit.plan build it",
@@ -22253,28 +23324,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.plan build it",
-     "--x",
-     "a b",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "/speckit-plan",
     null,
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit-plan",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit-plan",
@@ -22284,26 +23341,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit-plan",
-     "--x",
-     "a b",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit-plan",
     null,
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit-plan"
-    ]
+    null
    ],
    [
     "/speckit-plan",
@@ -22313,28 +23358,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit-plan",
-     "--x",
-     "a b"
-    ]
+    null
    ],
    [
     "/speckit-plan",
     "m1",
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit-plan",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit-plan",
@@ -22344,30 +23375,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit-plan",
-     "--x",
-     "a b",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit-plan",
     "m1",
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit-plan",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "/speckit-plan",
@@ -22377,28 +23392,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit-plan",
-     "--x",
-     "a b",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "free text",
     null,
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "free text",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "free text",
@@ -22408,26 +23409,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "free text",
-     "--x",
-     "a b",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "free text",
     null,
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "free text"
-    ]
+    null
    ],
    [
     "free text",
@@ -22437,28 +23426,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "free text",
-     "--x",
-     "a b"
-    ]
+    null
    ],
    [
     "free text",
     "m1",
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "free text",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "free text",
@@ -22468,30 +23443,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "free text",
-     "--x",
-     "a b",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "free text",
     "m1",
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "free text",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "free text",
@@ -22501,28 +23460,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "free text",
-     "--x",
-     "a b",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "/help",
     null,
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/help",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/help",
@@ -22532,26 +23477,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/help",
-     "--x",
-     "a b",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/help",
     null,
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/help"
-    ]
+    null
    ],
    [
     "/help",
@@ -22561,28 +23494,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/help",
-     "--x",
-     "a b"
-    ]
+    null
    ],
    [
     "/help",
     "m1",
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/help",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/help",
@@ -22592,30 +23511,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/help",
-     "--x",
-     "a b",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/help",
     "m1",
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/help",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "/help",
@@ -22625,28 +23528,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/help",
-     "--x",
-     "a b",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "/speckit.",
     null,
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit.",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.",
@@ -22656,26 +23545,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.",
-     "--x",
-     "a b",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.",
     null,
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit."
-    ]
+    null
    ],
    [
     "/speckit.",
@@ -22685,28 +23562,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.",
-     "--x",
-     "a b"
-    ]
+    null
    ],
    [
     "/speckit.",
     "m1",
     true,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit.",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.",
@@ -22716,30 +23579,14 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.",
-     "--x",
-     "a b",
-     "--model",
-     "m1",
-     "--output-format",
-     "json"
-    ]
+    null
    ],
    [
     "/speckit.",
     "m1",
     false,
     {},
-    [
-     "shai",
-     "-p",
-     "/speckit.",
-     "--model",
-     "m1"
-    ]
+    null
    ],
    [
     "/speckit.",
@@ -22749,15 +23596,7 @@
      "SPECKIT_INTEGRATION_SHAI_EXTRA_ARGS": "--x \"a b\"",
      "SPECKIT_INTEGRATION_SHAI_EXECUTABLE": "/opt/bin/tool"
     },
-    [
-     "/opt/bin/tool",
-     "-p",
-     "/speckit.",
-     "--x",
-     "a b",
-     "--model",
-     "m1"
-    ]
+    null
    ]
   ],
   "options": [],
@@ -23849,7 +24688,7 @@
      "vibe",
      "-p",
      "/speckit.plan build it",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -23867,7 +24706,7 @@
      "/speckit.plan build it",
      "--x",
      "a b",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -23907,9 +24746,7 @@
      "vibe",
      "-p",
      "/speckit.plan build it",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -23927,9 +24764,7 @@
      "/speckit.plan build it",
      "--x",
      "a b",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -23941,9 +24776,7 @@
     [
      "vibe",
      "-p",
-     "/speckit.plan build it",
-     "--model",
-     "m1"
+     "/speckit.plan build it"
     ]
    ],
    [
@@ -23959,9 +24792,7 @@
      "-p",
      "/speckit.plan build it",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -23973,7 +24804,7 @@
      "vibe",
      "-p",
      "/speckit-plan",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -23991,7 +24822,7 @@
      "/speckit-plan",
      "--x",
      "a b",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24031,9 +24862,7 @@
      "vibe",
      "-p",
      "/speckit-plan",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24051,9 +24880,7 @@
      "/speckit-plan",
      "--x",
      "a b",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24065,9 +24892,7 @@
     [
      "vibe",
      "-p",
-     "/speckit-plan",
-     "--model",
-     "m1"
+     "/speckit-plan"
     ]
    ],
    [
@@ -24083,9 +24908,7 @@
      "-p",
      "/speckit-plan",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -24097,7 +24920,7 @@
      "vibe",
      "-p",
      "free text",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24115,7 +24938,7 @@
      "free text",
      "--x",
      "a b",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24155,9 +24978,7 @@
      "vibe",
      "-p",
      "free text",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24175,9 +24996,7 @@
      "free text",
      "--x",
      "a b",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24189,9 +25008,7 @@
     [
      "vibe",
      "-p",
-     "free text",
-     "--model",
-     "m1"
+     "free text"
     ]
    ],
    [
@@ -24207,9 +25024,7 @@
      "-p",
      "free text",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -24221,7 +25036,7 @@
      "vibe",
      "-p",
      "/help",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24239,7 +25054,7 @@
      "/help",
      "--x",
      "a b",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24279,9 +25094,7 @@
      "vibe",
      "-p",
      "/help",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24299,9 +25112,7 @@
      "/help",
      "--x",
      "a b",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24313,9 +25124,7 @@
     [
      "vibe",
      "-p",
-     "/help",
-     "--model",
-     "m1"
+     "/help"
     ]
    ],
    [
@@ -24331,9 +25140,7 @@
      "-p",
      "/help",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -24345,7 +25152,7 @@
      "vibe",
      "-p",
      "/speckit.",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24363,7 +25170,7 @@
      "/speckit.",
      "--x",
      "a b",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24403,9 +25210,7 @@
      "vibe",
      "-p",
      "/speckit.",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24423,9 +25228,7 @@
      "/speckit.",
      "--x",
      "a b",
-     "--model",
-     "m1",
-     "--output-format",
+     "--output",
      "json"
     ]
    ],
@@ -24437,9 +25240,7 @@
     [
      "vibe",
      "-p",
-     "/speckit.",
-     "--model",
-     "m1"
+     "/speckit."
     ]
    ],
    [
@@ -24455,9 +25256,7 @@
      "-p",
      "/speckit.",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ]
   ],
@@ -24475,6 +25274,13 @@
     false,
     true,
     "Install as agent skills"
+   ],
+   [
+    "--no-model-invocation",
+    true,
+    false,
+    false,
+    "Install core command skills as user-invocable only (disable-model-invocation: true)"
    ]
   ],
   "config": {
@@ -24577,8 +25383,6 @@
      "zcode",
      "-p",
      "/speckit.plan build it",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24597,8 +25401,6 @@
      "/speckit.plan build it",
      "--x",
      "a b",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24611,9 +25413,7 @@
     [
      "zcode",
      "-p",
-     "/speckit.plan build it",
-     "--model",
-     "m1"
+     "/speckit.plan build it"
     ]
    ],
    [
@@ -24629,9 +25429,7 @@
      "-p",
      "/speckit.plan build it",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -24701,8 +25499,6 @@
      "zcode",
      "-p",
      "/speckit-plan",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24721,8 +25517,6 @@
      "/speckit-plan",
      "--x",
      "a b",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24735,9 +25529,7 @@
     [
      "zcode",
      "-p",
-     "/speckit-plan",
-     "--model",
-     "m1"
+     "/speckit-plan"
     ]
    ],
    [
@@ -24753,9 +25545,7 @@
      "-p",
      "/speckit-plan",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -24825,8 +25615,6 @@
      "zcode",
      "-p",
      "free text",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24845,8 +25633,6 @@
      "free text",
      "--x",
      "a b",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24859,9 +25645,7 @@
     [
      "zcode",
      "-p",
-     "free text",
-     "--model",
-     "m1"
+     "free text"
     ]
    ],
    [
@@ -24877,9 +25661,7 @@
      "-p",
      "free text",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -24949,8 +25731,6 @@
      "zcode",
      "-p",
      "/help",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24969,8 +25749,6 @@
      "/help",
      "--x",
      "a b",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -24983,9 +25761,7 @@
     [
      "zcode",
      "-p",
-     "/help",
-     "--model",
-     "m1"
+     "/help"
     ]
    ],
    [
@@ -25001,9 +25777,7 @@
      "-p",
      "/help",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ],
    [
@@ -25073,8 +25847,6 @@
      "zcode",
      "-p",
      "/speckit.",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -25093,8 +25865,6 @@
      "/speckit.",
      "--x",
      "a b",
-     "--model",
-     "m1",
      "--output-format",
      "json"
     ]
@@ -25107,9 +25877,7 @@
     [
      "zcode",
      "-p",
-     "/speckit.",
-     "--model",
-     "m1"
+     "/speckit."
     ]
    ],
    [
@@ -25125,9 +25893,7 @@
      "-p",
      "/speckit.",
      "--x",
-     "a b",
-     "--model",
-     "m1"
+     "a b"
     ]
    ]
   ],

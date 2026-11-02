@@ -2,7 +2,7 @@
  * Dispatch / CLI invocation tests.
  *
  * Golden parity (tests/fixtures/integrations/dispatch.json, generated from
- * Python v1.0.12) for every registered integration: build_exec_args across
+ * Python v1.2.5) for every registered integration: build_exec_args across
  * prompts/models/output modes/env overrides, build_command_invocation,
  * options, configs, separators and skills-mode defaults. Plus real
  * dispatch_command runs against fake executables.
@@ -55,9 +55,9 @@ afterEach(() => {
 });
 
 describe('registry metadata parity', () => {
-  test('41 integrations in upstream order', () => {
+  test('43 integrations in upstream order', () => {
     expect(Object.keys(INTEGRATION_REGISTRY)).toEqual(Object.keys(fixture));
-    expect(Object.keys(INTEGRATION_REGISTRY).length).toBe(41);
+    expect(Object.keys(INTEGRATION_REGISTRY).length).toBe(43);
   });
 
   for (const [key, exp] of Object.entries(fixture)) {

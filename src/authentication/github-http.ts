@@ -4,7 +4,8 @@
  * Port of upstream `authentication/github_http.py`: `buildGithubRequest()`
  * (GITHUB_TOKEN / GH_TOKEN for GitHub-owned hosts) and
  * `resolveGithubReleaseAssetApiUrl()` (browser release-download URL -> REST
- * API asset URL, for github.com and allow-listed GHES hosts).
+ * API asset URL, for github.com, trusted GHE.com tenants and allow-listed
+ * GHES hosts).
  *
  * @module authentication/github-http
  */
@@ -22,6 +23,8 @@ export const GITHUB_HOSTS: ReadonlySet<string> = new Set([
 ]);
 
 export const MAX_RELEASE_METADATA_BYTES = 5 * 1024 * 1024;
+const GHE_COM_SUFFIX = '.ghe.com';
+const GHE_COM_API_PREFIX = 'api.';
 
 function hasValidPercentEscapes(value: string): boolean {
   const hex = '0123456789abcdefABCDEF';
@@ -31,6 +34,31 @@ function hasValidPercentEscapes(value: string): boolean {
     }
   }
   return true;
+}
+
+/** Return whether an asset URL uses an unambiguous raw spelling. */
+function hasValidAssetUrlSpelling(value: string): boolean {
+  return (
+    ![...value].some((c) => c.codePointAt(0)! <= 0x20 || c.codePointAt(0) === 0x7f) &&
+    !['?', '#', ';'].some((d) => value.includes(d)) &&
+    hasValidPercentEscapes(value)
+  );
+}
+
+/** Return the paired GHE.com API hostname for a tenant web hostname (#4807). */
+export function gheComApiHostname(webHostname: string): string | null {
+  if (webHostname === 'ghe.com' || webHostname.startsWith(GHE_COM_API_PREFIX) || !webHostname.endsWith(GHE_COM_SUFFIX)) {
+    return null;
+  }
+  return `${GHE_COM_API_PREFIX}${webHostname}`;
+}
+
+/** Return the paired GHE.com web hostname for a tenant API hostname (#4807). */
+export function gheComWebHostname(apiHostname: string): string | null {
+  if (!apiHostname.startsWith(GHE_COM_API_PREFIX)) return null;
+  const web = apiHostname.slice(GHE_COM_API_PREFIX.length);
+  if (web === 'ghe.com' || !web.endsWith(GHE_COM_SUFFIX)) return null;
+  return web;
 }
 
 /** Python `urllib.parse.unquote` (UTF-8, errors='replace'). */
@@ -154,9 +182,13 @@ export interface ResolveReleaseAssetOptions {
 }
 
 /**
- * Resolve a GitHub release browser-download URL to its REST API asset URL
- * (github.com or allow-listed GHES hosts). Returns the API asset URL, the
- * input when already an API asset URL, or null.
+ * Resolve a GitHub release browser-download URL to its REST API asset URL.
+ *
+ * Works for public github.com, GitHub Enterprise Cloud with data residency
+ * (GHE.com) and GitHub Enterprise Server (GHES). Enterprise hosts must match
+ * `githubHosts`; GHE.com additionally requires both the tenant web hostname
+ * and its paired `api.` hostname to be trusted. Returns the API asset URL,
+ * the input when already a recognized API asset URL, or null.
  */
 export async function resolveGithubReleaseAssetApiUrl(
   downloadUrl: string,
@@ -168,33 +200,78 @@ export async function resolveGithubReleaseAssetApiUrl(
   const maxMetadataBytes = opts.maxMetadataBytes ?? MAX_RELEASE_METADATA_BYTES;
   let parsed: ReturnType<typeof urlparse>;
   let hostname: string;
+  let port: number | null;
   try {
     parsed = urlparse(downloadUrl);
     hostname = (parsed.hostname ?? '').toLowerCase();
-  } catch {
-    return null;
-  }
-  const parts = parsed.path.replace(/^\/+|\/+$/g, '').split('/').map(pyUnquote);
-  const isGhes = !!hostname && !GITHUB_HOSTS.has(hostname) && hostMatches(hostname, githubHosts);
-  const isAssetPath = (seg: string[]): boolean =>
-    seg.length >= 6 && seg[0] === 'repos' && seg[3] === 'releases' && seg[4] === 'assets';
-
-  if (hostname === 'api.github.com' && isAssetPath(parts)) return downloadUrl;
-  if (hostname && parts[0] === 'api' && parts[1] === 'v3' && isAssetPath(parts.slice(2))) return downloadUrl;
-
-  if (parsed.scheme !== 'http' && parsed.scheme !== 'https') return null;
-  let port: number | null;
-  try {
     port = urlPort(parsed);
   } catch {
     return null;
   }
+  const parts = parsed.path.replace(/^\/+|\/+$/g, '').split('/').map(pyUnquote);
+  const gheComApi = gheComApiHostname(hostname);
+  const isGheCom =
+    gheComApi !== null &&
+    parsed.scheme === 'https' &&
+    (port === null || port === 443) &&
+    hostMatches(hostname, githubHosts) &&
+    hostMatches(gheComApi, githubHosts);
+  const isGhes =
+    !!hostname && !GITHUB_HOSTS.has(hostname) && !hostname.endsWith(GHE_COM_SUFFIX) && hostMatches(hostname, githubHosts);
+  const isAssetPath = (seg: string[]): boolean =>
+    seg.length >= 6 && seg[0] === 'repos' && seg[3] === 'releases' && seg[4] === 'assets';
+  const isExactRawAssetPath = (path: string): boolean => {
+    const seg = path.split('/');
+    return (
+      seg.length === 7 &&
+      seg[0] === '' &&
+      seg[1] === 'repos' &&
+      !!seg[2] &&
+      !!seg[3] &&
+      seg[4] === 'releases' &&
+      seg[5] === 'assets' &&
+      /^[0-9]+$/.test(seg[6])
+    );
+  };
+
+  // Already a REST API asset URL: GitHub.com / GHES passthrough stays path-gated;
+  // GHE.com uses the stricter tenant-pair trust check.
+  if (hostname === 'api.github.com' && isAssetPath(parts)) return downloadUrl;
+  if (hostname && !hostname.endsWith(GHE_COM_SUFFIX) && parts[0] === 'api' && parts[1] === 'v3' && isAssetPath(parts.slice(2))) {
+    return downloadUrl;
+  }
+  const gheComWeb = gheComWebHostname(hostname);
+  if (
+    gheComWeb !== null &&
+    hasValidAssetUrlSpelling(downloadUrl) &&
+    parsed.scheme === 'https' &&
+    (port === null || port === 443) &&
+    parsed.username === null &&
+    parsed.password === null &&
+    !parsed.query &&
+    !parsed.fragment &&
+    !parsed.params &&
+    hostMatches(hostname, githubHosts) &&
+    hostMatches(gheComWeb, githubHosts) &&
+    isExactRawAssetPath(parsed.path)
+  ) {
+    return downloadUrl;
+  }
+
+  if (parsed.scheme !== 'http' && parsed.scheme !== 'https') return null;
   let apiBase: string;
-  if (hostname === 'github.com') apiBase = 'https://api.github.com';
-  else if (isGhes) {
+  let expectedAssetPrefix: string[];
+  if (hostname === 'github.com') {
+    apiBase = 'https://api.github.com';
+    expectedAssetPrefix = ['', 'repos'];
+  } else if (isGheCom) {
+    apiBase = `https://${gheComApi}`;
+    expectedAssetPrefix = ['', 'repos'];
+  } else if (isGhes) {
     const authorityHost = hostname.includes(':') ? `[${hostname}]` : hostname;
     const authority = port === null ? authorityHost : `${authorityHost}:${port}`;
     apiBase = `${parsed.scheme}://${authority}/api/v3`;
+    expectedAssetPrefix = ['', 'api', 'v3', 'repos'];
   } else return null;
 
   if (parts.length < 6 || parts[2] !== 'releases' || parts[3] !== 'download') return null;
@@ -206,13 +283,7 @@ export async function resolveGithubReleaseAssetApiUrl(
 
   const isExpectedAssetUrl = (assetUrl: unknown): assetUrl is string => {
     if (typeof assetUrl !== 'string') return false;
-    if (
-      [...assetUrl].some((c) => c.codePointAt(0)! <= 0x20 || c.codePointAt(0) === 0x7f) ||
-      ['?', '#', ';'].some((d) => assetUrl.includes(d)) ||
-      !hasValidPercentEscapes(assetUrl)
-    ) {
-      return false;
-    }
+    if (!hasValidAssetUrlSpelling(assetUrl)) return false;
     let assetParsed: ReturnType<typeof urlparse>;
     let assetPort: number | null;
     let apiParsed: ReturnType<typeof urlparse>;
@@ -244,9 +315,8 @@ export async function resolveGithubReleaseAssetApiUrl(
     };
     if (origin(assetParsed, assetHost, assetPort) !== origin(apiParsed, apiParsed.hostname ?? '', apiPort)) return false;
     const assetParts = assetParsed.path.split('/');
-    const isPublic = apiBase === 'https://api.github.com';
-    const ownerIndex = isPublic ? 2 : 4;
-    const expectedPrefix = isPublic ? ['', 'repos'] : ['', 'api', 'v3', 'repos'];
+    const ownerIndex = expectedAssetPrefix.length;
+    const expectedPrefix = expectedAssetPrefix;
     const last = assetParts[assetParts.length - 1];
     return (
       assetParts.length === ownerIndex + 5 &&

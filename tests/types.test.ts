@@ -82,6 +82,7 @@ const EXPECTED: Record<string, [string, string, string, string]> = {
   pi: ['.pi/prompts', 'markdown', '$ARGUMENTS', '.md'],
   qodercli: ['.qoder/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
   qwen: ['.qwen/commands', 'markdown', '$ARGUMENTS', '.md'],
+  mcode: ['.minimax/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
   rovodev: ['.rovodev/skills', 'markdown', '$ARGUMENTS', '/SKILL.md'],
   shai: ['.shai/commands', 'markdown', '$ARGUMENTS', '.md'],
   tabnine: ['.tabnine/agent/commands', 'toml', '{{args}}', '.toml'],
@@ -92,8 +93,8 @@ const EXPECTED: Record<string, [string, string, string, string]> = {
 };
 
 describe('AGENT_CONFIGS', () => {
-  test('contains all 40 registrar agents (generic excluded)', () => {
-    expect(SUPPORTED_AGENTS.length).toBe(40);
+  test('contains all 41 registrar agents (generic and none excluded)', () => {
+    expect(SUPPORTED_AGENTS.length).toBe(41);
     expect([...SUPPORTED_AGENTS].sort()).toEqual(Object.keys(EXPECTED).sort());
     expect(SUPPORTED_AGENTS).toEqual(Object.keys(CommandRegistrar.AGENT_CONFIGS));
   });

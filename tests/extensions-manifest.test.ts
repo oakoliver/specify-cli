@@ -291,7 +291,7 @@ describe('ExtensionManifest', () => {
   test('hook missing command rejected', () => {
     const data = validManifestData();
     data.hooks.after_tasks = { optional: true };
-    expectInvalid(data, "Hook 'after_tasks' missing required 'command' field");
+    expectInvalid(data, "Hook 'after_tasks' missing required 'command' string");
   });
 
   test('hook priority validation', () => {

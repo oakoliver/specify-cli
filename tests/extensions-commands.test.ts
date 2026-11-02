@@ -406,7 +406,8 @@ describe('specify extension catalog', () => {
     expect(output()).toContain('Config: .specify/extension-catalogs.yml');
     out = [];
     expect(await run(proj, 'catalog', 'remove', 'team')).toBe(0);
-    expect(output()).toContain('No catalogs remain in config. Built-in defaults will be used.');
+    expect(output()).toContain('Project catalog override removed; user configuration or built-in defaults will be used.');
+    expect(existsSync(join(proj, '.specify', 'extension-catalogs.yml'))).toBe(false);
   });
 
   test('add rejects non-https and invalid config shapes', async () => {

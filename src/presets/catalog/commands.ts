@@ -14,6 +14,7 @@ import { defineCommand, type CommandSpec, type GroupSpec } from '../../cli-args.
 import { CliExit, console, escapeMarkup } from '../../console.js';
 import { displayProjectPath } from '../../utils.js';
 import { dumpYaml, parseYaml } from '../../yaml.js';
+import { pyTypeName } from '../../bundles/pycompat.js';
 import { PresetCatalog } from '../catalog.js';
 import { requireSpecifyProject } from '../commands.js';
 import { PresetValidationError, userHome, deepEqual, isMapping, pathExists, pyStr, readTextStrict } from '../manifest.js';
@@ -226,10 +227,18 @@ export function presetCatalogRemove(name: string): void {
     console.print("[red]Error:[/red] Invalid catalog config: 'catalogs' must be a list.");
     throw new CliExit(1);
   }
+  (catalogs as unknown[]).forEach((entry, index) => {
+    if (!isMapping(entry)) {
+      console.print(
+        `[red]Error:[/red] Invalid catalog entry at index ${index}: expected a mapping, got ${pyTypeName(entry)}`,
+      );
+      throw new CliExit(1);
+    }
+  });
   const safeName = escapeMarkup(pyStr(name));
 
   const originalCount = catalogs.length;
-  catalogs = catalogs.filter((c: unknown) => isMapping(c) && c.name !== name);
+  catalogs = catalogs.filter((c: Record<string, unknown>) => c.name !== name);
 
   if ((catalogs as unknown[]).length === originalCount) {
     console.print(`[red]Error:[/red] Catalog '${safeName}' not found.`);

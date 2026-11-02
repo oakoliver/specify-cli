@@ -8,11 +8,9 @@
  * @module extensions/root-helpers
  */
 
-import { statSync } from 'node:fs';
-import { join } from 'node:path';
 
-import { console, errConsole, CliExit } from '../console.js';
-import { resolveInitDirOverride } from '../project.js';
+import { console } from '../console.js';
+import { requireSpecifyProject as requireSpecifyProjectRoot } from '../project.js';
 
 /** Constants kept for backward compatibility with presets and extensions. */
 export const DEFAULT_SKILLS_DIR = '.agents/skills';
@@ -48,17 +46,6 @@ export function printCliWarning(
  * Honors the ``SPECIFY_INIT_DIR`` override.
  */
 export function requireSpecifyProject(): string {
-  const override = resolveInitDirOverride();
-  if (override !== null && override !== undefined) return override;
-  const projectRoot = process.cwd();
-  let isDir = false;
-  try {
-    isDir = statSync(join(projectRoot, '.specify')).isDirectory();
-  } catch {
-    isDir = false;
-  }
-  if (isDir) return projectRoot;
-  errConsole.print('[red]Error:[/red] Not a Spec Kit project (no .specify/ directory)');
-  errConsole.print('Run this command from a Spec Kit project root or set SPECIFY_INIT_DIR to one.');
-  throw new CliExit(1);
+  // #4934: delegate to the root helper, which preflights the persisted symlink policy.
+  return requireSpecifyProjectRoot();
 }

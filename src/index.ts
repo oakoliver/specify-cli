@@ -232,7 +232,7 @@ export {
 } from './catalog.js';
 
 // ============================================================================
-// spec-kit v1.0.12 parity API (v2.0.0)
+// spec-kit v1.0.12 parity API (v2.0.0); extended for v1.2.5 in v2.1.0
 // ============================================================================
 
 export { UPSTREAM_SPEC_KIT_VERSION } from './version.js';
@@ -247,6 +247,24 @@ export { WorkflowEngine, WorkflowDefinition, RunState } from './workflows/engine
 export { runInitCommand } from './init.js';
 export { runCheckCommand } from './command-check.js';
 export { runVersionCommand } from './command-version.js';
+export { runMcpCommand } from './command-mcp.js';
+export { createServer as createMcpServer, runStdioServer } from './mcp-server/server.js';
+export { collectVersionResult, versionResultPayload, VERSION_OPERATION } from './operation-version.js';
+export {
+  FileHelper,
+  FileHelperError,
+  PathEscapeError,
+  SymlinkDeniedError,
+  UnsupportedPathError,
+} from './file-helper.js';
+export {
+  ProjectPolicyError,
+  prepareInitRoot,
+  preflightInitRoot,
+  projectFiles,
+  readProjectOptions,
+  saveProjectOptions,
+} from './file-policy.js';
 export { runSelfCommand } from './selfs/commands.js';
 export { runExtensionCommand } from './extensions/commands.js';
 export { runIntegrationCommand } from './integrations/commands.js';

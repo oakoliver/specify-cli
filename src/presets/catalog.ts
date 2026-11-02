@@ -22,13 +22,16 @@ import {
   buildSafeDownloadPath,
   detectArchiveFormat,
   isHttpsOrLocalhostHttp,
+  isSafeDownloadRedirect,
   readResponseLimited,
 } from '../download-security.js';
+import { findDuplicateJsonKey } from '../json-unique.js';
 import { githubProviderHosts, openUrl } from '../authentication/http.js';
 import { resolveGithubReleaseAssetApiUrl } from '../authentication/github-http.js';
 import { REINSTALL_COMMAND } from '../extensions/index.js';
 import { verifyArchiveSha256 } from '../shared-infra.js';
 import { parseYaml } from '../yaml.js';
+import { availableVersions, selectRelease } from './catalog-versions.js';
 import {
   PresetError,
   PresetValidationError,
@@ -179,6 +182,51 @@ export class PresetCatalogEntry {
 /** Merged catalog pack record (catalog fields plus ``_catalog_name`` / ``_install_allowed``). */
 export type PresetCatalogPack = Record<string, any>;
 
+/** A catalog supplied invalid content rather than being unreachable. */
+export class PresetCatalogValidationError extends PresetError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PresetCatalogValidationError';
+  }
+}
+
+/** Reject duplicate keys before JSON parsing discards conflicting records. */
+export function decodeCatalogJson(raw: string | Uint8Array, url: string): unknown {
+  let text: string;
+  try {
+    text = typeof raw === 'string' ? raw : new TextDecoder('utf-8', { fatal: true }).decode(raw);
+  } catch (exc) {
+    throw new PresetCatalogValidationError(
+      `Invalid preset catalog format from ${url}: invalid encoding (${errorText(exc)})`,
+    );
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (exc) {
+    throw new PresetCatalogValidationError(`Invalid preset catalog format from ${url}: invalid JSON (${errorText(exc)})`);
+  }
+  const duplicate = findDuplicateJsonKey(text);
+  if (duplicate !== null) {
+    throw new PresetCatalogValidationError(
+      `Invalid preset catalog format from ${url}: duplicate JSON key '${duplicate}'.`,
+    );
+  }
+  return value;
+}
+
+function selectCatalogRelease(packId: string, pack: PresetCatalogPack, version: string | null): PresetCatalogPack | null {
+  if ('releases' in pack && ('id' in pack ? pack.id : packId) !== packId) {
+    throw new PresetCatalogValidationError(`Preset '${packId}' has an inconsistent catalog ID.`);
+  }
+  try {
+    return selectRelease({ ...pack, id: packId }, version);
+  } catch (exc) {
+    if (exc instanceof PresetError) throw new PresetCatalogValidationError(exc.message);
+    throw exc;
+  }
+}
+
 // ============================================================================
 // PresetCatalog
 // ============================================================================
@@ -273,13 +321,13 @@ export class PresetCatalog {
    */
   validateCatalogPayload(catalogData: unknown, url: string): void {
     if (!isMapping(catalogData)) {
-      throw new PresetError(`Invalid preset catalog format from ${url}: expected a JSON object`);
+      throw new PresetCatalogValidationError(`Invalid preset catalog format from ${url}: expected a JSON object`);
     }
     if (!('schema_version' in catalogData) || !('presets' in catalogData)) {
-      throw new PresetError(`Invalid preset catalog format from ${url}`);
+      throw new PresetCatalogValidationError(`Invalid preset catalog format from ${url}`);
     }
     if (!isMapping(catalogData.presets)) {
-      throw new PresetError(`Invalid preset catalog format from ${url}: 'presets' must be a JSON object`);
+      throw new PresetCatalogValidationError(`Invalid preset catalog format from ${url}: 'presets' must be a JSON object`);
     }
   }
 
@@ -475,10 +523,10 @@ export class PresetCatalog {
     if (finalUrl !== url) this.validateCatalogUrl(finalUrl);
     const body = await readResponseLimited(response as Parameters<typeof readResponseLimited>[0], {
       maxBytes: MAX_JSON_CATALOG_BYTES,
-      errorType: PresetError,
+      errorType: PresetCatalogValidationError,
       label: `preset catalog ${url}`,
     });
-    const catalogData = JSON.parse(Buffer.from(body).toString('utf-8')) as unknown;
+    const catalogData = decodeCatalogJson(body, url);
     this.validateCatalogPayload(catalogData, url);
     return catalogData as Record<string, any>;
   }
@@ -493,7 +541,7 @@ export class PresetCatalog {
 
     if (!forceRefresh && this.isUrlCacheValid(entry.url)) {
       try {
-        const cachedData = JSON.parse(readTextStrict(cacheFile)) as unknown;
+        const cachedData = decodeCatalogJson(readTextStrict(cacheFile), entry.url);
         this.validateCatalogPayload(cachedData, entry.url);
         return cachedData as Record<string, any>;
       } catch {
@@ -515,26 +563,52 @@ export class PresetCatalog {
    * Fetch and merge presets from all active catalogs. Higher-priority catalogs
    * (lower priority number) win on ID conflicts.
    */
-  async getMergedPacks(forceRefresh = false): Promise<Record<string, PresetCatalogPack>> {
+  async getMergedPacks(
+    forceRefresh = false,
+    opts: { packId?: string | null } = {},
+  ): Promise<Record<string, PresetCatalogPack>> {
+    // For a requested ID, stop at the first matching catalog so malformed
+    // lower-priority sources cannot block its winning entry.
+    const packId = opts.packId ?? null;
     const activeCatalogs = this.getActiveCatalogs();
     const merged: Record<string, PresetCatalogPack> = {};
-    for (const entry of [...activeCatalogs].reverse()) {
+    let firstFetchError: PresetError | null = null;
+    let readableSource = false;
+    const sources = packId !== null ? activeCatalogs : [...activeCatalogs].reverse();
+    for (const entry of sources) {
       try {
         const data = await this.fetchSingleCatalog(entry, forceRefresh);
+        readableSource = true;
         const presets = (data.presets ?? {}) as Record<string, unknown>;
-        for (const [packId, packData] of Object.entries(presets)) {
-          if (!isMapping(packData)) continue;
-          merged[packId] = {
+        for (const [foundId, packData] of Object.entries(presets)) {
+          if (packId !== null && foundId !== packId) continue;
+          // Untargeted searches skip malformed entries; an exact matching ID
+          // must fail instead of falling through to a lower-priority source.
+          if (!isMapping(packData)) {
+            if (packId !== null) {
+              throw new PresetCatalogValidationError(
+                `Invalid preset catalog entry for '${packId}' from ${entry.url}: expected a JSON object`,
+              );
+            }
+            continue;
+          }
+          merged[foundId] = {
             ...packData,
             _catalog_name: entry.name,
             _install_allowed: entry.install_allowed,
           };
+          if (packId !== null) return merged;
         }
       } catch (e) {
-        if (e instanceof PresetError) continue;
+        if (e instanceof PresetCatalogValidationError) throw e;
+        if (e instanceof PresetError) {
+          if (firstFetchError === null) firstFetchError = e;
+          continue;
+        }
         throw e;
       }
     }
+    if (!readableSource && firstFetchError !== null) throw firstFetchError;
     return merged;
   }
 
@@ -556,7 +630,7 @@ export class PresetCatalog {
       try {
         const metadata = JSON.parse(readTextStrict(this.cacheMetadataFile)) as unknown;
         if (isMapping(metadata) && metadata.catalog_url === catalogUrl) {
-          const cachedData = JSON.parse(readTextStrict(this.cacheFile)) as unknown;
+          const cachedData = decodeCatalogJson(readTextStrict(this.cacheFile), catalogUrl);
           this.validateCatalogPayload(cachedData, catalogUrl);
           return cachedData as Record<string, any>;
         }
@@ -590,12 +664,14 @@ export class PresetCatalog {
     try {
       packs = await this.getMergedPacks();
     } catch (e) {
+      if (e instanceof PresetCatalogValidationError) throw e;
       if (e instanceof PresetError) return [];
       throw e;
     }
 
     const results: PresetCatalogPack[] = [];
     for (const [packId, packData] of Object.entries(packs)) {
+      selectCatalogRelease(packId, packData, null);
       if (author) {
         let authorVal: unknown = 'author' in packData ? packData.author : '';
         if (typeof authorVal !== 'string') {
@@ -632,30 +708,38 @@ export class PresetCatalog {
     return results;
   }
 
-  /** Get detailed information about a specific preset across all active catalogs. */
-  async getPackInfo(packId: string): Promise<PresetCatalogPack | null> {
-    let packs: Record<string, PresetCatalogPack>;
-    try {
-      packs = await this.getMergedPacks();
-    } catch (e) {
-      if (e instanceof PresetError) return null;
-      throw e;
-    }
-    if (Object.prototype.hasOwnProperty.call(packs, packId)) return { ...packs[packId], id: packId };
+  /**
+   * Get detailed information about a specific preset. Searches active
+   * catalogs in priority order, stopping at the winning ID; ``version``
+   * selects an exact catalog release (``null`` for the advertised current).
+   */
+  async getPackInfo(packId: string, version: string | null = null): Promise<PresetCatalogPack | null> {
+    const packs = await this.getMergedPacks(false, { packId });
+    if (Object.prototype.hasOwnProperty.call(packs, packId)) return selectCatalogRelease(packId, packs[packId], version);
     return null;
   }
 
-  /**
-   * Download a preset archive from a catalog.
-   *
-   * @returns Path to the downloaded archive
-   * @throws PresetError If pack not found or download fails
-   */
+  /** List the versions advertised by the winning catalog entry. */
+  async getPackVersions(packId: string): Promise<string[]> {
+    const pack = await this.getPackInfo(packId);
+    return pack !== null ? availableVersions(pack) : [];
+  }
+
+  /** Download the advertised current preset archive from a catalog. */
   async downloadPack(packId: string, targetDir: string | null = null): Promise<string> {
     const packInfo = await this.getPackInfo(packId);
-    if (!packInfo) {
-      throw new PresetError(`Preset '${packId}' not found in catalog`);
-    }
+    if (packInfo === null) throw new PresetError(`Preset '${packId}' not found in catalog`);
+    return this.downloadPackInfo(packInfo, targetDir);
+  }
+
+  /**
+   * Download an already-selected release without resolving its ID again.
+   *
+   * @returns Path to the downloaded archive
+   * @throws PresetError If the download fails
+   */
+  async downloadPackInfo(packInfo: PresetCatalogPack, targetDir: string | null = null): Promise<string> {
+    const packId = packInfo.id as string;
 
     if (pyTruthy(packInfo.bundled) && !pyTruthy(packInfo.download_url)) {
       throw new PresetError(
@@ -720,12 +804,23 @@ export class PresetCatalog {
       let finalUrl: string;
       let contentType: string | null;
       try {
-        const response = await this.openUrl(effectiveUrl, 60, extraHeaders);
+        const validateRedirect = (oldUrl: string, newUrl: string): void => {
+          if (!isSafeDownloadRedirect(oldUrl, newUrl)) {
+            throw new PresetError(`Preset download redirected to a disallowed URL: ${newUrl}`);
+          }
+        };
+        const response = await this.openUrl(effectiveUrl, 60, extraHeaders, validateRedirect);
         archiveData = await readResponseLimited(response as Parameters<typeof readResponseLimited>[0], {
           errorType: PresetError,
           label: `preset '${packId}' download`,
         });
         finalUrl = responseFinalUrl(response, effectiveUrl);
+        if (
+          !isHttpsOrLocalhostHttp(finalUrl) ||
+          (finalUrl !== effectiveUrl && !isSafeDownloadRedirect(effectiveUrl, finalUrl))
+        ) {
+          throw new PresetError(`Preset download redirected to a disallowed URL: ${finalUrl}`);
+        }
         contentType = responseContentType(response);
       } catch (e) {
         if (e instanceof PresetError) throw e;

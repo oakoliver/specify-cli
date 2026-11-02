@@ -22,7 +22,15 @@ import { BundlerError } from './index.js';
 import { loadsJson, decodeUtf8, UnicodeDecodeError } from './yamlio.js';
 import type { CatalogSource } from './catalogs.js';
 import type { ComponentRef } from './manifest.js';
-import { primitiveManager, type KindManager } from './primitives.js';
+import {
+  bundledComponentVersion,
+  bundledPinWarning,
+  primitiveManager,
+  type BundledPatchWarning,
+  type KindManager,
+} from './primitives.js';
+import { resolvedInCatalog } from './references.js';
+import { isNewerPatch, sameVersion } from './versioning.js';
 import type { PrimitiveInstaller } from './installer.js';
 import { pyRepr, urlHostname, urlparse, urlPort, type ParsedUrl } from './pycompat.js';
 
@@ -246,7 +254,7 @@ export function makeCatalogFetcher(opts: { allowNetwork?: boolean } = {}): (sour
     }
     const scheme = parsed.scheme.toLowerCase();
 
-    if (scheme === 'builtin') {
+    if (source.isBuiltin) {
       const repositoryUrl = BUILTIN_REPOSITORY_URLS[url];
       if (repositoryUrl === undefined) throw new BundlerError(`Unknown built-in catalog '${url}'.`);
       const snapshotName = BUILTIN_PACKAGED_SNAPSHOTS[url];
@@ -353,7 +361,9 @@ export async function httpGetJson(sourceId: string, url: string): Promise<unknow
       throw new BundlerError(`Failed to fetch catalog from ${url}: ${errMessage(exc)}`, { cause: exc });
     }
     const name = exc && typeof exc === 'object' ? (exc as { name?: string }).name : undefined;
-    if (name === 'RedirectPolicyError') {
+    // Authentication and redirect-policy failures are definitive, not
+    // transient catalog unavailability.
+    if (name === 'GitHubCliAuthError' || name === 'RedirectPolicyError') {
       throw new BundlerError(`Failed to fetch catalog from ${url}: ${errMessage(exc)}`, { cause: exc });
     }
     const http = httpStatusOf(exc);
@@ -389,11 +399,45 @@ export class DefaultPrimitiveInstaller implements PrimitiveInstaller {
     return this.managerFor(component, projectRoot).isInstalled(component);
   }
 
-  install(projectRoot: string, component: ComponentRef): Promise<void> {
+  installedVersion(projectRoot: string, component: ComponentRef): Promise<string | null> {
+    return this.managerFor(component, projectRoot).installedVersion(component);
+  }
+
+  async bundledPatchWarning(component: ComponentRef, actual: string): Promise<BundledPatchWarning | null> {
+    const packaged = await bundledComponentVersion(component);
+    if (component.version && packaged && sameVersion(actual, packaged) && isNewerPatch(actual, component.version)) {
+      const kind = component.kind.slice(0, -1);
+      return bundledPinWarning(kind.charAt(0).toUpperCase() + kind.slice(1), component, actual);
+    }
+    return null;
+  }
+
+  async validateSource(projectRoot: string, component: ComponentRef): Promise<void> {
+    if (!this.allowNetwork) {
+      throw new BundlerError(
+        `Cannot verify catalog source '${component.source}' for ` +
+          `${component.kind.slice(0, -1)} '${component.id}' offline; ` +
+          're-run without --offline.',
+      );
+    }
+    const result = await resolvedInCatalog(projectRoot, component);
+    if (result === true) return;
+    let detail: string;
+    if (result === null) detail = 'catalog unreachable';
+    else if (result === false) detail = 'the winning install-allowed catalog has no matching release';
+    else detail = result;
+    throw new BundlerError(
+      `Cannot verify ${component.kind.slice(0, -1)} '${component.id}' at ` +
+        `${component.version || 'current'} from catalog ` +
+        `'${component.source}': ${detail}.`,
+    );
+  }
+
+  install(projectRoot: string, component: ComponentRef): Promise<BundledPatchWarning | null> {
     return this.managerFor(component, projectRoot).install(component);
   }
 
-  refresh(projectRoot: string, component: ComponentRef): Promise<void> {
+  refresh(projectRoot: string, component: ComponentRef): Promise<BundledPatchWarning | null> {
     return this.managerFor(component, projectRoot).refresh(component);
   }
 

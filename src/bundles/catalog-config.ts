@@ -214,14 +214,17 @@ export function addSource(
 /** Remove a project-scoped catalog source by id or url. */
 export function removeSource(projectRoot: string, idOrUrl: string): string {
   const target = idOrUrl.trim();
-  if (BUILTIN_IDS.has(target)) {
+  const catalogs = read(projectRoot);
+  // Refuse a built-in id only when there is nothing project-scoped to remove:
+  // a same-id project override is the user's own entry and deleting it simply
+  // restores the built-in default.
+  if (BUILTIN_IDS.has(target) && !catalogs.some((c) => dget(c, 'id') === target)) {
     throw new BundlerError(
       `'${target}' is a built-in default source and cannot be deleted ` +
         '(add a same-id source to override it instead).',
     );
   }
 
-  const catalogs = read(projectRoot);
   let remaining = catalogs.filter((c) => dget(c, 'id') !== target && dget(c, 'url') !== target);
   if (remaining.length === catalogs.length) {
     // Fallback: canonicalized local-path match (so `remove ./cat.json` undoes

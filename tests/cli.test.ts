@@ -17,17 +17,17 @@ function run(args: string[], cwd?: string) {
 }
 
 describe('root app', () => {
-  test('registers every upstream v1.0.12 command in upstream order', () => {
+  test('registers every upstream v1.2.5 command in upstream order', () => {
     const names = ROOT_APP.commands.map((c) => c.name);
-    expect(names.slice(0, 11)).toEqual([
-      'init', 'check', 'version', 'self', 'extension', 'integration', 'event', 'preset', 'artifact', 'bundle', 'workflow',
+    expect(names.slice(0, 12)).toEqual([
+      'init', 'check', 'version', 'mcp', 'self', 'extension', 'integration', 'event', 'preset', 'artifact', 'bundle', 'workflow',
     ]);
     expect(names).toContain('doctor');
     expect(names).toContain('status');
   });
 
-  test('parity constant is 1.0.12', () => {
-    expect(UPSTREAM_SPEC_KIT_VERSION).toBe('1.0.12');
+  test('parity constant is 1.2.5', () => {
+    expect(UPSTREAM_SPEC_KIT_VERSION).toBe('1.2.5');
   });
 
   test('--version prints package version', () => {

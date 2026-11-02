@@ -21,8 +21,9 @@ function contextNoteFor(extId: string): string {
 export class CommandRegistrar {
   private readonly registrar: AgentRegistrar;
 
-  constructor() {
-    this.registrar = new AgentRegistrar();
+  /** With *projectRoot*, a ``generic`` project also registers into its ``--commands-dir`` (#4785). */
+  constructor(projectRoot: string | null = null, opts: { includeGeneric?: boolean } = {}) {
+    this.registrar = new AgentRegistrar(projectRoot, opts);
   }
 
   /** Agent registration configs (re-exported from the shared registrar). */
@@ -31,7 +32,7 @@ export class CommandRegistrar {
   }
 
   get AGENT_CONFIGS(): Record<string, Dict> {
-    return AgentRegistrar.AGENT_CONFIGS as Record<string, Dict>;
+    return this.registrar.AGENT_CONFIGS as Record<string, Dict>;
   }
 
   static parseFrontmatter(content: string): [Dict, string] {

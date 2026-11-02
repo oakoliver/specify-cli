@@ -332,7 +332,7 @@ describe('specify workflow step add', () => {
     stubDownloads({ 'https://example.com/step.yml': 'step:\n  type_key: other\n', 'https://example.com/__init__.py': '' });
     output = '';
     expect(await runWorkflowStepCommand(['add', 'my-step'])).toBe(1);
-    expect(output).toContain("step.yml type_key ('other') does not match catalog ID ('my-step')");
+    expect(output).toContain("step.yml type_key ('other') does not match step ID ('my-step')");
     stubDownloads({ 'https://example.com/step.yml': 'step: 5\n', 'https://example.com/__init__.py': '' });
     output = '';
     expect(await runWorkflowStepCommand(['add', 'my-step'])).toBe(1);
@@ -389,7 +389,7 @@ describe('specify workflow step add', () => {
     stubCatalogEntry({ ...BASIC, extra_files: { 'a.py': 'https://example.com/a', 'b.py': 'https://example.com/b' } });
     forbidNetwork();
     expect(await runWorkflowStepCommand(['add', 'my-step'])).toBe(1);
-    expect(output).toContain('exceeding the 3-file limit');
+    expect(output).toContain('exceeding the 3-entry limit (files and directories combined)');
     expect(existsSync(stepsDir()) ? readdirSync(stepsDir()).filter((n) => n.startsWith('speckit_step_tmp_')) : []).toEqual([]);
 
     stepPackageLimits.maxFiles = 512;
@@ -400,7 +400,8 @@ describe('specify workflow step add', () => {
     expect(await runWorkflowStepCommand(['add', 'my-step'])).toBe(1);
     expect(output).toContain('40-byte total size limit');
     expect(existsSync(join(stepsDir(), 'my-step'))).toBe(false);
-    expect(readdirSync(stepsDir()).filter((n) => n.startsWith('speckit_step_tmp_'))).toEqual([]);
+    // v1.2.5 stages catalog downloads outside the project (#4769).
+    expect(existsSync(stepsDir()) ? readdirSync(stepsDir()) : []).toEqual([]);
   });
 
   test('rejects symlinked steps base dir and existing step dir', async () => {

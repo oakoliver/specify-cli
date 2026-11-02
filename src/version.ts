@@ -35,7 +35,7 @@ import { MAX_JSON_METADATA_BYTES, readResponseLimited } from './download-securit
 // ============================================================================
 
 /** Upstream github/spec-kit release this port is at behavioral parity with. */
-export const UPSTREAM_SPEC_KIT_VERSION = '1.0.12';
+export const UPSTREAM_SPEC_KIT_VERSION = '1.2.5';
 
 /** npm package name of this CLI. */
 export const NPM_PACKAGE_NAME = '@oakoliver/specify-cli';
@@ -61,6 +61,12 @@ export const RESOLUTION_FAILURE_OFFLINE = 'offline or timeout';
 // the actionable hint is simply to retry later.
 export const RESOLUTION_FAILURE_RATE_LIMITED = 'rate limited (try again later)';
 export const RESOLUTION_FAILURE_HTTP_PREFIX = 'HTTP ';
+/**
+ * Category prefix for credential acquisition failures (#4960). ADAPTATION:
+ * the npm registry lookup sends no auth.json credentials, so this port never
+ * produces it; failure rendering still recognizes it like upstream.
+ */
+export const RESOLUTION_FAILURE_AUTH_PREFIX = 'authentication error: ';
 export const FAILURE_INSTALLER_MISSING = 'installer-missing';
 export const FAILURE_INSTALLER_INVALID = 'installer-invalid';
 export const FAILURE_TARGET_TAG_UNPARSEABLE = 'target-tag-unparseable';
@@ -1239,7 +1245,11 @@ export interface EmitFailureOptions {
 export function emitFailure(category: string, opts: EmitFailureOptions = {}): void {
   const { plan = null, installerExit = null, installerName = null, verifiedVersion = null } = opts;
 
-  if (RESOLUTION_FAILURE_CATEGORIES.has(category) || category.startsWith(RESOLUTION_FAILURE_HTTP_PREFIX)) {
+  if (
+    RESOLUTION_FAILURE_CATEGORIES.has(category) ||
+    category.startsWith(RESOLUTION_FAILURE_HTTP_PREFIX) ||
+    category.startsWith(RESOLUTION_FAILURE_AUTH_PREFIX)
+  ) {
     console.print(`Upgrade aborted: ${category}`);
     return;
   }

@@ -155,7 +155,13 @@ describe('list and catalog', () => {
     expect(text.out).toContain('[red]b[/red] v1.0.0 (0 components, installed 2026-01-01T00:00:00Z)');
     const json = await run(['list', '--json']);
     expect(JSON.parse(json.out)).toEqual([
-      { bundle_id: '[red]b[/red]', version: '1.0.0', installed_at: '2026-01-01T00:00:00Z', contributed_components: [] },
+      {
+        bundle_id: '[red]b[/red]',
+        version: '1.0.0',
+        installed_at: '2026-01-01T00:00:00Z',
+        contributed_components: [],
+        required_components: [],
+      },
     ]);
   });
 

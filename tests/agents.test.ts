@@ -3,7 +3,7 @@
  *
  * Covers upstream tests/test_extensions.py (CommandRegistrar parts),
  * tests/test_registrar_path_traversal.py, tests/test_extension_skills.py
- * (registrar parts) and golden parity against Python v1.0.12 output for
+ * (registrar parts) and golden parity against Python v1.2.5 output for
  * every registrar agent.
  */
 
@@ -76,11 +76,11 @@ function writeExt(root: string, files: Record<string, string>): string {
 // ============================================================================
 
 describe('AGENT_CONFIGS', () => {
-  test('derived from the registry, excluding generic (40 agents)', () => {
+  test('derived from the registry, excluding generic and none (41 agents)', () => {
     const configs = CommandRegistrar.AGENT_CONFIGS;
-    expect(Object.keys(configs).length).toBe(40);
+    expect(Object.keys(configs).length).toBe(41);
     expect('generic' in configs).toBe(false);
-    expect(Object.keys(configs)).toEqual(Object.keys(INTEGRATION_REGISTRY).filter((k) => k !== 'generic'));
+    expect(Object.keys(configs)).toEqual(Object.keys(INTEGRATION_REGISTRY).filter((k) => k !== 'generic' && k !== 'none'));
   });
 
   test('propagates invoke_separator and dev_no_symlink', () => {

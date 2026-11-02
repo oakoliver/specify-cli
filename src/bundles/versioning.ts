@@ -359,6 +359,17 @@ export class SpecifierSet {
 // PEP 440 rejects verbatim. Normalized to PEP 440 before parsing.
 const PRERELEASE_PATTERN = /^([0-9]+\.[0-9]+\.[0-9]+)[-.]?(alpha|beta|a|b|rc)[-.]?([0-9]+)(.*)$/i;
 
+/**
+ * Return *value* without an optional leading ``v``/``V``.
+ *
+ * Display formatter: only the prefix is removed, so prerelease spellings stay
+ * as the author wrote them.
+ */
+export function stripVersionPrefix(value: string): string {
+  const text = String(value);
+  return text.slice(0, 1) === 'v' || text.slice(0, 1) === 'V' ? text.slice(1) : text;
+}
+
 function normalizeSemver(value: string): string {
   const text = String(value);
   const normalized = text.slice(0, 1) === 'v' || text.slice(0, 1) === 'V' ? text.slice(1) : text;
@@ -382,13 +393,20 @@ export function parseVersion(value: string): Version {
   }
 }
 
-const SPECIFIER_CLAUSE = /^\s*(===|==|~=|!=|<=|>=|<|>)?\s*(.*?)\s*$/s;
+// No ``s`` flag: like Python's ``.``, the body must not cross a newline, so a
+// clause with an EMBEDDED newline (a YAML block literal) fails to match.
+const SPECIFIER_CLAUSE = /^\s*(===|==|~=|!=|<=|>=|<|>)?\s*(.*?)\s*$/;
 
 function normalizeConstraint(value: string): string {
   const clauses: string[] = [];
   for (const raw of String(value).split(',')) {
     if (!raw.trim()) continue;
-    const match = SPECIFIER_CLAUSE.exec(raw)!;
+    const match = SPECIFIER_CLAUSE.exec(raw);
+    if (match === null) {
+      // A clause containing an embedded newline does not match at all; report
+      // it as bad input instead of crashing (``requires.speckit_version: |``).
+      throw new InvalidSpecifier(`Invalid specifier: ${pyStrRepr(raw)}`);
+    }
     const operator = match[1] ?? '';
     clauses.push(`${operator}${normalizeSemver(match[2])}`);
   }
@@ -417,6 +435,22 @@ export function satisfies(installed: string, constraint: string): boolean {
   return spec.contains(version);
 }
 
+/**
+ * Return true if *actual* is the exact version *pinned* names.
+ *
+ * Compares parsed versions (``v1.0.0`` matches ``1.0.0``) and falls back to a
+ * plain string comparison when either side does not parse.
+ */
+export function sameVersion(actual: string, pinned: string): boolean {
+  try {
+    return parseVersion(actual).equals(parseVersion(pinned));
+  } catch (exc) {
+    if (exc instanceof BundlerError) return String(actual).trim() === String(pinned).trim();
+    throw exc;
+  }
+}
+
+// ASCII-only (Python ``re.ASCII``): ``\d`` never matches non-ASCII digits.
 const SEMVER_RE = new RegExp(
   '^(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)\\.(?:0|[1-9]\\d*)' +
     '(?:-(?:(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)' +
@@ -431,6 +465,19 @@ const SEMVER_RE = new RegExp(
 export function isSemver(value: string): boolean {
   const text = String(value);
   const core = text.slice(0, 1) === 'v' || text.slice(0, 1) === 'V' ? text.slice(1) : text;
-  // Python's ``$`` also matches before a single trailing newline.
-  return SEMVER_RE.test(core.endsWith('\n') ? core.slice(0, -1) : core);
+  // ``fullmatch``: a trailing newline is not tolerated.
+  return SEMVER_RE.test(core);
+}
+
+/** Accept only stable SemVer patch upgrades within the same major/minor. */
+export function isNewerPatch(actual: string, pinned: string): boolean {
+  if (!isSemver(actual) || !isSemver(pinned)) return false;
+  const cores: number[][] = [];
+  for (const value of [actual, pinned]) {
+    const core = value.replace(/^[vV]+/, '').split('+', 1)[0];
+    if (core.includes('-')) return false;
+    cores.push(core.split('.').map((part) => Number.parseInt(part, 10)));
+  }
+  const [resolved, requested] = cores;
+  return resolved[0] === requested[0] && resolved[1] === requested[1] && resolved[2] > requested[2];
 }

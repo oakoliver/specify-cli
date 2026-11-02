@@ -16,9 +16,11 @@ import { isAbsolute, join } from 'node:path';
 import { MAX_JSON_METADATA_BYTES, readResponseLimited, urlsplit, urlPort } from '../download-security.js';
 import { eventsStaleExclusions, installIntegrationEvents, removeIntegrationEvents } from '../events/index.js';
 import { Version } from '../version.js';
+import { InvalidSpecifier, SpecifierSet } from '../bundles/versioning.js';
 import { YAMLError, dumpYaml, isEmptyYamlDocument, parseYaml } from '../yaml.js';
 import { IntegrationBase, KeyError, ValueError, pyRepr, setIntegrationEventsBridge, type IntegrationEventsBridge } from './base.js';
 import { homeDir, pathParts, pyTypeName, utcIsoNow } from './manifest.js';
+import { availableVersions, selectRelease, validatedReleases } from './catalog-versions.js';
 
 import { AgyIntegration } from './agy.js';
 import { AlquimiaAIIntegration } from './alquimia.js';
@@ -48,7 +50,9 @@ import { KilocodeIntegration } from './kilocode.js';
 import { KimiIntegration } from './kimi.js';
 import { KiroCliIntegration } from './kiro-cli.js';
 import { LingmaIntegration } from './lingma.js';
+import { McodeIntegration } from './mcode.js';
 import { MuseIntegration } from './muse.js';
+import { NoneIntegration } from './none.js';
 import { OmpIntegration } from './omp.js';
 import { OpencodeIntegration } from './opencode.js';
 import { PiIntegration } from './pi.js';
@@ -99,7 +103,9 @@ export { KilocodeIntegration } from './kilocode.js';
 export { KimiIntegration } from './kimi.js';
 export { KiroCliIntegration } from './kiro-cli.js';
 export { LingmaIntegration } from './lingma.js';
+export { McodeIntegration } from './mcode.js';
 export { MuseIntegration } from './muse.js';
+export { NoneIntegration } from './none.js';
 export { OmpIntegration } from './omp.js';
 export { OpencodeIntegration } from './opencode.js';
 export { PiIntegration } from './pi.js';
@@ -168,7 +174,9 @@ function registerBuiltins(): void {
   register(new KimiIntegration());
   register(new KiroCliIntegration());
   register(new LingmaIntegration());
+  register(new McodeIntegration());
   register(new MuseIntegration());
+  register(new NoneIntegration());
   register(new OmpIntegration());
   register(new OpencodeIntegration());
   register(new PiIntegration());
@@ -188,9 +196,10 @@ registerBuiltins();
 // Wire the runtime-events subsystem into the integration base classes
 // (see ``setIntegrationEventsBridge`` for why this is late-bound).
 setIntegrationEventsBridge({
-  installIntegrationEvents: (integration, projectRoot, manifest, events) =>
-    installIntegrationEvents(integration, projectRoot, manifest, events as never),
-  removeIntegrationEvents: (integration, projectRoot, manifest) => removeIntegrationEvents(integration, projectRoot, manifest),
+  installIntegrationEvents: (integration, projectRoot, manifest, events, opts) =>
+    installIntegrationEvents(integration, projectRoot, manifest, events as never, opts),
+  removeIntegrationEvents: (integration, projectRoot, manifest, opts) =>
+    removeIntegrationEvents(integration, projectRoot, manifest, opts),
   eventsStaleExclusions: (key) => eventsStaleExclusions(key),
 } satisfies IntegrationEventsBridge);
 
@@ -226,6 +235,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date);
 }
 
+/** ``_optional_metadata_error``: author/repository/license must be non-empty strings when present. */
+export function optionalMetadataError(metadata: Record<string, unknown>): string | null {
+  for (const field of ['author', 'repository', 'license']) {
+    if (field in metadata && (typeof metadata[field] !== 'string' || !(metadata[field] as string).trim())) {
+      return `${field} must be a non-empty string`;
+    }
+  }
+  return null;
+}
+
 /** Reason *payload* is not a valid integration catalog document, else ``null``. */
 export function catalogShapeError(payload: unknown): string | null {
   if (!isPlainObject(payload)) return 'expected a JSON object';
@@ -233,6 +252,19 @@ export function catalogShapeError(payload: unknown): string | null {
     return "missing required 'schema_version' or 'integrations' key";
   }
   if (!isPlainObject(payload.integrations)) return "'integrations' must be a JSON object";
+  for (const [integrationId, entry] of Object.entries(payload.integrations)) {
+    if (isPlainObject(entry) && 'releases' in entry) {
+      if (('id' in entry ? entry.id : integrationId) !== integrationId) {
+        return `Integration '${integrationId}' has an inconsistent id.`;
+      }
+      try {
+        validatedReleases({ ...entry, id: integrationId });
+      } catch (exc) {
+        if (exc instanceof IntegrationCatalogError) return exc.message;
+        throw exc;
+      }
+    }
+  }
   return null;
 }
 
@@ -612,6 +644,7 @@ export class IntegrationCatalog {
           merged.set(integId, {
             ...integData,
             id: integId,
+            _declared_id: 'id' in integData ? integData.id : integId,
             _catalog_name: entry.name,
             _install_allowed: entry.install_allowed,
           });
@@ -647,12 +680,20 @@ export class IntegrationCatalog {
     return results;
   }
 
-  /** Catalog metadata for a single integration, or ``null``. */
-  async getIntegrationInfo(integrationId: string): Promise<Record<string, unknown> | null> {
+  /** Current or exact-version metadata from the winning catalog, or ``null``. */
+  async getIntegrationInfo(integrationId: string, version: string | null = null): Promise<Record<string, unknown> | null> {
     for (const item of await this.getMergedIntegrations()) {
-      if (item.id === integrationId) return item;
+      if (item.id === integrationId) return selectRelease(item, version);
     }
     return null;
+  }
+
+  /** The current and historical versions from the winning catalog. */
+  async getIntegrationVersions(integrationId: string): Promise<string[]> {
+    for (const item of await this.getMergedIntegrations()) {
+      if (item.id === integrationId) return availableVersions(item);
+    }
+    return [];
   }
 
   // -- Cache management -------------------------------------------------------
@@ -886,7 +927,7 @@ function isUnsafeRelative(p: string): boolean {
 /** Loads and validates an ``integration.yml`` descriptor. */
 export class IntegrationDescriptor {
   static SCHEMA_VERSION = '1.0';
-  static REQUIRED_TOP_LEVEL = ['schema_version', 'integration', 'requires', 'provides'];
+  static REQUIRED_TOP_LEVEL = ['schema_version', 'integration', 'requires'];
 
   path: string;
   data: Record<string, any>;
@@ -939,6 +980,8 @@ export class IntegrationDescriptor {
         throw new IntegrationDescriptorError(`integration.${field} must be a string, got ${pyTypeName(integ[field])}`);
       }
     }
+    const optionalError = optionalMetadataError(integ);
+    if (optionalError) throw new IntegrationDescriptorError(`integration.${optionalError}`);
     if (!/^[a-z0-9-]+$/.test(integ.id as string)) {
       throw new IntegrationDescriptorError(
         `Invalid integration ID '${integ.id as string}': must be lowercase alphanumeric with hyphens only`,
@@ -955,6 +998,12 @@ export class IntegrationDescriptor {
     if (typeof requires.speckit_version !== 'string' || !requires.speckit_version.trim()) {
       throw new IntegrationDescriptorError('requires.speckit_version must be a non-empty string');
     }
+    try {
+      new SpecifierSet(requires.speckit_version);
+    } catch (exc) {
+      if (!(exc instanceof InvalidSpecifier)) throw exc;
+      throw new IntegrationDescriptorError(`Invalid requires.speckit_version: ${exc.message}`);
+    }
     const tools = requires.tools;
     if (tools !== null && tools !== undefined) {
       if (!Array.isArray(tools)) throw new IntegrationDescriptorError('requires.tools must be a list');
@@ -964,9 +1013,24 @@ export class IntegrationDescriptor {
         if (typeof toolName !== 'string' || !toolName.trim()) {
           throw new IntegrationDescriptorError("requires.tools entry 'name' must be a non-empty string");
         }
+        if ('required' in tool && typeof tool.required !== 'boolean') {
+          throw new IntegrationDescriptorError("requires.tools entry 'required' must be a boolean");
+        }
+        if ('version' in tool) {
+          if (typeof tool.version !== 'string') {
+            throw new IntegrationDescriptorError("requires.tools entry 'version' must be a string");
+          }
+          try {
+            new SpecifierSet(tool.version);
+          } catch (exc) {
+            if (!(exc instanceof InvalidSpecifier)) throw exc;
+            throw new IntegrationDescriptorError(`Invalid requires.tools version: ${exc.message}`);
+          }
+        }
       }
     }
-    const provides = data.provides;
+    // Optional legacy metadata, validated but not an adapter command inventory.
+    const provides = 'provides' in data ? data.provides : {};
     if (!isPlainObject(provides)) throw new IntegrationDescriptorError("'provides' must be a mapping");
     const commands = 'commands' in provides ? provides.commands : [];
     const scripts = 'scripts' in provides ? provides.scripts : [];
@@ -975,9 +1039,6 @@ export class IntegrationDescriptor {
     }
     if ('scripts' in provides && !Array.isArray(scripts)) {
       throw new IntegrationDescriptorError('Invalid provides.scripts: expected a list');
-    }
-    if (!pyBool(commands) && !pyBool(scripts)) {
-      throw new IntegrationDescriptorError('Integration must provide at least one command or script');
     }
     for (const cmd of (commands ?? []) as unknown[]) {
       if (!isPlainObject(cmd)) throw new IntegrationDescriptorError('Each command entry must be a mapping');

@@ -1,7 +1,7 @@
 /**
  * @oakoliver/specify-cli - ``specify artifact`` CLI adapter
  *
- * Port of spec-kit v1.0.12 ``specify_cli/artifacts/_commands.py``,
+ * Port of spec-kit v1.2.5 ``specify_cli/artifacts/_commands.py``,
  * ``command_list.py``, ``command_info.py`` and ``command_lookup.py``.
  *
  * Every subcommand requires ``--json`` for now (exit 2 otherwise). Failures are
@@ -18,7 +18,11 @@ import { PresetError } from '../presets/manifest.js';
 import { pyJsonDumps, pyRepr } from '../events/py-compat.js';
 
 import { ArtifactCatalog } from './catalog.js';
+import { resolvePathLoose } from '../download-security.js';
+import { ProjectPolicyError } from '../file-policy.js';
+import { ProjectResolutionError, preflightProjectPolicy } from '../project.js';
 import { ArtifactError, ArtifactResolutionError, NotASpecKitProjectError, type ArtifactKind } from './models.js';
+import { ArtifactInfoResolutionError, ArtifactListResolutionError, getArtifactInfo, listArtifacts } from './operations.js';
 import { isOSError } from './resolution.js';
 
 // ============================================================================
@@ -134,14 +138,28 @@ function isDirectory(p: string): boolean {
  */
 export function resolveProjectRoot(io: ArtifactCommandIO = defaultArtifactIO): string {
   const raw = io.env('SPECIFY_INIT_DIR') ?? '';
-  if (raw) {
-    const initRoot = resolvePath(io.cwd(), raw);
-    if (!isDirectory(initRoot) || !isDirectory(join(initRoot, '.specify'))) throw new NotASpecKitProjectError();
-    return initRoot;
+  const projectRoot = raw ? resolvePathLoose(resolvePath(io.cwd(), raw)) : io.cwd();
+  if (raw && !isDirectory(projectRoot)) throw new NotASpecKitProjectError();
+  // #4934: policy failures retain their actionable message for the JSON error handler.
+  try {
+    preflightProjectPolicy(projectRoot);
+  } catch (e) {
+    if (e instanceof ProjectResolutionError && (e as { cause?: unknown }).cause instanceof ProjectPolicyError) {
+      throw new ArtifactError(e.message);
+    }
+    if (e instanceof ProjectResolutionError) throw new NotASpecKitProjectError();
+    throw e;
   }
-  const projectRoot = io.cwd();
   if (existsSync(join(projectRoot, '.specify')) && isDirectory(join(projectRoot, '.specify'))) return projectRoot;
   throw new NotASpecKitProjectError();
+}
+
+/** The explicit project directory selected by the CLI invocation (cwd or SPECIFY_INIT_DIR). */
+export function projectDirectoryFromCliContext(io: ArtifactCommandIO = defaultArtifactIO): string {
+  const invocationDirectory = io.cwd();
+  const override = io.env('SPECIFY_INIT_DIR') ?? '';
+  if (!override) return invocationDirectory;
+  return resolvePathLoose(resolvePath(invocationDirectory, override));
 }
 
 /** Write ``{"error": "..."}`` to stderr and exit with code 1. */
@@ -240,10 +258,11 @@ function artifactList(io: ArtifactCommandIO, args: string[]): void {
   requireJsonFlag(io, parsed.json);
   let rows: Array<Record<string, unknown>>;
   try {
-    const root = resolveProjectRoot(io);
-    rows = new ArtifactCatalog(root).listArtifactsWithStack();
+    rows = listArtifacts({ projectDirectory: projectDirectoryFromCliContext(io) }).rows;
   } catch (e) {
-    handleDomainError(io, e);
+    if (e instanceof ArtifactError) emitErrorAndExit(io, e);
+    if (isOSError(e)) emitErrorAndExit(io, new ArtifactListResolutionError('.'));
+    throw e;
   }
   io.writeOut(renderJson(rows));
   io.writeOut('\n');
@@ -273,10 +292,15 @@ function artifactInfo(io: ArtifactCommandIO, args: string[]): void {
 
   let payload: Record<string, unknown>;
   try {
-    const root = resolveProjectRoot(io);
-    payload = new ArtifactCatalog(root).getArtifactInfo(parsed.positionals[0]!, resolvedKind);
+    payload = getArtifactInfo({
+      projectDirectory: projectDirectoryFromCliContext(io),
+      identifier: parsed.positionals[0]!,
+      kind: resolvedKind,
+    }).toJsonDict();
   } catch (e) {
-    handleDomainError(io, e);
+    if (e instanceof ArtifactError) emitErrorAndExit(io, e);
+    if (isOSError(e)) emitErrorAndExit(io, new ArtifactInfoResolutionError('.', parsed.positionals[0]!));
+    throw e;
   }
   io.writeOut(renderJson(payload));
   io.writeOut('\n');

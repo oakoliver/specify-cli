@@ -15,8 +15,9 @@ import * as path from 'node:path';
 
 import { BundlerError } from './index.js';
 import { ensureWithin, loadYaml } from './yamlio.js';
-import { pyInt } from './manifest.js';
-import { dget, isMapping, pyRepr, pyStr, pyTruthy, pyTypeName } from './pycompat.js';
+import { validatedReleases } from './catalog-versions.js';
+import { pyInt, text } from './manifest.js';
+import { dget, isMapping, pyRepr, pyStr, pyTruthy, pyTypeName, urlparse } from './pycompat.js';
 
 export const CONFIG_FILENAME = 'bundle-catalogs.yml';
 /** Supported bundle-catalogs.yml schema (major version). */
@@ -83,10 +84,20 @@ export class CatalogSource {
     return this.install_policy === InstallPolicy.INSTALL_ALLOWED;
   }
 
+  /** Whether this source is a ``builtin://`` catalog (packaged snapshot offline). */
+  get isBuiltin(): boolean {
+    try {
+      return urlparse(this.url).scheme.toLowerCase() === 'builtin';
+    } catch {
+      return false;
+    }
+  }
+
   static fromDict(data: unknown, scope: Scope): CatalogSource {
     if (!isMapping(data)) throw new BundlerError('Each catalog source must be a mapping.');
-    const sourceId = pyStr(dget(data, 'id') ?? '').trim();
-    const url = pyStr(dget(data, 'url') ?? '').trim();
+    // ``text`` maps an explicit null (YAML ``id:``) to "" instead of "None".
+    const sourceId = text(dget(data, 'id'));
+    const url = text(dget(data, 'url'));
     if (!sourceId) throw new BundlerError("A catalog source is missing its 'id'.");
     if (!url) throw new BundlerError(`Catalog source '${sourceId}' is missing its 'url'.`);
     const priority = dget(data, 'priority');
@@ -153,6 +164,8 @@ export interface CatalogEntryInit {
   verified?: boolean;
   source_id?: string | null;
   source_policy?: InstallPolicy | null;
+  /** Unknown additive catalog fields, preserved for release-history materialization. */
+  raw?: Record<string, unknown> | null;
 }
 
 export class CatalogEntry {
@@ -173,6 +186,7 @@ export class CatalogEntry {
   // Resolution provenance (filled in by the catalog stack at lookup time):
   readonly source_id: string | null;
   readonly source_policy: InstallPolicy | null;
+  readonly raw: Record<string, unknown> | null;
 
   constructor(init: CatalogEntryInit) {
     this.id = init.id;
@@ -191,12 +205,14 @@ export class CatalogEntry {
     this.verified = init.verified ?? false;
     this.source_id = init.source_id ?? null;
     this.source_policy = init.source_policy ?? null;
+    this.raw = init.raw ?? null;
     Object.freeze(this);
   }
 
   static fromDict(data: unknown): CatalogEntry {
     if (!isMapping(data)) throw new BundlerError('Each catalog entry must be a mapping.');
-    const s = (key: string): string => pyStr(dget(data, key) ?? '').trim();
+    // ``text``: an explicitly null field reads as empty, not as "None".
+    const s = (key: string): string => text(dget(data, key));
     const entryId = s('id');
     let requires = dget(data, 'requires');
     if (requires === undefined || requires === null) {
@@ -226,12 +242,13 @@ export class CatalogEntry {
       author: s('author'),
       license: s('license'),
       download_url: s('download_url'),
-      requires_speckit_version: pyStr(dget(requires as Record<string, unknown>, 'speckit_version') ?? '').trim(),
+      requires_speckit_version: text(dget(requires as Record<string, unknown>, 'speckit_version')),
       sha256: sha === undefined || sha === null ? null : pyStr(sha).trim(),
       provides: { ...(providesRaw as Record<string, unknown>) },
       repository: pyTruthy(repo) ? pyStr(repo) : null,
       tags: parseTags(dget(data, 'tags'), entryId),
       verified: parseVerified(verified === undefined ? false : verified, entryId),
+      raw: { ...data },
     });
   }
 
@@ -269,6 +286,7 @@ export function loadCatalogPayload(data: unknown): Map<string, CatalogEntry> {
     if (entry.id !== key) {
       throw new BundlerError(`Catalog entry id mismatch: key '${key}' != entry id '${entry.id}'.`);
     }
+    validatedReleases(entry);
     entries.set(key, entry);
   }
   return entries;

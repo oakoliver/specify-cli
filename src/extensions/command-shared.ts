@@ -13,12 +13,13 @@ import { join } from 'node:path';
 
 import { Table, console, escapeMarkup, CliExit } from '../console.js';
 import { getSpeckitVersion, locateBundledExtension } from '../assets.js';
-import { loadInitOptions } from '../init-options.js';
+import { isAiSkillsEnabled, loadInitOptions } from '../init-options.js';
+import { getIntegration } from '../integrations/index.js';
 import { displayProjectPath } from '../utils.js';
 import { archiveFormatFromName, detectArchiveFormat, isHttpsOrLocalhostHttp, readResponseLimited } from '../download-security.js';
 import { ExtensionCatalog } from './extension-catalog.js';
 import { ExtensionError } from './errors.js';
-import type { ExtensionManager, InstalledExtensionRecord } from './manager.js';
+import { ExtensionManager, type InstalledExtensionRecord } from './manager.js';
 import { type Dict, type ExtensionManifest, VALID_EXTENSION_ARTIFACT_NAME_PATTERN } from './manifest.js';
 import { isRelativeTo, resolveStrictFalse } from './fs-utils.js';
 import { requireSpecifyProject } from './root-helpers.js';
@@ -390,4 +391,28 @@ export async function resolveCatalogExtension(
     if (exc instanceof ExtensionError) return [null, exc];
     throw exc;
   }
+}
+
+/**
+ * Return ``commandName`` the way the project's active agent registers it.
+ *
+ * Skills projects register extension commands as ``speckit-<ext>-<cmd>``
+ * skills, which needs no integration lookup. In command mode, agents whose
+ * command references use ``-`` (such as Cline, Forge, and Junie) register the
+ * same hyphenated name; the others, and agents that are not loaded, keep the
+ * manifest's dotted name. (Port of ``_registered_command_name``.)
+ */
+export function registeredCommandName(projectRoot: string, commandName: string): string {
+  const opts = loadInitOptions(projectRoot) as unknown;
+  const selectedAi =
+    opts !== null && typeof opts === 'object' && !Array.isArray(opts) ? (opts as Dict).ai : null;
+  if (typeof selectedAi !== 'string' || !selectedAi) return commandName;
+  // Check skills mode before the integration: generic's command-mode
+  // separator applies to both of its layouts.
+  if (isAiSkillsEnabled(opts)) return ExtensionManager.skillNameForCommand(commandName);
+  const integration = getIntegration(selectedAi);
+  if (integration === null || integration === undefined || integration.invokeSeparatorForMode(false) !== '-') {
+    return commandName;
+  }
+  return ExtensionManager.skillNameForCommand(commandName);
 }

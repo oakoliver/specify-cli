@@ -7,6 +7,7 @@
  * @module events/commands
  */
 
+import { ProjectResolutionError, preflightProjectPolicy } from '../project.js';
 import { resolveAndRunEventCommand, type RunEventCommandOptions } from './index.js';
 
 // ============================================================================
@@ -152,7 +153,17 @@ export async function eventRun(
     payload = '{}';
   }
 
-  const projectRoot = deps.cwd();
+  const projectRoot = deps.cwd(); // The agent runs events from project root
+  // #4934: validate the persisted project symlink policy at the command boundary.
+  try {
+    preflightProjectPolicy(projectRoot);
+  } catch (e) {
+    if (e instanceof ProjectResolutionError) {
+      deps.writeErr(`Error: ${e.message}\n`);
+      return 1;
+    }
+    throw e;
+  }
   return deps.resolveAndRun(commandName, eventName, payload, projectRoot, { timeout });
 }
 

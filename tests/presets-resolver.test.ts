@@ -476,3 +476,27 @@ describe('collectAllLayers', () => {
 // Silence unused imports on platforms where chmod/symlink tests are skipped.
 void chmodSync;
 void symlinkSync;
+
+describe('spec-kit 1.2 resolver fixes', () => {
+  test('a core filename sharing the overrides prefix is still core (#5129)', () => {
+    const core = join(projectDir, '.specify', 'templates', 'overrides-report.md');
+    write(core, '# Core report\n');
+    expect(new PresetResolver(projectDir).resolveWithSource('overrides-report')).toEqual({ path: core, source: 'core' });
+  });
+
+  test('non-mapping command frontmatter composes as empty (#5125)', () => {
+    install(
+      makePack({
+        id: 'odd-frontmatter-pack',
+        templates: [{ type: 'command', name: 'speckit.demo', file: 'commands/speckit.demo.md', strategy: 'append' }],
+        files: { 'commands/speckit.demo.md': '---\njust a note\n---\nAPPENDED\n' },
+      }),
+    );
+    write(join(projectDir, '.specify', 'templates', 'commands', 'speckit.demo.md'), '---\ndescription: core\n---\nCORE BODY\n');
+    const content = new PresetResolver(projectDir).resolveContent('speckit.demo', 'command');
+    expect(content).not.toBeNull();
+    expect(content).toContain('CORE BODY');
+    expect(content).toContain('APPENDED');
+    expect(content).not.toContain('just a note');
+  });
+});

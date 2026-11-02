@@ -65,6 +65,64 @@ export interface WorkflowAddOptions {
   dev?: boolean;
   /** ``--from``: install from a custom URL (``source`` is then the expected ID). */
   fromUrl?: string | null;
+  /** ``--version``: install an exact catalog release. */
+  version?: string | null;
+}
+
+/**
+ * Shared ``workflow add`` preflight (``_prepare_workflow_add``): validates
+ * ``--version`` usage, loads custom steps, opens the registry and rejects a
+ * symlinked ``.specify`` / ``.specify/workflows``. Returns the workflows dir.
+ */
+export async function prepareWorkflowAdd(
+  projectRoot: string,
+  source: string,
+  opts: { dev: boolean; fromUrl: string | null; version: string | null; selectedCatalog?: boolean },
+): Promise<string> {
+  const { dev, fromUrl, version } = opts;
+  const selectedCatalog = opts.selectedCatalog ?? false;
+  if (
+    version !== null &&
+    (dev ||
+      fromUrl !== null ||
+      (!selectedCatalog &&
+        (source.startsWith('http://') || source.startsWith('https://') || pathExists(source))))
+  ) {
+    console.print('[red]Error:[/red] --version requires a workflow ID from a catalog.');
+    throw new CliExit(1);
+  }
+  if (version !== null || selectedCatalog) validateWorkflowIdOrExit(source);
+  await loadCustomSteps(projectRoot);
+  openWorkflowRegistry(projectRoot);
+  const workflowsDir = join(projectRoot, '.specify', 'workflows');
+  // With --from, source names the expected workflow ID: validate it up front.
+  if (fromUrl !== null && !dev) validateWorkflowIdOrExit(source);
+  // Reject a symlinked .specify / .specify/workflows before any write.
+  rejectUnsafeDir(join(projectRoot, '.specify'), '.specify');
+  rejectUnsafeDir(workflowsDir, '.specify/workflows');
+  return workflowsDir;
+}
+
+/**
+ * Install a bundle-selected release with the normal workflow preflights
+ * (``_install_preselected_workflow``). ``selectedInfo`` is the catalog record
+ * the bundler already selected; it is used without a second catalog lookup.
+ */
+export async function installPreselectedWorkflow(
+  workflowId: string,
+  opts: { version: string | null; selectedInfo: Record<string, unknown> },
+): Promise<void> {
+  const projectRoot = requireSpecifyProject();
+  const workflowsDir = await prepareWorkflowAdd(projectRoot, workflowId, {
+    dev: false,
+    fromUrl: null,
+    version: opts.version,
+    selectedCatalog: true,
+  });
+  await installWorkflowFromCatalog(projectRoot, workflowsDir, workflowId, null, null, {
+    requestedVersion: opts.version,
+    selectedInfo: opts.selectedInfo,
+  });
 }
 
 /**
@@ -326,16 +384,10 @@ export async function workflowAdd(opts: WorkflowAddOptions): Promise<void> {
   const source = opts.source;
   const dev = opts.dev ?? false;
   const fromUrl = opts.fromUrl ?? null;
+  const version = opts.version ?? null;
 
   const projectRoot = requireSpecifyProject();
-  await loadCustomSteps(projectRoot);
-  openWorkflowRegistry(projectRoot);
-  const workflowsDir = join(projectRoot, '.specify', 'workflows');
-  // With --from, source names the expected workflow ID: validate it up front.
-  if (fromUrl !== null && !dev) validateWorkflowIdOrExit(source);
-  // Reject a symlinked .specify / .specify/workflows before any write.
-  rejectUnsafeDir(join(projectRoot, '.specify'), '.specify');
-  rejectUnsafeDir(workflowsDir, '.specify/workflows');
+  const workflowsDir = await prepareWorkflowAdd(projectRoot, source, { dev, fromUrl, version });
 
   const installLocal = (yamlPath: string, label: string, expectedId: string | null = null): void =>
     validateAndInstallLocal(projectRoot, workflowsDir, yamlPath, label, expectedId);
@@ -517,5 +569,5 @@ export async function workflowAdd(opts: WorkflowAddOptions): Promise<void> {
   }
 
   // Try from catalog.
-  await installWorkflowFromCatalog(projectRoot, workflowsDir, source);
+  await installWorkflowFromCatalog(projectRoot, workflowsDir, source, null, null, { requestedVersion: version });
 }

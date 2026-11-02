@@ -6,7 +6,9 @@
  * @module integrations/claude
  */
 
-import { SkillsIntegration, type IntegrationConfig, type RegistrarConfig, injectArgumentHint, injectFrontmatterFlag, skillStemFromContent, buildSkillFrontmatter, pyStrip } from './base.js';
+import { SkillsIntegration, IntegrationOption, type IntegrationConfig, type RegistrarConfig, type ParsedOptions, type SetupOptions, injectArgumentHint, injectFrontmatterFlag, skillNameFromContent, skillStemFromContent, buildSkillFrontmatter, pyStrip } from './base.js';
+import type { IntegrationManifest } from './manifest.js';
+import { CORE_COMMAND_NAMES } from '../extensions/manifest.js';
 import { dumpFrontmatter } from '../utils.js';
 
 /**
@@ -58,6 +60,37 @@ export class ClaudeIntegration extends SkillsIntegration {
   eventsConfigFile: string | null = '.claude/settings.json';
   eventsFormat: string | null = 'json-nested';
 
+  /**
+   * Set by ``setup()`` from ``--no-model-invocation``; applies to core command
+   * skills only, since mandatory extension hooks rely on the model invoking
+   * the hook skill. Integrations are process-wide singletons, so preset
+   * overrides re-registered later in the same run see the same value.
+   * Commands that rewrite skills without calling setup() get the default.
+   */
+  disableModelInvocation = false;
+
+  options(): IntegrationOption[] {
+    const opts = super.options();
+    opts.push(
+      new IntegrationOption('--no-model-invocation', {
+        isFlag: true,
+        default: false,
+        help: 'Install core command skills as user-invocable only (disable-model-invocation: true)',
+      }),
+    );
+    return opts;
+  }
+
+  setup(projectRoot: string, manifest: IntegrationManifest, parsedOptions?: ParsedOptions | null, opts: SetupOptions = {}): string[] {
+    this.disableModelInvocation = (parsedOptions ?? {}).no_model_invocation === true;
+    try {
+      return super.setup(projectRoot, manifest, parsedOptions, opts);
+    } catch (err) {
+      this.disableModelInvocation = false;
+      throw err;
+    }
+  }
+
   /** Insert ``argument-hint`` after the ``description:`` scalar (no-op if present). */
   static injectArgumentHint(content: string, hint: string): string {
     return injectArgumentHint(content, hint);
@@ -89,12 +122,22 @@ export class ClaudeIntegration extends SkillsIntegration {
     return skillStemFromContent(content);
   }
 
+  static skillNameFromContent(content: string): string | null {
+    return skillNameFromContent(content);
+  }
+
+  static isCoreCommandSkill(name: string | null): boolean {
+    return !!name && name.startsWith('speckit-') && CORE_COMMAND_NAMES.has(name.slice('speckit-'.length));
+  }
+
   /** Inject Claude-specific frontmatter flags, hook notes, hints and fork context. */
   postProcessSkillContent(content: string): string {
     let updated = super.postProcessSkillContent(content);
     updated = injectFrontmatterFlag(updated, 'user-invocable');
-    updated = injectFrontmatterFlag(updated, 'disable-model-invocation', 'false');
-    const stem = skillStemFromContent(updated);
+    const name = skillNameFromContent(updated);
+    const disable = this.disableModelInvocation && ClaudeIntegration.isCoreCommandSkill(name);
+    updated = injectFrontmatterFlag(updated, 'disable-model-invocation', disable ? 'true' : 'false');
+    const stem = name ? (name.startsWith('speckit-') ? name.slice('speckit-'.length) : name) : null;
     if (stem) {
       const hint = ARGUMENT_HINTS[stem] ?? '';
       if (hint) updated = injectArgumentHint(updated, hint);

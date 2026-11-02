@@ -33,6 +33,7 @@ import { verifyArchiveSha256 } from '../shared-infra.js';
 import { parseYaml } from '../yaml.js';
 import { pyJsonDumps, pyRepr, pyTypeName, urlHostname, urlparse, urlPort } from '../bundles/pycompat.js';
 import { decodeUtf8Strict, exists, parseIsoformat, pyInt, readTextUtf8, utcNowIsoformat } from './compat.js';
+import { availableVersions, selectRelease } from './catalog-versions.js';
 import { ExtensionError, ValidationError } from './errors.js';
 import { unlink } from './fs-utils.js';
 import { type CatalogEntry, type Dict, REINSTALL_COMMAND, isMapping } from './manifest.js';
@@ -553,11 +554,19 @@ export class ExtensionCatalog {
   }
 
   /** Detailed information about a specific extension, or ``null``. */
-  async getExtensionInfo(extensionId: string): Promise<Dict | null> {
+  async getExtensionInfo(extensionId: string, version: string | null = null): Promise<Dict | null> {
     for (const extData of await this.getMergedExtensions()) {
-      if (extData.id === extensionId) return extData;
+      if (extData.id === extensionId) return selectRelease(extData, version);
     }
     return null;
+  }
+
+  /** List versions advertised by the winning catalog source. */
+  async getExtensionVersions(extensionId: string): Promise<string[]> {
+    for (const extData of await this.getMergedExtensions()) {
+      if (extData.id === extensionId) return availableVersions(extData);
+    }
+    return [];
   }
 
   /**
@@ -567,6 +576,22 @@ export class ExtensionCatalog {
   async downloadExtension(extensionId: string, targetDir: string | null = null): Promise<string> {
     const extInfo = await this.getExtensionInfo(extensionId);
     if (!extInfo) throw new ExtensionError(`Extension '${extensionId}' not found in catalog`);
+    return this.downloadExtensionInfo(extInfo, targetDir);
+  }
+
+  /**
+   * Download a selected release without looking up its ID again.
+   *
+   * Exact-version callers pass the already-selected record so a catalog
+   * change between lookup and download cannot substitute the current URL.
+   */
+  async downloadExtensionInfo(extInfo: Dict, targetDir: string | null = null): Promise<string> {
+    const extensionId = extInfo.id as string;
+    if (!(Object.prototype.hasOwnProperty.call(extInfo, '_install_allowed') ? extInfo._install_allowed : true)) {
+      throw new ExtensionError(
+        `Extension '${extensionId}' is from a discovery-only catalog; installation is not allowed.`,
+      );
+    }
 
     if (truthyLoose(extInfo.bundled) && !truthyLoose(extInfo.download_url)) {
       throw new ExtensionError(

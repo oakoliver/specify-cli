@@ -67,6 +67,21 @@ export class FanInStep extends StepBase {
       });
     }
 
+    // Generated fan-out item aliases (``fan:template:0``) are reporting-only:
+    // declared step IDs cannot contain ':', so such an entry never matches a
+    // real step. Reject it loudly rather than joining a stale or empty result.
+    const aliased = (waitFor as string[]).filter((w) => w.includes(':'));
+    if (aliased.length) {
+      return new StepResult({
+        status: StepStatus.FAILED,
+        error:
+          `Fan-in step ${id}: 'wait_for' entry ${pyRepr(aliased[0])} looks like a fan-out ` +
+          "item alias; wait on the fan-out step id instead — its 'output.results' holds the " +
+          'ordered item results.',
+        output: { results: [] },
+      });
+    }
+
     const results: unknown[] = [];
     for (const stepId of waitFor as string[]) {
       const stepData = Object.prototype.hasOwnProperty.call(context.steps, stepId)

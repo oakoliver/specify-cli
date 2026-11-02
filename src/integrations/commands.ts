@@ -77,6 +77,7 @@ import {
   manifestTracksSkillLayout,
 } from './command-upgrade-layout.js';
 import { scaffoldIntegration, supportedIntegrationScaffoldTypes } from './command-scaffold-generation.js';
+import { availableVersions } from './catalog-versions.js';
 import { runIntegrationCatalogCommand } from './catalog/commands.js';
 
 // ============================================================================
@@ -243,7 +244,7 @@ export async function integrationList(opts: { catalog?: boolean } = {}): Promise
     let status = '';
     if (key === defaultKey) status = '[green]installed (default)[/green]';
     else if (installedKeys.has(key)) status = '[green]installed[/green]';
-    const cliReq = requiresCli ? 'yes' : 'no (IDE)';
+    const cliReq = requiresCli ? 'yes' : 'no';
     const safe = integration?.multiInstallSafe ? 'yes' : 'no';
     table.addRow(key, name, status, cliReq, safe);
   }
@@ -400,13 +401,13 @@ export async function integrationInstall(key: string, opts: IntegrationInstallOp
 // uninstall
 // ============================================================================
 
-function setDefaultAfterRemoval(
+async function setDefaultAfterRemoval(
   projectRoot: string,
   current: IntegrationState,
   key: string,
   defaultKey: string | null,
   installedKeys: string[],
-): void {
+): Promise<void> {
   const remaining = installedKeys.filter((installed) => installed !== key);
   const newDefault = defaultKey !== key ? defaultKey : remaining.length > 0 ? remaining[0] : null;
   if (remaining.length > 0) {
@@ -417,12 +418,29 @@ function setDefaultAfterRemoval(
         rawOptions,
         parsedOptions,
       });
+      // Like ``use`` and ``switch``: register enabled extensions/presets for the fallback.
+      await registerExtensionsForAgent(projectRoot, newDefault, {
+        continuing: 'The fallback integration was selected, but extensions may need re-registration.',
+      });
+      await registerPresetsForAgent(projectRoot, newDefault, {
+        continuing: 'The fallback integration was selected, but presets may need re-registration.',
+      });
     } else {
       writeIntegrationJson(projectRoot, newDefault, remaining, integrationSettings(current));
     }
   } else {
     removeIntegrationJson(projectRoot);
   }
+}
+
+/** Remove the extension and preset commands/skills registered for *key*. */
+async function unregisterAgentArtifacts(projectRoot: string, key: string): Promise<void> {
+  await unregisterExtensionsForAgent(projectRoot, key, {
+    continuing: 'Continuing with integration uninstall; extension artifacts may need manual cleanup.',
+  });
+  await unregisterPresetsForAgent(projectRoot, key, {
+    continuing: 'Continuing with integration uninstall; preset artifacts may need manual cleanup.',
+  });
 }
 
 export async function integrationUninstall(key: string | null, opts: { force?: boolean } = {}): Promise<void> {
@@ -449,7 +467,8 @@ export async function integrationUninstall(key: string | null, opts: { force?: b
   const manifestPath = manifestPathFor(projectRoot, key);
   if (!pathExists(manifestPath)) {
     console.print(`[yellow]No manifest found for integration '${key}'. Nothing to uninstall.[/yellow]`);
-    setDefaultAfterRemoval(projectRoot, current, key, defaultKey, installedKeys);
+    await unregisterAgentArtifacts(projectRoot, key);
+    await setDefaultAfterRemoval(projectRoot, current, key, defaultKey, installedKeys);
     if (defaultKey === key) clearInitOptionsForIntegration(projectRoot, key);
     throw new CliExit(0);
   }
@@ -482,7 +501,11 @@ export async function integrationUninstall(key: string | null, opts: { force?: b
     [removed, skipped] = integration.teardown(projectRoot, manifest, { force: opts.force ?? false });
   }
 
-  setDefaultAfterRemoval(projectRoot, current, key, defaultKey, installedKeys);
+  // Extension/preset artifacts are tracked in their own registries, not the
+  // integration manifest, so teardown leaves them behind.
+  await unregisterAgentArtifacts(projectRoot, key);
+
+  await setDefaultAfterRemoval(projectRoot, current, key, defaultKey, installedKeys);
 
   if (defaultKey === key) clearInitOptionsForIntegration(projectRoot, key);
 
@@ -498,6 +521,19 @@ export async function integrationUninstall(key: string | null, opts: { force?: b
 // ============================================================================
 // switch
 // ============================================================================
+
+/** The integration's required options that are absent or blank. */
+export function missingRequiredOptions(integration: IntegrationBase, parsedOptions: Record<string, unknown> | null | undefined): string[] {
+  const parsed = parsedOptions ?? {};
+  const missing: string[] = [];
+  for (const option of integration.options()) {
+    const value = parsed[option.name.replace(/^-+/, '').replace(/-/g, '_')];
+    if (option.required && (value === null || value === undefined || (typeof value === 'string' && !value.trim()))) {
+      missing.push(option.name);
+    }
+  }
+  return missing;
+}
 
 export interface IntegrationSwitchOptions {
   script?: string | null;
@@ -591,6 +627,16 @@ export async function integrationSwitch(target: string, opts: IntegrationSwitchO
     integrationOptions,
   );
   targetIntegration.isSkillsMode(targetParsedOptions, projectRoot);
+  // Required options are otherwise only enforced by setup(), which runs
+  // after Phase 1 has already removed the current integration.
+  const missingOptions = missingRequiredOptions(targetIntegration, targetParsedOptions);
+  if (missingOptions.length > 0) {
+    console.print(
+      `[red]Error:[/red] Integration '${escapeMarkup(target)}' requires ${missingOptions.join(', ')} in --integration-options.`,
+    );
+    console.print('No files were changed.');
+    throw new CliExit(1);
+  }
 
   // Phase 1: Uninstall current integration (if any)
   if (installedKey) {
@@ -999,6 +1045,7 @@ export async function integrationUpgrade(key: string | null, opts: IntegrationUp
       scriptType: selectedScript,
       rawOptions,
       events: eventsMap,
+      force,
     });
     const settings = withIntegrationSetting(current, key, integration, {
       scriptType: selectedScript,
@@ -1283,7 +1330,7 @@ export async function integrationSearch(
 // info
 // ============================================================================
 
-export async function integrationInfo(integrationId: string): Promise<void> {
+export async function integrationInfo(integrationId: string, opts: { versions?: boolean } = {}): Promise<void> {
   const projectRoot = requireSpecifyProject();
   const catalog = new IntegrationCatalog(projectRoot);
   const installedKey = defaultIntegrationKey(readIntegrationJson(projectRoot));
@@ -1297,6 +1344,41 @@ export async function integrationInfo(integrationId: string): Promise<void> {
     if (!(exc instanceof IntegrationCatalogError)) throw exc;
     info = null;
     catalogError = exc as Error;
+  }
+
+  if (opts.versions === true) {
+    if (info) {
+      let advertised: string[];
+      try {
+        advertised = availableVersions(info);
+      } catch (exc) {
+        if (!(exc instanceof IntegrationCatalogError)) throw exc;
+        console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+        throw new CliExit(1);
+      }
+      if (advertised.length === 0) {
+        console.print(`[red]Error:[/red] No catalog versions advertised for ${safeIntegrationId}.`);
+        throw new CliExit(1);
+      }
+      console.print(`Catalog versions for ${safeIntegrationId}:`);
+      advertised.forEach((advertisedVersion, index) => {
+        const label = index === 0 ? ' (current)' : '';
+        console.print(`  ${escapeMarkup(advertisedVersion)}${label}`);
+      });
+      if (!(info['_install_allowed'] ?? true)) {
+        console.print('[yellow]Discovery only; catalog installation is disabled.[/yellow]');
+      }
+      console.print(
+        '[dim]Historical versions are metadata only; integration install supports registered built-in implementations, not catalog releases.[/dim]',
+      );
+      return;
+    }
+    if (catalogError) {
+      console.print(`[red]Error:[/red] Could not query integration catalog: ${escapeMarkup(String(catalogError.message))}`);
+    } else {
+      console.print(`[red]Error:[/red] No catalog versions found for ${safeIntegrationId}.`);
+    }
+    throw new CliExit(1);
   }
 
   if (info) {
@@ -1558,8 +1640,9 @@ const INTEGRATION_GROUP: GroupSpec = {
         name: 'info',
         help: 'Show catalog details for a single integration.',
         arguments: [{ name: 'integration_id', required: true, help: 'Integration ID' }],
+        options: [{ name: 'versions', flags: ['--versions'], type: 'boolean', help: 'List catalog versions' }],
       },
-      async (p) => integrationInfo(String(argStr(p, 'integration_id'))),
+      async (p) => integrationInfo(String(argStr(p, 'integration_id')), { versions: optBool(p, 'versions') }),
     ),
     defineCommand(
       {

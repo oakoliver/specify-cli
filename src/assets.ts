@@ -102,7 +102,11 @@ export function getSpeckitVersion(): string {
   try {
     const data = JSON.parse(fs.readFileSync(path.join(packageRoot(), 'package.json'), 'utf8')) as { version?: unknown };
     return typeof data.version === 'string' ? data.version : 'unknown';
-  } catch {
-    return 'unknown';
+  } catch (e) {
+    // #3917: only unreadable / malformed package metadata falls back to "unknown"
+    // (upstream: OSError, ValueError, KeyError); programming errors propagate.
+    const code = (e as { code?: unknown } | null)?.code;
+    if (e instanceof SyntaxError || (typeof code === 'string' && /^E[A-Z0-9]+$/.test(code))) return 'unknown';
+    throw e;
   }
 }

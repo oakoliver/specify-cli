@@ -48,6 +48,8 @@ import {
 } from '../shared-infra.js';
 import { dumpFrontmatter, relativeExtensionPathViolation, versionSatisfies } from '../utils.js';
 import { SpecifierSet } from '../bundles/versioning.js';
+import { InvalidVersion, Version as PepVersion } from '../version.js';
+import { loadInstallIgnore } from '../install-ignore.js';
 import { pyRepr, pyTruthy, pyTypeName } from '../bundles/pycompat.js';
 import { CommandRegistrar } from './command-registrar.js';
 import {
@@ -76,7 +78,6 @@ import {
   unlink,
   withTempDir,
 } from './fs-utils.js';
-import { GitIgnoreSpec } from './gitignore-spec.js';
 import { HookExecutor } from './hooks.js';
 import {
   CORE_COMMAND_NAMES,
@@ -88,6 +89,13 @@ import {
   normalizePriority,
 } from './manifest.js';
 import { ExtensionRegistry } from './registry.js';
+import { registrationDirectory } from '../integrations/generic.js';
+import {
+  INTEGRATION_STATE_SCHEMA,
+  defaultIntegrationKey,
+  integrationSetting,
+  tryReadIntegrationJson,
+} from '../integration-state.js';
 import { DEFAULT_SKILLS_DIR, printCliWarning } from './root-helpers.js';
 
 // ============================================================================
@@ -112,6 +120,10 @@ export interface InstallFromArchiveOptions {
   sourceName?: string | null;
   contentType?: string | null;
   catalogName?: string | null;
+  /** Exact-version installs: the archive must declare this extension ID. */
+  expectedId?: string | null;
+  /** Exact-version installs: the archive must declare this (PEP 440-equal) version. */
+  expectedVersion?: string | null;
 }
 
 /** One record returned by {@link ExtensionManager.listInstalled}. */
@@ -328,44 +340,7 @@ export class ExtensionManager {
 
   /** Load ``.extensionignore`` and return a copytree ignore function, or null. */
   static loadExtensionignore(sourceDir: string): IgnoreFn | null {
-    const ignoreFile = join(sourceDir, '.extensionignore');
-    if (!exists(ignoreFile)) return null;
-    let raw: string;
-    try {
-      raw = decodeUtf8Strict(readFileSync(ignoreFile));
-    } catch (err) {
-      if (err instanceof UnicodeDecodeError) {
-        throw new ValidationError(
-          `.extensionignore is not valid UTF-8: ${ignoreFile} (${err.reason} at byte ${err.start})`,
-        );
-      }
-      throw err;
-    }
-    const lines = raw.split(/\r\n|\r|\n/);
-    if (lines.length && lines[lines.length - 1] === '') lines.pop();
-    const normalised: string[] = [];
-    for (const line of lines) {
-      const stripped = line.trim();
-      if (stripped && !stripped.startsWith('#')) normalised.push(stripped.replace(/\\/g, '/'));
-      else normalised.push(line);
-    }
-    normalised.push('.extensionignore');
-    const spec = GitIgnoreSpec.fromLines(normalised);
-
-    return (directory: string, entries: string[]): Set<string> => {
-      const ignored = new Set<string>();
-      const relDir = relative(sourceDir, directory);
-      for (const entry of entries) {
-        const relPath = relDir && relDir !== '.' ? join(relDir, entry) : entry;
-        const relFwd = relPath.split(sep).join('/').replace(/\\/g, '/');
-        if (isDir(join(directory, entry))) {
-          if (spec.matchFile(relFwd + '/')) ignored.add(entry);
-        } else if (spec.matchFile(relFwd)) {
-          ignored.add(entry);
-        }
-      }
-      return ignored;
-    };
+    return loadInstallIgnore(sourceDir, '.extensionignore', ValidationError);
   }
 
   /**
@@ -431,6 +406,290 @@ export class ExtensionManager {
     return name !== '.';
   }
 
+  // -- Generic integration artifacts (#4785) -----------------------------
+
+  private genericOutputPath(outputDir: string, name: string, skills: boolean): string {
+    return skills ? join(outputDir, name, 'SKILL.md') : join(outputDir, `${name}.md`);
+  }
+
+  private relativeToRoot(path: string): string {
+    return relative(resolveStrictFalse(this.projectRoot), path).split(sep).join('/');
+  }
+
+  private static sha256File(path: string): string {
+    return createHash('sha256').update(readFileSync(path)).digest('hex');
+  }
+
+  /** Record generic-owned output by path and hash for safe later removal. */
+  genericArtifactHashes(
+    registeredCommands: Record<string, string[]>,
+    registeredSkills: string[],
+    previous: Record<string, string> | null = null,
+  ): Record<string, string> {
+    if (!(registeredCommands.generic ?? []).length && !registeredSkills.length) return previous ?? {};
+    const outputDir = registrationDirectory(this.projectRoot);
+    const root = resolveStrictFalse(this.projectRoot);
+    const paths = [
+      ...(registeredCommands.generic ?? []).map((name) => join(outputDir, `${name}.md`)),
+      ...registeredSkills.map((name) => join(outputDir, name, 'SKILL.md')),
+    ];
+    const hashes: Record<string, string> = { ...(previous ?? {}) };
+    for (const path of paths) {
+      try {
+        validateSafeSharedDirectory(root, dirname(path));
+      } catch {
+        continue;
+      }
+      if (!isFile(path)) continue;
+      hashes[relative(root, path).split(sep).join('/')] = ExtensionManager.sha256File(path);
+    }
+    return hashes;
+  }
+
+  /** Keep customized or untracked generic artifacts out of cleanup. */
+  genericOwnedNames(metadata: Dict, names: string[], opts: { skills: boolean; extensionId: string }): string[] {
+    const hashes = get(metadata, 'generic_artifact_hashes', {});
+    if (!isMapping(hashes)) return [];
+    const outputDir = registrationDirectory(this.projectRoot);
+    const root = resolveStrictFalse(this.projectRoot);
+    const source = resolveStrictFalse(join(this.extensionsDir, opts.extensionId));
+    const owned: string[] = [];
+    for (const name of names) {
+      const path = this.genericOutputPath(outputDir, name, opts.skills);
+      try {
+        validateSafeSharedDirectory(root, dirname(path));
+      } catch {
+        continue;
+      }
+      if (!isFile(path)) continue;
+      if (statSync(path).nlink > 1) continue;
+      if (isSymlink(path) && !isRelativeTo(resolveStrictFalse(path), source)) continue;
+      if (hashes[relative(root, path).split(sep).join('/')] === ExtensionManager.sha256File(path)) owned.push(name);
+    }
+    return owned;
+  }
+
+  /** Clean recorded generic paths even after the configured directory moves. */
+  removeGenericArtifactPaths(extensionId: string, metadata: Dict, opts: { skills?: boolean } = {}): void {
+    const includeSkills = opts.skills ?? true;
+    const manifest = this.getExtension(extensionId);
+    const registered = get(metadata, 'registered_commands', {});
+    const commandNames = new Set(isMapping(registered) ? ExtensionManager.validNameList(registered.generic) : []);
+    const skillNames = new Set(ExtensionManager.validNameList(get(metadata, 'registered_skills', [])));
+    if (manifest !== null) {
+      for (const command of manifest.commands) {
+        commandNames.add(command.name);
+        for (const alias of Array.isArray(command.aliases) ? command.aliases : []) {
+          if (typeof alias === 'string') commandNames.add(alias);
+        }
+        skillNames.add(ExtensionManager.skillNameForCommand(command.name));
+      }
+    }
+    const hashes = get(metadata, 'generic_artifact_hashes', {});
+    if (!isMapping(hashes)) return;
+    const root = resolveStrictFalse(this.projectRoot);
+    const source = resolveStrictFalse(join(this.extensionsDir, extensionId));
+    const commandFiles = new Set([...commandNames].map((c) => `${c}.md`));
+    for (const [rel, expected] of Object.entries(hashes)) {
+      if (typeof expected !== 'string') continue;
+      const parts = rel.split('/');
+      if (isAbsolute(rel) || parts.includes('..')) continue;
+      const skillOutput = parts[parts.length - 1] === 'SKILL.md' && parts.length >= 2 && skillNames.has(parts[parts.length - 2]);
+      if (skillOutput && !includeSkills) continue;
+      if (!skillOutput && !commandFiles.has(parts[parts.length - 1])) continue;
+      const path = join(root, ...parts);
+      try {
+        validateSafeSharedDirectory(root, dirname(path));
+      } catch {
+        continue;
+      }
+      if (!isFile(path)) continue;
+      if (isSymlink(path) && !isRelativeTo(resolveStrictFalse(path), source)) continue;
+      const content = readFileSync(path);
+      if (createHash('sha256').update(content).digest('hex') !== expected) {
+        if (isSymlink(path)) {
+          unlink(path);
+          writeFileSync(path, content);
+        }
+        continue;
+      }
+      unlink(path);
+      if (skillOutput) {
+        try {
+          rmdirSync(dirname(path));
+        } catch {
+          // not empty
+        }
+      }
+    }
+  }
+
+  /**
+   * Disable an extension in a generic project and retire its generic
+   * invocations without removing sources (``disable_generic_extension_artifacts``).
+   *
+   * ADAPTATION: upstream snapshots the artifacts and restores them when the
+   * registry write fails; this port verifies ownership up front and does not
+   * snapshot (see CHANGELOG).
+   */
+  disableGenericExtensionArtifacts(extensionId: string): void {
+    const metadata = this.registry.get(extensionId);
+    if (!metadata) throw new ExtensionError(`Extension '${extensionId}' is not installed`);
+    const registered = get(metadata, 'registered_commands', {});
+    const commands = isMapping(registered) ? ExtensionManager.validNameList(registered.generic) : [];
+    const skills = ExtensionManager.validNameList(get(metadata, 'registered_skills', []));
+    const hashes = get(metadata, 'generic_artifact_hashes', {});
+    const hasArtifacts = commands.length > 0 || skills.length > 0 || (isMapping(hashes) && Object.keys(hashes).length > 0);
+    const updates: Dict = { enabled: false };
+    if (hasArtifacts) {
+      const directory = registrationDirectory(this.projectRoot);
+      const root = resolveStrictFalse(this.projectRoot);
+      const notOwned = (path: string): ExtensionError =>
+        new ExtensionError(
+          `Cannot disable '${extensionId}': generic artifact ${path} was modified or is not owned; preserve it and remove it manually`,
+        );
+      if (isMapping(hashes)) {
+        for (const [rel, expected] of Object.entries(hashes)) {
+          if (typeof expected !== 'string' || isAbsolute(rel) || rel.split('/').includes('..')) continue;
+          const path = join(root, ...rel.split('/'));
+          if (isRelativeTo(resolveStrictFalse(dirname(path)), root) && isFile(path)) {
+            if (isSymlink(path) && !isRelativeTo(resolveStrictFalse(path), resolveStrictFalse(join(this.extensionsDir, extensionId)))) {
+              throw notOwned(path);
+            }
+            if (ExtensionManager.sha256File(path) !== expected) throw notOwned(path);
+          }
+        }
+      }
+      if (!isMapping(hashes) || Object.keys(hashes).length === 0) {
+        for (const [names, isSkill] of [[commands, false], [skills, true]] as const) {
+          for (const name of names) {
+            const path = this.genericOutputPath(directory, name, isSkill);
+            if (exists(path) || isSymlink(path)) throw notOwned(path);
+          }
+        }
+      }
+      this.removeGenericArtifactPaths(extensionId, metadata);
+      if (skills.length) {
+        this.unregisterExtensionSkills(skills, extensionId, directory, isMapping(hashes) ? (hashes as Record<string, string>) : {});
+      }
+      const newCommands: Dict = isMapping(registered) ? { ...registered } : {};
+      delete newCommands.generic;
+      updates.registered_commands = newCommands;
+      updates.registered_skills = this.extensionOwnedSkillNames(skills, extensionId);
+      updates.generic_artifact_hashes = {};
+    }
+    this.registry.update(extensionId, updates);
+  }
+
+  /**
+   * Pre-flight checks before registering commands in a generic project:
+   * consistent integration state, readable sources and no unowned outputs.
+   * Returns the output directory, layout and expected invocation names.
+   */
+  private preflightGenericRegistration(
+    manifest: ExtensionManifest,
+    sourceDir: string,
+    force: boolean,
+  ): { outputDir: string; skills: boolean; names: string[] } | null {
+    const activeOptions = loadInitOptions(this.projectRoot);
+    const genericActive = isMapping(activeOptions) && activeOptions.ai === 'generic';
+    const [state, stateError] = tryReadIntegrationJson(this.projectRoot);
+    if (stateError !== null && genericActive) {
+      const detail =
+        stateError.kind === 'schema_too_new'
+          ? `integration state schema ${stateError.schema} is newer than supported schema ${INTEGRATION_STATE_SCHEMA}; upgrade Spec Kit`
+          : stateError.detail || stateError.kind;
+      throw new ExtensionError(`Cannot register extension commands: cannot read integration settings: ${detail}`);
+    }
+    const genericDefault = state ? defaultIntegrationKey(state) === 'generic' : false;
+    if (state !== null && (genericDefault || genericActive)) {
+      if (genericDefault !== genericActive) {
+        throw new ExtensionError('Cannot register generic extension commands: generic integration and init options disagree');
+      }
+      const parsed = (integrationSetting(state, 'generic') as Dict).parsed_options;
+      const configuredSkills = isMapping(parsed) ? get(parsed, 'skills', false) : false;
+      const initSkills = get(activeOptions, 'ai_skills', false);
+      if (typeof configuredSkills !== 'boolean' || typeof initSkills !== 'boolean' || configuredSkills !== initSkills) {
+        throw new ExtensionError(
+          'Cannot register generic extension commands: generic integration and init options disagree on skills mode',
+        );
+      }
+    }
+    if (!genericActive) return null;
+    let outputDir: string;
+    try {
+      outputDir = registrationDirectory(this.projectRoot);
+    } catch (exc) {
+      throw new ExtensionError(`Cannot register generic extension commands: ${(exc as Error).message}`);
+    }
+    const sourceRoot = resolveStrictFalse(sourceDir);
+    for (const command of manifest.commands) {
+      const sourceFile = resolveStrictFalse(join(sourceRoot, command.file));
+      if (!isRelativeTo(sourceFile, sourceRoot) || !isFile(sourceFile)) {
+        throw new ExtensionError(`Cannot register generic extension commands: missing source '${command.file}'`);
+      }
+      try {
+        readTextUtf8(sourceFile);
+      } catch (exc) {
+        throw new ExtensionError(
+          `Cannot register generic extension commands: unreadable source '${command.file}': ${(exc as Error).message}`,
+        );
+      }
+    }
+    const skills = isAiSkillsEnabled(activeOptions);
+    const names = skills
+      ? [...new Set(manifest.commands.map((c: Dict) => ExtensionManager.skillNameForCommand(c.name)))]
+      : [...ExtensionManager.collectManifestCommandNames(manifest).keys()];
+    const owned = new Set(
+      force && this.registry.isInstalled(manifest.id)
+        ? this.genericOwnedNames(this.registry.get(manifest.id) ?? {}, names, { skills, extensionId: manifest.id })
+        : [],
+    );
+    for (const name of [...names].sort()) {
+      const target = skills ? join(outputDir, name) : join(outputDir, `${name}.md`);
+      if (!(exists(target) || isSymlink(target))) continue;
+      if (owned.has(name) && (!skills || listDir(target).every((child) => child === 'SKILL.md'))) continue;
+      throw new ExtensionError(
+        `Cannot register generic extension commands: existing invocation artifact or directory '${target}' cannot be replaced safely`,
+      );
+    }
+    return { outputDir, skills, names };
+  }
+
+  /** Remove the generic outputs written by a failed install. */
+  private rollbackGenericRegistration(plan: { outputDir: string; skills: boolean; names: string[] }, destDir: string): void {
+    const root = resolveStrictFalse(this.projectRoot);
+    const installedRoot = resolveStrictFalse(destDir);
+    for (const name of plan.names) {
+      const path = this.genericOutputPath(plan.outputDir, name, plan.skills);
+      try {
+        validateSafeSharedDirectory(root, dirname(path));
+      } catch {
+        continue;
+      }
+      if (isSymlink(path)) {
+        if (!isRelativeTo(resolveStrictFalse(path), installedRoot)) continue;
+      } else if (!isFile(path)) {
+        if (plan.skills && isDir(dirname(path))) {
+          try {
+            rmdirSync(dirname(path));
+          } catch {
+            // not empty
+          }
+        }
+        continue;
+      }
+      unlink(path);
+      if (plan.skills) {
+        try {
+          rmdirSync(dirname(path));
+        } catch {
+          // not empty
+        }
+      }
+    }
+  }
+
   /** Generated skill directory name for an extension command. */
   static skillNameForCommand(commandName: string): string {
     let shortName = commandName;
@@ -447,7 +706,7 @@ export class ExtensionManager {
     if (activeAgent === MISSING_INIT_OPTIONS_FILE) return null;
     if (activeAgent === null || typeof activeAgent !== 'string') return new Set();
 
-    const agentConfig = (AgentRegistrar.AGENT_CONFIGS as Record<string, Dict>)[activeAgent];
+    const agentConfig = (new AgentRegistrar(this.projectRoot).AGENT_CONFIGS as Record<string, Dict>)[activeAgent];
     if (
       agentConfig &&
       isAiSkillsEnabled(loadInitOptions(this.projectRoot)) &&
@@ -466,7 +725,7 @@ export class ExtensionManager {
       activeSkillsAgent !== null ? this.getSkillsDir({ create: false }) : null;
     const targets = new Map<string, string>();
 
-    for (const [agentName, agentConfig] of Object.entries(AgentRegistrar.AGENT_CONFIGS as Record<string, Dict>)) {
+    for (const [agentName, agentConfig] of Object.entries(new AgentRegistrar(this.projectRoot).AGENT_CONFIGS as Record<string, Dict>)) {
       if (agentScope !== null && !agentScope.has(agentName)) continue;
       const activeSkillsOutput = agentName === activeSkillsAgent && agentConfig.extension === '/SKILL.md';
       const commandsDir = AgentRegistrar.resolveAgentDir(agentName, agentConfig as RegistrarConfig, this.projectRoot);
@@ -487,7 +746,8 @@ export class ExtensionManager {
     extensionDir: string,
     linkOutputs = false,
   ): Record<string, string[]> {
-    const registrar = new CommandRegistrar();
+    if (!manifest.commands.length) return {};
+    const registrar = new CommandRegistrar(this.projectRoot);
     const agentScope = this.activeCommandRegistrationScope();
     if (agentScope === null) {
       return registrar.registerCommandsForAllAgents(manifest, extensionDir, this.projectRoot, {
@@ -511,6 +771,7 @@ export class ExtensionManager {
     linkOutputs = false,
     force = false,
   ): string[] {
+    if (!manifest.commands.length) return [];
     const skillsDir = this.getSkillsDir();
     if (!skillsDir) return [];
 
@@ -519,8 +780,8 @@ export class ExtensionManager {
     if (!isMapping(opts)) opts = {};
     const selectedAi = opts.ai;
     if (typeof selectedAi !== 'string' || !selectedAi) return [];
-    const registrar = new AgentRegistrar();
-    const agentConfig: Dict = (AgentRegistrar.AGENT_CONFIGS as Record<string, Dict>)[selectedAi] ?? {};
+    const registrar = new AgentRegistrar(this.projectRoot);
+    const agentConfig: Dict = (registrar.AGENT_CONFIGS as Record<string, Dict>)[selectedAi] ?? {};
     const integration = getIntegration(selectedAi);
     const aiSkillsEnabled = isAiSkillsEnabled(opts);
 
@@ -562,6 +823,12 @@ export class ExtensionManager {
       const useDevSymlink = linkOutputs && !agentConfig.dev_no_symlink;
       const skillDirPreexists = exists(skillSubdir) || isSymlink(skillSubdir);
       AgentRegistrar.ensureInside(cacheFile, cacheRoot);
+      if (selectedAi === 'generic' && skillDirPreexists) {
+        const metadata = this.registry.get(manifest.id) ?? {};
+        if (!this.genericOwnedNames(metadata, [skillName], { skills: true, extensionId: manifest.id }).includes(skillName)) {
+          continue;
+        }
+      }
       if (exists(skillFile) || isSymlink(skillFile)) {
         const isExpectedDevSymlink = ExtensionManager.isExpectedDevSymlink(skillFile, cacheFile);
         if (!isExpectedDevSymlink && !force) continue;
@@ -729,6 +996,14 @@ export class ExtensionManager {
       }
     }
     addCandidate(join(this.projectRoot, DEFAULT_SKILLS_DIR));
+    const [state, error] = tryReadIntegrationJson(this.projectRoot);
+    if (error === null && Object.keys(integrationSetting(state ?? {}, 'generic')).length > 0) {
+      try {
+        addCandidate(registrationDirectory(this.projectRoot));
+      } catch {
+        // Recorded paths and static roots still allow safe cleanup.
+      }
+    }
     for (const [agentName, agentConfig] of Object.entries(AgentRegistrar.AGENT_CONFIGS as Record<string, Dict>)) {
       if (agentConfig.extension !== '/SKILL.md') continue;
       addCandidate(AgentRegistrar.resolveAgentDir(agentName, agentConfig as RegistrarConfig, this.projectRoot));
@@ -737,8 +1012,36 @@ export class ExtensionManager {
   }
 
   /** Remove SKILL.md directories for extension skills. */
-  unregisterExtensionSkills(skillNames: string[], extensionId: string, skillsDir?: string | null): void {
+  unregisterExtensionSkills(
+    skillNames: string[],
+    extensionId: string,
+    skillsDir?: string | null,
+    genericHashes: Record<string, string> | null = null,
+  ): void {
+    // Generic skills are removed only while their recorded hashes still match (#4785).
+    const genericRoots = new Set(
+      Object.keys(genericHashes ?? {})
+        .filter((p) => p.endsWith('/SKILL.md'))
+        .map((p) => p.split('/').slice(0, -2).join('/')),
+    );
+    const root = resolveStrictFalse(this.projectRoot);
+    const source = resolveStrictFalse(join(this.extensionsDir, extensionId));
     for (const dir of this.findExtensionSkillDirs(skillNames, extensionId, skillsDir)) {
+      const skillFile = join(dir, 'SKILL.md');
+      if (genericHashes !== null && isSymlink(skillFile) && !isRelativeTo(resolveStrictFalse(skillFile), source)) continue;
+      if (genericHashes !== null && isRelativeTo(skillFile, root)) {
+        const rel = relative(root, skillFile).split(sep).join('/');
+        if (genericRoots.has(rel.split('/').slice(0, -2).join('/'))) {
+          if (genericHashes[rel] !== ExtensionManager.sha256File(skillFile)) continue;
+          unlink(skillFile);
+          try {
+            rmdirSync(dir);
+          } catch {
+            // not empty
+          }
+          continue;
+        }
+      }
       rmtree(dir);
     }
   }
@@ -837,6 +1140,11 @@ export class ExtensionManager {
     }
 
     this.validateInstallConflicts(manifest);
+
+    // Generic projects register into their --commands-dir: validate state,
+    // sources and existing outputs before anything is changed (#4785).
+    const genericPlan =
+      registerCommands && manifest.commands.length ? this.preflightGenericRegistration(manifest, sourceDir, force) : null;
 
     const destDir = join(this.extensionsDir, manifest.id);
     let sameLocation: boolean;
@@ -1103,13 +1411,31 @@ export class ExtensionManager {
     }
 
     let registeredCommands: Record<string, string[]> = {};
-    if (registerCommands) {
-      registeredCommands = this.registerCommandsForActiveAgent(manifest, destDir, linkCommands);
+    let registeredSkills: string[] = [];
+    let genericHashes: Record<string, string> = {};
+    try {
+      if (registerCommands) {
+        registeredCommands = this.registerCommandsForActiveAgent(manifest, destDir, linkCommands);
+      }
+      registeredSkills = this.registerExtensionSkills(manifest, destDir, linkCommands);
+      if (genericPlan !== null) {
+        const actual = new Set(genericPlan.skills ? registeredSkills : (registeredCommands.generic ?? []));
+        const missing = genericPlan.names.filter((name) => !actual.has(name)).sort();
+        if (missing.length) {
+          throw new ExtensionError(
+            `Cannot register generic extension commands: missing invocation artifacts for ${missing.join(', ')}`,
+          );
+        }
+        genericHashes = this.genericArtifactHashes(registeredCommands, registeredSkills);
+      }
+      new HookExecutor(this.projectRoot).registerHooks(manifest);
+    } catch (err) {
+      // Roll back generated generic outputs so a retry starts clean.
+      // ADAPTATION: upstream also restores rescued configs and the previous
+      // registry state; this port removes only the new generic outputs.
+      if (genericPlan !== null) this.rollbackGenericRegistration(genericPlan, destDir);
+      throw err;
     }
-
-    const registeredSkills = this.registerExtensionSkills(manifest, destDir, linkCommands);
-
-    new HookExecutor(this.projectRoot).registerHooks(manifest);
 
     if (didRemove) {
       const backupConfigDir = join(this.extensionsDir, '.backup', manifest.id);
@@ -1140,6 +1466,7 @@ export class ExtensionManager {
       priority,
       registered_commands: registeredCommands,
       registered_skills: registeredSkills,
+      ...(genericPlan !== null ? { generic_artifact_hashes: genericHashes } : {}),
     });
 
     if (isDir(rescueStagingDir) && !isSymlink(rescueStagingDir)) {
@@ -1190,6 +1517,32 @@ export class ExtensionManager {
         }
       }
       if (!exists(manifestPath)) throw new ValidationError('No extension.yml found in archive');
+
+      const expectedId = options.expectedId ?? null;
+      const expectedVersion = options.expectedVersion ?? null;
+      if (expectedId !== null || expectedVersion !== null) {
+        const archiveManifest = new ExtensionManifest(manifestPath);
+        if (expectedId !== null && archiveManifest.id !== expectedId) {
+          throw new ValidationError(
+            `Downloaded extension declares ID '${archiveManifest.id}', expected '${expectedId}'.`,
+          );
+        }
+        if (expectedVersion !== null) {
+          let versionMatches: boolean;
+          try {
+            versionMatches = new PepVersion(String(archiveManifest.version)).equals(new PepVersion(expectedVersion));
+          } catch (e) {
+            if (!(e instanceof InvalidVersion)) throw e;
+            versionMatches = false;
+          }
+          if (!versionMatches) {
+            throw new ValidationError(
+              `Downloaded extension '${archiveManifest.id}' declares version ` +
+                `${archiveManifest.version}, expected ${expectedVersion}.`,
+            );
+          }
+        }
+      }
 
       return this.installFromDirectory(extensionDir, speckitVersion, {
         priority,
@@ -1318,10 +1671,22 @@ export class ExtensionManager {
     const extensionDir = join(this.extensionsDir, extensionId);
 
     if (pyTruthy(registeredCommands)) {
-      new CommandRegistrar().unregisterCommands(registeredCommands as Record<string, string[]>, this.projectRoot);
+      // Generic outputs are removed only while hash-owned (below).
+      const safeCommands = { ...(registeredCommands as Record<string, string[]>) };
+      delete safeCommands.generic;
+      if (Object.keys(safeCommands).length) {
+        new CommandRegistrar(this.projectRoot, { includeGeneric: false }).unregisterCommands(safeCommands, this.projectRoot);
+      }
     }
+    if (metadata) this.removeGenericArtifactPaths(extensionId, metadata);
 
-    this.unregisterExtensionSkills(registeredSkills, extensionId);
+    const genericHashesRaw = metadata ? get(metadata, 'generic_artifact_hashes', null) : null;
+    this.unregisterExtensionSkills(
+      registeredSkills,
+      extensionId,
+      undefined,
+      isMapping(genericHashesRaw) ? (genericHashesRaw as Record<string, string>) : null,
+    );
 
     if (keepConfig) {
       if (exists(extensionDir)) {
@@ -1363,26 +1728,36 @@ export class ExtensionManager {
     opts: { enabledOnly?: boolean; commandsOnly?: boolean } = {},
   ): void {
     if (!agentName) return;
-    const registrar = new CommandRegistrar();
+    const registrar = new CommandRegistrar(this.projectRoot);
     if (!has(registrar.AGENT_CONFIGS, agentName)) return;
     const agentSkillsDir = resolveConfiguredSkillsDir(this.projectRoot, agentName);
+    const isGeneric = agentName === 'generic';
 
     for (const [extId, metadata] of Object.entries(this.registry.list())) {
       if (opts.enabledOnly && !pyTruthy(get(metadata, 'enabled', true))) continue;
+      if (isGeneric) this.removeGenericArtifactPaths(extId, metadata, { skills: !opts.commandsOnly });
       const updates: Dict = {};
 
       const registeredCommands = get(metadata, 'registered_commands', {});
       if (isMapping(registeredCommands) && has(registeredCommands, agentName)) {
-        const commandNames = ExtensionManager.validNameList(registeredCommands[agentName]);
+        let commandNames = ExtensionManager.validNameList(registeredCommands[agentName]);
+        if (isGeneric) commandNames = this.genericOwnedNames(metadata, commandNames, { skills: false, extensionId: extId });
         if (commandNames.length) registrar.unregisterCommands({ [agentName]: commandNames }, this.projectRoot);
         const newRegistered = structuredClone(registeredCommands);
         delete newRegistered[agentName];
         updates.registered_commands = newRegistered;
       }
 
-      const registeredSkills = ExtensionManager.validNameList(get(metadata, 'registered_skills', []));
+      let registeredSkills = ExtensionManager.validNameList(get(metadata, 'registered_skills', []));
       if (registeredSkills.length && !opts.commandsOnly) {
-        this.unregisterExtensionSkills(registeredSkills, extId, agentSkillsDir);
+        const genericHashes = get(metadata, 'generic_artifact_hashes', null);
+        if (isGeneric) registeredSkills = this.genericOwnedNames(metadata, registeredSkills, { skills: true, extensionId: extId });
+        this.unregisterExtensionSkills(
+          registeredSkills,
+          extId,
+          agentSkillsDir,
+          isGeneric && isMapping(genericHashes) ? (genericHashes as Record<string, string>) : null,
+        );
         if (isDir(agentSkillsDir)) {
           const remaining = this.extensionOwnedSkillNames(registeredSkills, extId);
           if (!pyEquals(remaining, registeredSkills)) updates.registered_skills = remaining;
@@ -1445,7 +1820,7 @@ export class ExtensionManager {
   registerEnabledExtensionsForAgent(agentName: string, opts: { force?: boolean } = {}): void {
     if (!agentName) return;
     const force = opts.force ?? false;
-    const registrar = new CommandRegistrar();
+    const registrar = new CommandRegistrar(this.projectRoot);
     const agentConfig = (registrar.AGENT_CONFIGS as Record<string, Dict>)[agentName];
     let initOptions: Dict = loadInitOptions(this.projectRoot);
     if (!isMapping(initOptions)) initOptions = {};
@@ -1559,6 +1934,18 @@ export class ExtensionManager {
         }
 
         if (registered.length) this.retireLegacyFlatExtensionCommands(agentName, registered);
+        if (agentName === 'generic') {
+          const previous = get(metadata, 'generic_artifact_hashes', null);
+          const latestSkills = ExtensionManager.validNameList(
+            (updates.registered_skills as unknown) ?? get(metadata, 'registered_skills', []),
+          );
+          const hashes = this.genericArtifactHashes(
+            registered.length ? { generic: registered } : {},
+            agentName === activeAgent ? latestSkills : [],
+            isMapping(previous) ? (previous as Record<string, string>) : null,
+          );
+          if (!pyEquals(hashes, previous)) updates.generic_artifact_hashes = hashes;
+        }
         if (Object.keys(updates).length) this.registry.update(extId, updates);
       } catch (extErr) {
         printCliWarning('register extension artifacts for', 'extension', extId, extErr, {

@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import { BundlerError } from './index.js';
 import { satisfies } from './versioning.js';
 import { BundleManifest, ComponentRef } from './manifest.js';
+import { ExpandedManifest, ResolvedReference, formatChain } from './expansion.js';
 
 export class InstallPlan {
   bundle_id: string;
@@ -25,6 +26,7 @@ export class InstallPlan {
   effective_integration: string | null;
   components: ComponentRef[];
   warnings: string[];
+  references: ResolvedReference[];
 
   constructor(init: {
     bundle_id: string;
@@ -33,6 +35,7 @@ export class InstallPlan {
     effective_integration: string | null;
     components?: ComponentRef[];
     warnings?: string[];
+    references?: ResolvedReference[];
   }) {
     this.bundle_id = init.bundle_id;
     this.version = init.version;
@@ -40,6 +43,7 @@ export class InstallPlan {
     this.effective_integration = init.effective_integration;
     this.components = init.components ?? [];
     this.warnings = init.warnings ?? [];
+    this.references = init.references ?? [];
   }
 
   get componentCount(): number {
@@ -75,9 +79,23 @@ export interface ResolveInstallPlanOptions {
  * *integrationExplicit* signals that ``activeIntegration`` came from an
  * explicit ``--integration`` override rather than project auto-detection.
  */
-export function resolveInstallPlan(manifest: BundleManifest, opts: ResolveInstallPlanOptions): InstallPlan {
+export function resolveInstallPlan(
+  source: ExpandedManifest | BundleManifest,
+  opts: ResolveInstallPlanOptions,
+): InstallPlan {
   const { speckitVersion, integrationExplicit = false, enforceVersion = true } = opts;
   let activeIntegration = opts.activeIntegration;
+
+  let expanded: ExpandedManifest;
+  if (source instanceof BundleManifest) {
+    if (source.bundles.length) {
+      throw new BundlerError('Cannot resolve a bundle manifest with references before expansion.');
+    }
+    expanded = ExpandedManifest.flat(source);
+  } else {
+    expanded = source;
+  }
+  const manifest = expanded.root;
 
   const structural = manifest.structuralErrors();
   if (structural.length) {
@@ -125,20 +143,65 @@ export function resolveInstallPlan(manifest: BundleManifest, opts: ResolveInstal
   }
 
   const warnings: string[] = [];
-  if (manifest.requires.tools.length) {
-    warnings.push('Requires external tools: ' + manifest.requires.tools.join(', '));
+  let tools: string[];
+  let mcp: string[];
+  if (expanded.references.length) {
+    tools = [];
+    mcp = [];
+    const requirementsToMerge = [manifest.requires, ...expanded.references.map((r) => r.manifest.requires)];
+    for (const requirements of requirementsToMerge) {
+      for (const tool of requirements.tools) if (!tools.includes(tool)) tools.push(tool);
+      for (const server of requirements.mcp) if (!mcp.includes(server)) mcp.push(server);
+    }
+  } else {
+    // A flat bundle is deliberately byte-compatible with the pre-reference
+    // resolver: duplicate declarations remain visible in warning output.
+    tools = [...manifest.requires.tools];
+    mcp = [...manifest.requires.mcp];
   }
-  if (manifest.requires.mcp.length) {
-    warnings.push('Requires MCP servers: ' + manifest.requires.mcp.join(', '));
+  if (tools.length) warnings.push('Requires external tools: ' + tools.join(', '));
+  if (mcp.length) warnings.push('Requires MCP servers: ' + mcp.join(', '));
+
+  for (const reference of expanded.references) {
+    const referenceManifest = reference.manifest;
+    const chain = [manifest.bundle.id, ...reference.via, reference.id];
+    if (enforceVersion && referenceManifest.requires.speckit_version) {
+      if (!satisfies(speckitVersion, referenceManifest.requires.speckit_version)) {
+        throw new BundlerError(
+          `Bundle '${reference.id}' (${formatChain(chain)}) requires ` +
+            `Spec Kit ${referenceManifest.requires.speckit_version}, ` +
+            `but this project uses ${speckitVersion}. Update Spec Kit or ` +
+            'choose a compatible bundle.',
+        );
+      }
+    }
+    if (referenceManifest.integration !== null) {
+      const required = referenceManifest.integration.id;
+      if (effectiveIntegration === null) {
+        warnings.push(
+          `Bundle '${reference.id}' (${formatChain(chain)}) targets ` +
+            `integration '${required}'; the project's integration could ` +
+            'not be determined.',
+        );
+      } else if (required !== effectiveIntegration) {
+        warnings.push(
+          `Bundle '${reference.id}' (${formatChain(chain)}) targets ` +
+            `'${required}'; this install uses '${effectiveIntegration}'.`,
+        );
+      }
+    }
   }
+
+  warnings.push(...expanded.warnings);
 
   return new InstallPlan({
     bundle_id: manifest.bundle.id,
     version: manifest.bundle.version,
     role: manifest.bundle.role,
     effective_integration: effectiveIntegration,
-    components: [...manifest.components],
+    components: [...expanded.components],
     warnings,
+    references: [...expanded.references],
   });
 }
 

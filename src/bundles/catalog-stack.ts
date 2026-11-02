@@ -13,9 +13,39 @@
 
 import { BundlerError } from './index.js';
 import { CatalogEntry, CatalogSource, loadCatalogPayload, loadSourceStack, sortSources } from './catalogs.js';
+import { availableVersions, selectRelease } from './catalog-versions.js';
 
 /** A fetcher returns the raw JSON payload for a given source. */
 export type CatalogFetcher = (source: CatalogSource) => unknown | Promise<unknown>;
+
+/** A bundle ID is absent from every configured catalog. */
+export class BundleNotFoundError extends BundlerError {
+  override name = 'BundleNotFoundError';
+  constructor(bundleId: string) {
+    super(`Bundle '${bundleId}' was not found in any configured catalog.`);
+  }
+}
+
+/** A requested release is absent from the winning catalog entry. */
+export class ReleaseNotFoundError extends BundlerError {
+  override name = 'ReleaseNotFoundError';
+  readonly bundleId: string;
+  readonly version: string;
+  readonly sourceId: string;
+  readonly advertised: readonly string[];
+  constructor(init: { bundleId: string; version: string; sourceId: string; advertised: readonly string[] }) {
+    const offered = init.advertised.join(', ');
+    super(
+      `Bundle '${init.bundleId}' has no release ${init.version} in catalog source ` +
+        `'${init.sourceId}' (advertised: ${offered}). Only the ` +
+        'highest-precedence source that lists a bundle is consulted.',
+    );
+    this.bundleId = init.bundleId;
+    this.version = init.version;
+    this.sourceId = init.sourceId;
+    this.advertised = init.advertised;
+  }
+}
 
 export class ResolvedBundle {
   constructor(
@@ -68,15 +98,24 @@ export class CatalogStack {
   }
 
   /** Return the highest-precedence entry for *bundleId* or throw. */
-  async resolve(bundleId: string): Promise<ResolvedBundle> {
+  async resolve(bundleId: string, version: string | null = null): Promise<ResolvedBundle> {
     for (const source of this._sources) {
       const entries = await this.entriesFor(source);
       const entry = entries.get(bundleId);
       if (entry !== undefined) {
-        return new ResolvedBundle(entry.withProvenance(source), source);
+        const selected = selectRelease(entry, version);
+        if (selected === null) {
+          throw new ReleaseNotFoundError({
+            bundleId,
+            version: version as string,
+            sourceId: source.id,
+            advertised: availableVersions(entry),
+          });
+        }
+        return new ResolvedBundle(selected.withProvenance(source), source);
       }
     }
-    throw new BundlerError(`Bundle '${bundleId}' was not found in any configured catalog.`);
+    throw new BundleNotFoundError(bundleId);
   }
 
   /**

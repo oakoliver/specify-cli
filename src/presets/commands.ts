@@ -41,7 +41,10 @@ import { emitJson, emitJsonError, installedListItem } from '../installed-list-js
 import { URLError, githubProviderHosts, openUrl } from '../authentication/http.js';
 import { requireSpecifyProject, resolveSpecifyProjectRoot } from '../project.js';
 import { presetCatalogGroup } from './catalog/commands.js';
-import { PresetCatalog } from './catalog.js';
+import { PresetCatalog, PresetCatalogValidationError } from './catalog.js';
+import { availableVersions, selectRelease } from './catalog-versions.js';
+import { presetInfoItem } from '../installed-info-json.js';
+import { InvalidVersion, Version } from '../bundles/versioning.js';
 import { PresetManager, type UnmetExtensionDependency } from './manager.js';
 import {
   PresetCompatibilityError,
@@ -187,6 +190,8 @@ export interface PresetAddOptions {
   fromUrl?: string | null;
   dev?: string | null;
   priority?: number;
+  /** Install an exact version from a catalog. */
+  version?: string | null;
 }
 
 interface ResponseLike {
@@ -241,9 +246,14 @@ export async function presetAdd(opts: PresetAddOptions = {}): Promise<void> {
   let fromUrl = opts.fromUrl ?? null;
   const dev = opts.dev ?? null;
   const priority = opts.priority ?? 10;
+  const version = typeof opts.version === 'string' ? opts.version : null;
 
   const projectRoot = requireSpecifyProject();
   validatePriority(priority);
+  if (version !== null && (!version.trim() || dev !== null || fromUrl !== null || !presetId)) {
+    console.print('[red]Error:[/red] --version requires a catalog preset ID (without --dev or --from).');
+    throw new CliExit(1);
+  }
 
   const manager = new PresetManager(projectRoot);
   const speckitVersion = getSpeckitVersion();
@@ -341,24 +351,61 @@ export async function presetAdd(opts: PresetAddOptions = {}): Promise<void> {
       }
       console.print(INSTALLED_MSG(manifest, priority));
     } else if (presetId) {
-      const bundledPath = locateBundledPreset(presetId);
+      const bundledPath = version === null ? locateBundledPreset(presetId) : null;
       if (bundledPath) {
         console.print(`Installing bundled preset [cyan]${presetId}[/cyan]...`);
         manifest = manager.installFromDirectory(bundledPath, speckitVersion, priority);
         console.print(INSTALLED_MSG(manifest, priority));
       } else {
         const catalog = new PresetCatalog(projectRoot);
-        const packInfo = await catalog.getPackInfo(presetId);
+        let packInfo = await catalog.getPackInfo(presetId);
 
         if (!packInfo) {
           console.print(`[red]Error:[/red] Preset '${presetId}' not found in catalog`);
           throw new CliExit(1);
         }
 
+        if (version !== null) {
+          if (!pyTruthy('_install_allowed' in packInfo ? packInfo._install_allowed : true)) {
+            console.print(
+              `[red]Error:[/red] Preset '${escapeMarkup(presetId)}' is from a discovery-only catalog (install not allowed).`,
+            );
+            throw new CliExit(1);
+          }
+          const selected = selectRelease(packInfo, version);
+          if (selected === null) {
+            console.print(
+              `[red]Error:[/red] Preset '${escapeMarkup(presetId)}' ` +
+                `has no catalog release for version ${escapeMarkup(version)}.`,
+            );
+            throw new CliExit(1);
+          }
+          packInfo = selected;
+        }
+
+        // Bundled presets should have been caught above; if we reach here the
+        // bundled files are missing from the installation.
         if (pyTruthy(packInfo.bundled) && !pyTruthy(packInfo.download_url)) {
+          const packaged = locateBundledPreset(presetId);
+          if (version !== null && packaged) {
+            const packagedManifest = new PresetManifest(nodePath.join(packaged, 'preset.yml'));
+            let matches: boolean;
+            try {
+              matches = new Version(String(packagedManifest.version)).equals(new Version(String(packInfo.version)));
+            } catch (e) {
+              if (!(e instanceof InvalidVersion)) throw e;
+              matches = false;
+            }
+            if (packagedManifest.id === presetId && matches) {
+              manifest = manager.installFromDirectory(packaged, speckitVersion, priority);
+              console.print(INSTALLED_MSG(manifest, priority));
+              warnUnmetExtensionDependencies(manager, manifest);
+              return;
+            }
+          }
           console.print(
-            `[red]Error:[/red] Preset '${presetId}' is bundled with spec-kit ` +
-              `but could not be found in the installed package.`,
+            `[red]Error:[/red] Preset '${escapeMarkup(presetId)}' is bundled with spec-kit ` +
+              'but the requested version could not be found in the installed package.',
           );
           console.print('\nThis usually means the spec-kit installation is incomplete or corrupted.');
           console.print('Try reinstalling spec-kit:');
@@ -381,9 +428,10 @@ export async function presetAdd(opts: PresetAddOptions = {}): Promise<void> {
 
         let archivePath: string | null = null;
         try {
-          archivePath = await catalog.downloadPack(presetId);
+          archivePath = version !== null ? await catalog.downloadPackInfo(packInfo) : await catalog.downloadPack(presetId);
           manifest = manager.installFromZip(archivePath, speckitVersion, priority, {
             catalogName: (packInfo._catalog_name ?? null) as string | null,
+            ...(version !== null ? { expectedId: presetId, expectedVersion: String(packInfo.version) } : {}),
           });
           console.print(INSTALLED_MSG(manifest, priority));
         } finally {
@@ -722,9 +770,50 @@ export function presetResolve(templateName: string): void {
 // ============================================================================
 
 /** Show detailed information about a preset (``specify preset info``). */
-export async function presetInfo(presetId: string): Promise<void> {
+export async function presetInfo(
+  presetId: string,
+  opts: { versions?: boolean; json?: boolean } = {},
+): Promise<void> {
+  if (opts.json === true) {
+    if (opts.versions === true) emitJsonError(new Error('--json cannot be combined with --versions'), 2);
+    try {
+      const manager = new PresetManager(resolveSpecifyProjectRoot());
+      emitJson(presetInfoItem(manager.listInstalled() as unknown as Dict[], manager, presetId));
+      return;
+    } catch (error) {
+      if (error instanceof CliExit) throw error;
+      emitJsonError(error);
+    }
+  }
   const projectRoot = requireSpecifyProject();
   const safePresetId = escapeMarkup(presetId);
+  if (opts.versions === true) {
+    const catalog = new PresetCatalog(projectRoot);
+    let packInfo: Dict | null;
+    let available: string[];
+    try {
+      packInfo = await catalog.getPackInfo(presetId);
+      available = packInfo ? availableVersions(packInfo) : [];
+    } catch (exc) {
+      if (exc instanceof PresetError) {
+        console.print(`[red]Error:[/red] ${escapeMarkup(exc.message)}`);
+        throw new CliExit(1);
+      }
+      throw exc;
+    }
+    if (!available.length) {
+      console.print(`[red]Error:[/red] No catalog versions found for ${safePresetId}.`);
+      throw new CliExit(1);
+    }
+    console.print(`Catalog versions for ${safePresetId}:`);
+    available.forEach((item, index) => {
+      console.print(`  ${escapeMarkup(item)}${index === 0 ? ' (current)' : ''}`);
+    });
+    if (!pyTruthy('_install_allowed' in packInfo! ? packInfo!._install_allowed : true)) {
+      console.print('[yellow]Discovery only; catalog installation is disabled.[/yellow]');
+    }
+    return;
+  }
   const manager = new PresetManager(projectRoot);
   const localPack = manager.getPack(presetId);
 
@@ -763,6 +852,10 @@ export async function presetInfo(presetId: string): Promise<void> {
   try {
     packInfo = await catalog.getPackInfo(presetId);
   } catch (e) {
+    if (e instanceof PresetCatalogValidationError) {
+      console.print(`[red]Error:[/red] ${escapeMarkup(e.message)}`);
+      throw new CliExit(1);
+    }
     if (!(e instanceof PresetError)) throw e;
     packInfo = null;
   }
@@ -892,6 +985,7 @@ const ADD_SPEC: CommandSpec = {
       default: 10,
       help: 'Resolution priority (lower = higher precedence, default 10)',
     },
+    { name: 'version', flags: ['--version'], help: 'Install an exact version from a catalog' },
   ],
 };
 
@@ -938,6 +1032,10 @@ const INFO_SPEC: CommandSpec = {
   name: 'info',
   help: 'Show detailed information about a preset.',
   arguments: [{ name: 'preset_id', required: true, help: 'Preset ID to get info about' }],
+  options: [
+    { name: 'versions', flags: ['--versions'], type: 'boolean', help: 'List catalog versions' },
+    { name: 'json', flags: ['--json'], type: 'boolean', help: 'Output the installed preset as JSON' },
+  ],
 };
 
 const SET_PRIORITY_SPEC: CommandSpec = {
@@ -1001,6 +1099,32 @@ const listCommand: SubcommandDef = {
   },
 };
 
+/** ``specify preset info`` keeps parse failures on the JSON error contract when ``--json`` is given. */
+const infoCommand: SubcommandDef = {
+  name: 'info',
+  help: INFO_SPEC.help,
+  run: async (args, progName) => {
+    if (args.includes('--json') && !args.includes('--help')) {
+      try {
+        parseArgs(INFO_SPEC, args, progName);
+      } catch (e) {
+        if (e instanceof UsageError) {
+          return runHandled(() => {
+            emitJsonError(e, e.exitCode);
+          }, progName);
+        }
+        throw e;
+      }
+    }
+    return defineCommand(INFO_SPEC, (p) =>
+      presetInfo(argStr(p, 'preset_id') as string, {
+        versions: Boolean(p.options.versions),
+        json: Boolean(p.options.json),
+      }),
+    ).run(args, progName);
+  },
+};
+
 /** The ``specify preset`` Typer app. */
 export const presetGroup: GroupSpec = {
   name: 'preset',
@@ -1014,6 +1138,7 @@ export const presetGroup: GroupSpec = {
         fromUrl: optStr(p, 'from_url'),
         dev: optStr(p, 'dev'),
         priority: p.options.priority as number,
+        version: optStr(p, 'version'),
       }),
     ),
     defineCommand(REMOVE_SPEC, (p) => presetRemove(argStr(p, 'preset_id') as string)),
@@ -1029,7 +1154,7 @@ export const presetGroup: GroupSpec = {
       presetSearch({ query: argStr(p, 'query'), tag: optStr(p, 'tag'), author: optStr(p, 'author') }),
     ),
     defineCommand(RESOLVE_SPEC, (p) => presetResolve(argStr(p, 'template_name') as string)),
-    defineCommand(INFO_SPEC, (p) => presetInfo(argStr(p, 'preset_id') as string)),
+    infoCommand,
     defineCommand(SET_PRIORITY_SPEC, (p) =>
       presetSetPriority(argStr(p, 'preset_id') as string, p.args.priority as number),
     ),

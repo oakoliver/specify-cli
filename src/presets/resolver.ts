@@ -459,7 +459,7 @@ export class PresetResolver {
     if (resolved === null) return null;
     const resolvedStr = resolved;
 
-    if (resolvedStr.includes(this.overridesDir)) {
+    if (lexicallyUnder(resolved, this.overridesDir)) {
       return { path: resolvedStr, source: 'project override' };
     }
 

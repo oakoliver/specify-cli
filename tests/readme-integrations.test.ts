@@ -19,8 +19,8 @@ afterAll(() => rmSync(work, { recursive: true, force: true }));
 interface Row { key: string; dir: string; format: string }
 
 const rows: Row[] = [];
-for (const m of readFileSync(join(root, 'README.md'), 'utf8').matchAll(/^\| ([a-z0-9-]+) \| [^|]+ \| `([^`]+)` \| ([^|]+) \|$/gm)) {
-  rows.push({ key: m[1], dir: m[2], format: m[3].trim() });
+for (const m of readFileSync(join(root, 'README.md'), 'utf8').matchAll(/^\| ([a-z0-9-]+) \| [^|]+ \| (?:`([^`]+)`|—) \| ([^|]+) \|$/gm)) {
+  rows.push({ key: m[1], dir: m[2] ?? '', format: m[3].trim() });
 }
 
 function files(dir: string): string[] {
@@ -44,7 +44,20 @@ describe('README integration table', () => {
   });
 
   // generic needs --commands-dir, which the table documents instead of a directory.
-  for (const row of rows.filter((r) => r.key !== 'generic')) {
+  // none renders no command files: init must still succeed with shared scaffolding only.
+  for (const row of rows.filter((r) => r.dir === '')) {
+    test(`${row.key} installs only shared scaffolding`, () => {
+      const home = join(work, `home-${row.key}`);
+      const proc = Bun.spawnSync(
+        ['bun', cli, 'init', row.key, '--integration', row.key, '--non-interactive', '--ignore-agent-tools'],
+        { cwd: work, env: { ...process.env, HOME: home, NO_COLOR: '1' } },
+      );
+      expect(proc.exitCode).toBe(0);
+      expect(readdirSync(join(work, row.key)).sort()).toEqual(['.specify']);
+    }, 60_000);
+  }
+
+  for (const row of rows.filter((r) => r.key !== 'generic' && r.dir !== '')) {
     test(`${row.key} installs ${row.format} into ${row.dir}`, () => {
       const home = join(work, `home-${row.key}`);
       const proc = Bun.spawnSync(
